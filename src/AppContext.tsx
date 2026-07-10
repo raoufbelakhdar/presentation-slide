@@ -58,12 +58,16 @@ function getTimestamp() {
 }
 
 function cloneElement(element: SceneElement, overrides: Partial<SceneElement> = {}): SceneElement {
+  const keyframesSource = Object.prototype.hasOwnProperty.call(overrides, 'keyframes')
+    ? overrides.keyframes
+    : element.keyframes;
+
   return {
     ...element,
     ...overrides,
-    keyframes: element.keyframes
+    keyframes: keyframesSource
       ? Object.fromEntries(
-          Object.entries(element.keyframes).map(([step, keyframe]) => [Number(step), { ...keyframe }]),
+          Object.entries(keyframesSource).map(([step, keyframe]) => [Number(step), { ...keyframe }]),
         )
       : undefined,
   } as SceneElement;
@@ -572,12 +576,16 @@ function appReducer(state: AppState, action: Action): AppState {
       const scene = nextScenes[action.payload];
       if (!scene) return state;
 
+       const nextSequenceCount = (scene.sequenceCount || 1) + 1;
+
       nextScenes[action.payload] = {
         ...scene,
-        sequenceCount: (scene.sequenceCount || 1) + 1,
+        sequenceCount: nextSequenceCount,
       };
 
-      return applyProjectUpdate(state, { ...state.project, scenes: nextScenes });
+      return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
+        selectedSequenceStep: nextSequenceCount,
+      });
     }
     case 'DELETE_SEQUENCE': {
       const { sceneIndex, sequenceStep } = action.payload;

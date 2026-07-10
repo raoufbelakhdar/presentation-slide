@@ -2,8 +2,17 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TextElement, ImageElement, ShapeElement } from '../types';
+import { TextElement, ImageElement, ShapeElement, Scene } from '../types';
 import { getEffectiveElementState, getTextPadding, splitTextContent } from '../utils';
+
+function getSequenceConfig(scene: Scene, step: number) {
+  return scene.sequences?.find((sequence) => sequence.step === step) || {
+    step,
+    animationType: 'fade',
+    duration: 0.4,
+    delay: 0,
+  };
+}
 
 export function PresentationView() {
   const { state, dispatch } = useAppContext();
@@ -118,12 +127,16 @@ export function PresentationView() {
                 const effectiveElement = getEffectiveElementState(element, presentationRevealStep);
                 if (effectiveElement.hidden) return null;
 
-                const config = currentScene.sequences?.find(s => s.step === element.revealStep) || {
-                  step: element.revealStep,
-                  animationType: 'fade',
-                  duration: 0.4,
-                  delay: 0,
-                };
+                const hasCurrentStepKeyframe = Boolean(
+                  element.keyframes?.[presentationRevealStep] &&
+                  element.revealStep < presentationRevealStep,
+                );
+                const isCurrentStep = element.revealStep === presentationRevealStep;
+                const animatesThisStep = isCurrentStep || hasCurrentStepKeyframe;
+                const config = getSequenceConfig(
+                  currentScene,
+                  animatesThisStep ? presentationRevealStep : element.revealStep,
+                );
                 
                 let initial: any = { opacity: 0 };
                 let animate: any = { 
@@ -147,10 +160,6 @@ export function PresentationView() {
                   initial = { opacity: 1 };
                 }
 
-                // If element was revealed in a previous step, do not animate it again
-                // Only animate elements that are revealed in the current presentation step
-                const isCurrentStep = element.revealStep === presentationRevealStep;
-                
                 if (isCurrentStep) {
                   initial = { 
                     ...initial, 
@@ -169,8 +178,8 @@ export function PresentationView() {
                     animate={animate}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ 
-                      duration: isCurrentStep ? config.duration : 0.6, 
-                      delay: isCurrentStep ? config.delay : 0, 
+                      duration: animatesThisStep ? config.duration : 0.6, 
+                      delay: animatesThisStep ? config.delay : 0, 
                       ease: [0.16, 1, 0.3, 1] // Custom spring-like easing
                     }}
                     className="absolute"

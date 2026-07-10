@@ -32,7 +32,7 @@ export function Canvas() {
 
   if (!activeScene) return null;
 
-  const currentStep = selectedSequenceStep !== null ? selectedSequenceStep : 1;
+  const currentStep = selectedSequenceStep !== null ? selectedSequenceStep : 0;
 
   return (
     <div 
@@ -61,11 +61,21 @@ export function Canvas() {
             if (effectiveElement.hidden) return null;
 
             return (
-              <CanvasElement key={element.id} element={effectiveElement} isSelected={element.id === selectedElementId} scale={scale} />
+              <CanvasElement
+                key={`${element.id}-${currentStep}`}
+                element={effectiveElement}
+                isSelected={element.id === selectedElementId}
+                scale={scale}
+              />
             );
           } else {
             return (
-              <CanvasElement key={element.id} element={element} isSelected={element.id === selectedElementId} scale={scale} />
+              <CanvasElement
+                key={`${element.id}-${currentStep}`}
+                element={element}
+                isSelected={element.id === selectedElementId}
+                scale={scale}
+              />
             );
           }
         })}
@@ -77,17 +87,52 @@ export function Canvas() {
 function CanvasElement({ element, isSelected, scale }: { element: any, isSelected: boolean, scale: number, key?: React.Key }) {
   const { state, dispatch } = useAppContext();
   const [isEditingText, setIsEditingText] = useState(false);
+  const [frame, setFrame] = useState({
+    x: element.x,
+    y: element.y,
+    width: element.width,
+    height: element.height,
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textParts = element.type === 'text' ? splitTextContent(element.text) : null;
   const subtitleLines = textParts?.subtitle ? textParts.subtitle.split('\n').filter(Boolean) : [];
   const subtitleFontSize = element.type === 'text' ? (element.subtitleFontSize || element.fontSize * 0.6) : 0;
   const textPadding = element.type === 'text' ? getTextPadding(element) : 0;
 
+  useEffect(() => {
+    setFrame({
+      x: element.x,
+      y: element.y,
+      width: element.width,
+      height: element.height,
+    });
+  }, [element.id, element.x, element.y, element.width, element.height]);
+
+  const handleDrag = (e: any, d: any) => {
+    setFrame((current) => ({ ...current, x: d.x, y: d.y }));
+  };
+
   const handleDragStop = (e: any, d: any) => {
+    setFrame((current) => ({ ...current, x: d.x, y: d.y }));
     dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { x: d.x, y: d.y } } });
   };
 
+  const handleResize = (e: any, direction: any, ref: any, delta: any, position: any) => {
+    setFrame({
+      width: ref.offsetWidth,
+      height: ref.offsetHeight,
+      x: position.x,
+      y: position.y,
+    });
+  };
+
   const handleResizeStop = (e: any, direction: any, ref: any, delta: any, position: any) => {
+    setFrame({
+      width: ref.offsetWidth,
+      height: ref.offsetHeight,
+      x: position.x,
+      y: position.y,
+    });
     dispatch({ 
       type: 'UPDATE_ELEMENT', 
       payload: { 
@@ -119,9 +164,11 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
 
   return (
     <Rnd
-      size={{ width: element.width, height: element.height }}
-      position={{ x: element.x, y: element.y }}
+      size={{ width: frame.width, height: frame.height }}
+      position={{ x: frame.x, y: frame.y }}
+      onDrag={handleDrag}
       onDragStop={handleDragStop}
+      onResize={handleResize}
       onResizeStop={handleResizeStop}
       onDragStart={selectElement}
       onResizeStart={selectElement}
