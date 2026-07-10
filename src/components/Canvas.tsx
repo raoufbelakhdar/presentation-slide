@@ -94,32 +94,43 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
     width: element.width,
     height: element.height,
   });
+  const frameRef = useRef(frame);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textParts = element.type === 'text' ? splitTextContent(element.text) : null;
   const subtitleLines = textParts?.subtitle ? textParts.subtitle.split('\n').filter(Boolean) : [];
   const subtitleFontSize = element.type === 'text' ? (element.subtitleFontSize || element.fontSize * 0.6) : 0;
   const textPadding = element.type === 'text' ? getTextPadding(element) : 0;
 
+  const syncFrame = (nextFrame: typeof frame | ((current: typeof frame) => typeof frame)) => {
+    setFrame((current) => {
+      const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(current) : nextFrame;
+      frameRef.current = resolvedFrame;
+      return resolvedFrame;
+    });
+  };
+
   useEffect(() => {
-    setFrame({
+    const nextFrame = {
       x: element.x,
       y: element.y,
       width: element.width,
       height: element.height,
-    });
+    };
+    frameRef.current = nextFrame;
+    setFrame(nextFrame);
   }, [element.id, element.x, element.y, element.width, element.height]);
 
   const handleDrag = (e: any, d: any) => {
-    setFrame((current) => ({ ...current, x: d.x, y: d.y }));
+    syncFrame((current) => ({ ...current, x: d.x, y: d.y }));
   };
 
-  const handleDragStop = (e: any, d: any) => {
-    setFrame((current) => ({ ...current, x: d.x, y: d.y }));
-    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { x: d.x, y: d.y } } });
+  const handleDragStop = () => {
+    const { x, y } = frameRef.current;
+    dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { x, y } } });
   };
 
   const handleResize = (e: any, direction: any, ref: any, delta: any, position: any) => {
-    setFrame({
+    syncFrame({
       width: ref.offsetWidth,
       height: ref.offsetHeight,
       x: position.x,
@@ -127,21 +138,17 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
     });
   };
 
-  const handleResizeStop = (e: any, direction: any, ref: any, delta: any, position: any) => {
-    setFrame({
-      width: ref.offsetWidth,
-      height: ref.offsetHeight,
-      x: position.x,
-      y: position.y,
-    });
+  const handleResizeStop = () => {
+    const { x, y, width, height } = frameRef.current;
     dispatch({ 
       type: 'UPDATE_ELEMENT', 
       payload: { 
         id: element.id, 
         updates: { 
-          width: ref.offsetWidth, 
-          height: ref.offsetHeight,
-          ...position
+          width,
+          height,
+          x,
+          y,
         } 
       } 
     });
