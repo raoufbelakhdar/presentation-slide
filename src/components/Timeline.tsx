@@ -1,17 +1,13 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
-import { generateId } from '../utils';
-import { Scene, SceneElement } from '../types';
+import { generateId, getSceneSequenceCount } from '../utils';
+import { SceneElement } from '../types';
 
 function getElementTone(element: SceneElement) {
   if (element.type === 'text') return 'bg-sky-400';
   if (element.type === 'image') return 'bg-amber-400';
   return element.shapeType === 'yes' ? 'bg-emerald-400' : 'bg-rose-400';
-}
-
-function getSceneSequenceCount(scene: Scene) {
-  return Math.max(scene.sequenceCount || 1, ...scene.elements.map(element => element.revealStep), 1);
 }
 
 export function Timeline() {

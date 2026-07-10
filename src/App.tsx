@@ -9,6 +9,7 @@ import { Toolbar } from './components/Toolbar';
 import { LeftSidebar } from './components/LeftSidebar';
 import { RightSidebar } from './components/RightSidebar';
 import { Canvas } from './components/Canvas';
+import { SceneSequenceTimeline } from './components/SceneSequenceTimeline';
 import { Timeline } from './components/Timeline';
 import { PresentationView } from './components/PresentationView';
 import { ProjectsPage } from './components/ProjectsPage';
@@ -31,6 +32,7 @@ function AppContent() {
         <LeftSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <Canvas />
+          <SceneSequenceTimeline />
           <Timeline />
         </div>
         <RightSidebar />

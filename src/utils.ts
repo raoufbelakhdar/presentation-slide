@@ -27,6 +27,10 @@ export function getTextPadding(element: Pick<TextElement, 'padding'>) {
   return Math.max(8, Math.round(element.padding || 24));
 }
 
+export function getSceneSequenceCount(scene: Scene) {
+  return Math.max(scene.sequenceCount || 1, ...scene.elements.map((element) => element.revealStep), 1);
+}
+
 function escapeXml(value: string): string {
   return value
     .replaceAll('&', '&amp;')
