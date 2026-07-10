@@ -46,7 +46,7 @@ type Action =
   | { type: 'DUPLICATE_ELEMENT'; payload: string }
   | { type: 'SET_PRESENTATION_SCENE'; payload: number }
   | { type: 'SET_PRESENTATION_STEP'; payload: number }
-  | { type: 'ADD_SEQUENCE'; payload: number }
+  | { type: 'ADD_SEQUENCE'; payload: { sceneIndex: number; position?: 'start' | 'end' } }
   | { type: 'DELETE_SEQUENCE'; payload: { sceneIndex: number; sequenceStep: number } }
   | { type: 'SELECT_SEQUENCE'; payload: number | null }
   | { type: 'UPDATE_SEQUENCE_CONFIG'; payload: { sceneIndex: number; step: number; config: Partial<import('./types').SequenceConfig> } }
@@ -591,12 +591,45 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, presentationRevealStep: action.payload };
     case 'ADD_SEQUENCE': {
       const nextScenes = [...state.project.scenes];
-      const scene = nextScenes[action.payload];
+      const { sceneIndex, position = 'end' } = action.payload;
+      const scene = nextScenes[sceneIndex];
       if (!scene) return state;
 
-       const nextSequenceCount = (scene.sequenceCount || 1) + 1;
+      const nextSequenceCount = (scene.sequenceCount || 1) + 1;
 
-      nextScenes[action.payload] = {
+      if (position === 'start') {
+        const nextElements = scene.elements.map((element) => {
+          const shiftedKeyframes = element.keyframes
+            ? Object.fromEntries(
+                Object.entries(element.keyframes).map(([step, keyframe]) => [Number(step) + 1, { ...keyframe }]),
+              )
+            : undefined;
+
+          return cloneElement(element, {
+            revealStep: element.revealStep + 1,
+            hideStep: element.hideStep != null ? element.hideStep + 1 : element.hideStep,
+            keyframes: shiftedKeyframes,
+          });
+        });
+
+        const nextSequences = (scene.sequences || []).map((sequence) => ({
+          ...sequence,
+          step: sequence.step + 1,
+        }));
+
+        nextScenes[sceneIndex] = {
+          ...scene,
+          sequenceCount: nextSequenceCount,
+          elements: nextElements,
+          sequences: nextSequences,
+        };
+
+        return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
+          selectedSequenceStep: 1,
+        });
+      }
+
+      nextScenes[sceneIndex] = {
         ...scene,
         sequenceCount: nextSequenceCount,
       };

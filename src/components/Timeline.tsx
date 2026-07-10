@@ -61,11 +61,11 @@ export function Timeline({ collapsed, onToggleCollapse }: TimelineProps) {
     dispatch({ type: 'SELECT_SEQUENCE', payload: step });
   };
 
-  const addSceneSequence = (sceneIndex: number) => {
+  const addSceneSequence = (sceneIndex: number, position: 'start' | 'end') => {
     if (sceneIndex !== activeSceneIndex) {
       dispatch({ type: 'SET_ACTIVE_SCENE', payload: sceneIndex });
     }
-    dispatch({ type: 'ADD_SEQUENCE', payload: sceneIndex });
+    dispatch({ type: 'ADD_SEQUENCE', payload: { sceneIndex, position } });
   };
 
   const deleteSceneSequence = (sceneIndex: number, step: number) => {
@@ -247,16 +247,31 @@ export function Timeline({ collapsed, onToggleCollapse }: TimelineProps) {
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
-                          addSceneSequence(index);
+                          addSceneSequence(index, 'start');
                         }}
-                        className={`flex min-w-[34px] shrink-0 items-center justify-center rounded-md border border-dashed px-2 py-1.5 transition-colors ${
+                        className={`flex min-w-[52px] shrink-0 items-center justify-center rounded-md border border-dashed px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors ${
                           isActive
                             ? 'border-[#4f46e5]/40 bg-indigo-50 text-[#4f46e5] hover:border-[#4f46e5]'
                             : 'border-[#cbd5e1] bg-slate-50 text-slate-400 hover:border-slate-400'
                         }`}
-                        title="Add Sequence"
+                        title="Add Sequence At Start"
                       >
-                        <Plus className="h-3 w-3" />
+                        Start
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          addSceneSequence(index, 'end');
+                        }}
+                        className={`flex min-w-[48px] shrink-0 items-center justify-center rounded-md border border-dashed px-2 py-1 text-[9px] font-bold uppercase tracking-wider transition-colors ${
+                          isActive
+                            ? 'border-[#4f46e5]/40 bg-indigo-50 text-[#4f46e5] hover:border-[#4f46e5]'
+                            : 'border-[#cbd5e1] bg-slate-50 text-slate-400 hover:border-slate-400'
+                        }`}
+                        title="Add Sequence At End"
+                      >
+                        End
                       </button>
                     </div>
                   </div>

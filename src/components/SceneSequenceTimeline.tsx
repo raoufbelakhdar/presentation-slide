@@ -72,13 +72,25 @@ export function SceneSequenceTimeline({ collapsed, onToggleCollapse }: SceneSequ
 
           <button
             type="button"
-            onClick={() => dispatch({ type: 'ADD_SEQUENCE', payload: activeSceneIndex })}
+            onClick={() => dispatch({ type: 'ADD_SEQUENCE', payload: { sceneIndex: activeSceneIndex, position: 'start' } })}
             className="rounded-md border border-[#c7d2fe] bg-indigo-50 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-100"
-            title="Add Sequence"
+            title="Add Sequence At Start"
           >
             <span className="flex items-center gap-1.5">
               <Plus className="h-3 w-3" />
-              Add
+              Add Start
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'ADD_SEQUENCE', payload: { sceneIndex: activeSceneIndex, position: 'end' } })}
+            className="rounded-md border border-[#c7d2fe] bg-indigo-50 px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-100"
+            title="Add Sequence At End"
+          >
+            <span className="flex items-center gap-1.5">
+              <Plus className="h-3 w-3" />
+              Add End
             </span>
           </button>
 
