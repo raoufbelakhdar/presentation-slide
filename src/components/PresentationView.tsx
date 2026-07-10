@@ -81,6 +81,8 @@ export function PresentationView() {
 
   if (!currentScene) return null;
 
+  const orderedElements = [...currentScene.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+
   return (
     <div
       className="fixed inset-0 z-50 flex flex-col overflow-hidden text-white"
@@ -120,7 +122,7 @@ export function PresentationView() {
           }}
         >
           <AnimatePresence>
-            {currentScene.elements
+            {orderedElements
               .map(element => {
                 if (element.revealStep > presentationRevealStep) return null;
 
@@ -183,6 +185,7 @@ export function PresentationView() {
                       ease: [0.16, 1, 0.3, 1] // Custom spring-like easing
                     }}
                     className="absolute"
+                    style={{ zIndex: effectiveElement.zIndex ?? 0 }}
                   >
                   {effectiveElement.type === 'text' && (
                     <div 

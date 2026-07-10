@@ -61,10 +61,14 @@ function cloneElement(element: SceneElement, overrides: Partial<SceneElement> = 
   const keyframesSource = Object.prototype.hasOwnProperty.call(overrides, 'keyframes')
     ? overrides.keyframes
     : element.keyframes;
+  const zIndex = Object.prototype.hasOwnProperty.call(overrides, 'zIndex')
+    ? overrides.zIndex
+    : element.zIndex;
 
   return {
     ...element,
     ...overrides,
+    zIndex: zIndex ?? 0,
     keyframes: keyframesSource
       ? Object.fromEntries(
           Object.entries(keyframesSource).map(([step, keyframe]) => [Number(step), { ...keyframe }]),
@@ -86,10 +90,20 @@ function normalizeScene(scene: Partial<Scene> | null | undefined, index = 0): Sc
   return {
     id: scene?.id || generateId(),
     name: scene?.name || `Scene ${index + 1}`,
-    elements: Array.isArray(scene?.elements) ? scene.elements.map((element) => cloneElement(element as SceneElement)) : [],
+    elements: Array.isArray(scene?.elements)
+      ? scene.elements.map((element, elementIndex) =>
+          cloneElement(element as SceneElement, {
+            zIndex: (element as SceneElement).zIndex ?? elementIndex,
+          }),
+        )
+      : [],
     sequenceCount: scene?.sequenceCount,
     sequences: Array.isArray(scene?.sequences) ? scene.sequences.map((sequence) => ({ ...sequence })) : undefined,
   };
+}
+
+function getNextElementZIndex(elements: SceneElement[]) {
+  return elements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1) + 1;
 }
 
 function createDefaultScene(name = 'Scene 1'): Scene {
@@ -492,7 +506,10 @@ function appReducer(state: AppState, action: Action): AppState {
       return { ...state, selectedSequenceStep: action.payload };
     case 'ADD_ELEMENT': {
       const activeScene = state.project.scenes[state.activeSceneIndex];
-      const nextScene = { ...activeScene, elements: [...activeScene.elements, cloneElement(action.payload)] };
+      const nextScene = {
+        ...activeScene,
+        elements: [...activeScene.elements, cloneElement(action.payload, { zIndex: getNextElementZIndex(activeScene.elements) })],
+      };
       const nextScenes = [...state.project.scenes];
       nextScenes[state.activeSceneIndex] = nextScene;
 
@@ -556,6 +573,7 @@ function appReducer(state: AppState, action: Action): AppState {
         id: generateId(),
         x: elementToDuplicate.x + 20,
         y: elementToDuplicate.y + 20,
+        zIndex: getNextElementZIndex(activeScene.elements),
       });
       const nextScenes = [...state.project.scenes];
       nextScenes[state.activeSceneIndex] = {

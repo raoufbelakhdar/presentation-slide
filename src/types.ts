@@ -24,6 +24,7 @@ export interface BaseElement {
   y: number;
   width: number;
   height: number;
+  zIndex?: number;
   revealStep: number;
   hideStep?: number | null;
   keyframes?: Record<number, ElementKeyframe>;

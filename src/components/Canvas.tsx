@@ -33,6 +33,7 @@ export function Canvas() {
   if (!activeScene) return null;
 
   const currentStep = selectedSequenceStep !== null ? selectedSequenceStep : 0;
+  const orderedElements = [...activeScene.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
 
   return (
     <div 
@@ -53,7 +54,7 @@ export function Canvas() {
         onClick={() => dispatch({ type: 'SELECT_ELEMENT', payload: null })}
       >
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[12px] border-transparent outline outline-1 outline-slate-200 outline-offset-[-12px]"></div>
-        {activeScene.elements.map(element => {
+        {orderedElements.map(element => {
           if (selectedSequenceStep !== null) {
             if (element.revealStep > selectedSequenceStep) return null;
             
@@ -176,7 +177,7 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
       bounds="parent"
       scale={scale}
       className={`absolute z-10`}
-      style={{ zIndex: isSelected ? 50 : 10 }}
+      style={{ zIndex: (element.zIndex ?? 0) + (isSelected ? 10000 : 0) }}
       dragHandleClassName="drag-handle"
     >
       <div 

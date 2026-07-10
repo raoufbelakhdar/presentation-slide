@@ -140,6 +140,9 @@ export function RightSidebar() {
   const imageElement = selectedElement.type === 'image' ? (selectedElement as import('../types').ImageElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
+  const otherElements = activeScene.elements.filter((element) => element.id !== selectedElement.id);
+  const maxOtherZIndex = otherElements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1);
+  const minOtherZIndex = otherElements.reduce((minZIndex, element) => Math.min(minZIndex, element.zIndex ?? 0), 0);
 
   return (
     <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
@@ -361,6 +364,26 @@ export function RightSidebar() {
           <div className="flex items-center justify-between mb-2">
              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Position</span>
              <span className="text-[10px] font-mono text-[#4f46e5]">X: {Math.round(selectedElement.x)} | Y: {Math.round(selectedElement.y)}</span>
+          </div>
+          <div className="mb-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Layer Order</span>
+              <span className="text-[10px] font-mono text-[#4f46e5]">Z: {selectedElement.zIndex ?? 0}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
+                className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-50"
+              >
+                Send Back
+              </button>
+              <button
+                onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
+                className="rounded-sm border border-[#c7d2fe] bg-indigo-50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-100"
+              >
+                Bring Front
+              </button>
+            </div>
           </div>
           <button 
             onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
