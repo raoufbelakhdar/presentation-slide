@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, GripVertical, Plus, Trash2 } from 'lucide-react';
 import { generateId, getSceneSequenceCount } from '../utils';
 import { SceneElement } from '../types';
 
@@ -10,7 +10,12 @@ function getElementTone(element: SceneElement) {
   return element.shapeType === 'yes' ? 'bg-emerald-400' : 'bg-rose-400';
 }
 
-export function Timeline() {
+interface TimelineProps {
+  collapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export function Timeline({ collapsed, onToggleCollapse }: TimelineProps) {
   const { state, dispatch } = useAppContext();
   const { project, activeSceneIndex, selectedSequenceStep } = state;
   const activeScene = project.scenes[activeSceneIndex];
@@ -95,15 +100,32 @@ export function Timeline() {
   };
 
   return (
-    <div className="h-72 bg-white border-t border-[#e2e8f0] flex flex-col shrink-0 overflow-hidden">
-      <div className="h-8 border-b border-[#f1f5f9] flex items-center justify-between px-4 bg-[#f8fafc] shrink-0">
-        <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-widest">Scenes Timeline</div>
-        <div className="text-[10px] font-bold text-[#4f46e5] uppercase">
-          {project.scenes.length} Scenes
+    <div className={`bg-white border-t border-[#e2e8f0] flex flex-col shrink-0 overflow-hidden ${collapsed ? '' : 'h-56'}`}>
+      <div className="min-h-10 border-b border-[#f1f5f9] flex items-center justify-between px-4 py-2 bg-[#f8fafc] shrink-0">
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold text-[#64748b] uppercase tracking-widest">Scenes Timeline</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <span className="text-xs font-semibold text-[#0f172a]">Project scenes</span>
+            <span className="text-[10px] font-bold text-[#4f46e5] uppercase">
+              {project.scenes.length} Scenes
+            </span>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="rounded-md border border-[#dbe4f0] bg-white px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+          title={collapsed ? 'Show scenes timeline' : 'Hide scenes timeline'}
+        >
+          <span className="flex items-center gap-1.5">
+            <ChevronDown className={`h-3 w-3 transition-transform ${collapsed ? 'rotate-180' : ''}`} />
+            {collapsed ? 'Show' : 'Hide'}
+          </span>
+        </button>
       </div>
 
-      <div className="flex-1 px-4 py-3 bg-white overflow-x-auto overflow-y-hidden">
+      {!collapsed && (
+      <div className="flex-1 px-4 py-2 bg-white overflow-x-auto overflow-y-hidden">
         <div className="flex h-full gap-3 pb-1">
           {project.scenes.map((scene, index) => {
             const sequenceCount = getSceneSequenceCount(scene);
@@ -151,13 +173,13 @@ export function Timeline() {
                     setDraggingSceneIndex(null);
                     setSceneDropIndex(null);
                   }}
-                  className={`w-52 rounded-xl border p-3 text-left transition-all ${
+                  className={`w-44 rounded-xl border p-2.5 text-left transition-all ${
                     isActive
                       ? 'border-[#4f46e5] bg-indigo-50 shadow-[0_10px_25px_rgba(79,70,229,0.12)]'
                       : 'border-[#e2e8f0] bg-white hover:border-[#4f46e5]'
                   } ${isDragging ? 'opacity-60' : ''}`}
                 >
-                  <div className="mb-3 flex items-start justify-between gap-2">
+                  <div className="mb-2 flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className={`text-[10px] font-bold uppercase tracking-[0.22em] ${isActive ? 'text-[#4f46e5]' : 'text-slate-400'}`}>
                         Scene {String(index + 1).padStart(2, '0')}
@@ -167,10 +189,10 @@ export function Timeline() {
                     <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
                   </div>
 
-                  <div className="mb-3 rounded-lg border border-[#e2e8f0] bg-white/80 p-2">
-                    <div className="mb-2 flex items-center justify-between">
+                  <div className="mb-2 rounded-lg border border-[#e2e8f0] bg-white/80 p-2">
+                    <div className="mb-1.5 flex items-center justify-between">
                       <span className="text-[9px] font-bold uppercase tracking-[0.22em] text-slate-400">
-                        Scene Sequence Flow
+                        Sequence Flow
                       </span>
                       <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-300">
                         {sequenceCount} steps
@@ -189,7 +211,7 @@ export function Timeline() {
                                 event.stopPropagation();
                                 selectSceneSequence(index, step);
                               }}
-                              className={`flex min-w-[44px] shrink-0 flex-col items-center rounded-md border px-2 py-1 pr-5 transition-all ${
+                              className={`flex min-w-[40px] shrink-0 flex-col items-center rounded-md border px-2 py-1 pr-4 transition-all ${
                                 isSelectedStep
                                   ? 'border-[#4f46e5] bg-indigo-50 text-[#4f46e5]'
                                   : isActive
@@ -208,7 +230,7 @@ export function Timeline() {
                                   event.stopPropagation();
                                   deleteSceneSequence(index, step);
                                 }}
-                                className={`absolute right-1 top-1 rounded-sm p-0.5 transition-colors ${
+                                className={`absolute right-0.5 top-0.5 rounded-sm p-0.5 transition-colors ${
                                   isSelectedStep
                                     ? 'text-indigo-400 hover:bg-white/80 hover:text-rose-500'
                                     : 'text-slate-300 hover:bg-white hover:text-rose-500'
@@ -227,7 +249,7 @@ export function Timeline() {
                           event.stopPropagation();
                           addSceneSequence(index);
                         }}
-                        className={`flex min-w-[38px] shrink-0 items-center justify-center rounded-md border border-dashed px-2 py-2 transition-colors ${
+                        className={`flex min-w-[34px] shrink-0 items-center justify-center rounded-md border border-dashed px-2 py-1.5 transition-colors ${
                           isActive
                             ? 'border-[#4f46e5]/40 bg-indigo-50 text-[#4f46e5] hover:border-[#4f46e5]'
                             : 'border-[#cbd5e1] bg-slate-50 text-slate-400 hover:border-slate-400'
@@ -239,7 +261,7 @@ export function Timeline() {
                     </div>
                   </div>
 
-                  <div className="mb-3 h-16 rounded-lg border border-dashed border-[#dbe4f0] bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_100%)] p-3">
+                  <div className="mb-2 h-12 rounded-lg border border-dashed border-[#dbe4f0] bg-[linear-gradient(135deg,#f8fafc_0%,#eef2ff_100%)] p-2.5">
                     <div className="flex h-full items-end gap-1.5">
                       {scene.elements.length === 0 ? (
                         <div className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Empty Scene</div>
@@ -248,7 +270,7 @@ export function Timeline() {
                           <div
                             key={element.id}
                             className={`w-4 rounded-t-md ${getElementTone(element)}`}
-                            style={{ height: `${28 + (element.revealStep - 1) * 6}px` }}
+                            style={{ height: `${18 + (element.revealStep - 1) * 5}px` }}
                             title={`${element.type} • step ${element.revealStep}`}
                           />
                         ))
@@ -261,7 +283,7 @@ export function Timeline() {
                     <span>{selectedStepInCard ? `Step ${selectedStepInCard} selected` : `${sequenceCount} steps`}</span>
                   </div>
 
-                  <div className="mt-3 flex items-center gap-2">
+                  <div className="mt-2 flex items-center gap-2">
                     {isActive && selectedSequenceStep !== null && sequenceCount > 1 && (
                       <button
                         type="button"
@@ -269,7 +291,7 @@ export function Timeline() {
                           event.stopPropagation();
                           deleteSceneSequence(index, selectedSequenceStep);
                         }}
-                        className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-rose-600 transition-colors hover:bg-rose-100"
+                        className="rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-rose-600 transition-colors hover:bg-rose-100"
                         title="Delete Selected Sequence"
                       >
                         Delete S{selectedSequenceStep}
@@ -283,7 +305,7 @@ export function Timeline() {
                           moveScene(index, index - 1);
                         }}
                         disabled={index === 0}
-                        className="rounded-md border border-[#e2e8f0] bg-white p-1.5 text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-md border border-[#e2e8f0] bg-white p-1 text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-40"
                         title="Move Scene Left"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
@@ -295,7 +317,7 @@ export function Timeline() {
                           moveScene(index, index + 1);
                         }}
                         disabled={index === project.scenes.length - 1}
-                        className="rounded-md border border-[#e2e8f0] bg-white p-1.5 text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-40"
+                        className="rounded-md border border-[#e2e8f0] bg-white p-1 text-slate-400 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-40"
                         title="Move Scene Right"
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -307,7 +329,7 @@ export function Timeline() {
                         event.stopPropagation();
                         duplicateScene(index);
                       }}
-                      className="flex-1 rounded-md border border-[#e2e8f0] bg-white px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                      className="flex-1 rounded-md border border-[#e2e8f0] bg-white px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
                       title="Duplicate Scene"
                     >
                       <span className="flex items-center justify-center gap-1.5">
@@ -322,7 +344,7 @@ export function Timeline() {
                         deleteScene(index);
                       }}
                       disabled={project.scenes.length <= 1}
-                      className="rounded-md border border-[#e2e8f0] bg-white p-1.5 text-slate-400 transition-colors hover:border-rose-300 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="rounded-md border border-[#e2e8f0] bg-white p-1 text-slate-400 transition-colors hover:border-rose-300 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-40"
                       title="Delete Scene"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -346,13 +368,14 @@ export function Timeline() {
               event.preventDefault();
               commitSceneReorder(project.scenes.length);
             }}
-            className="flex h-full w-44 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-5 text-center transition-colors hover:border-[#4f46e5] hover:bg-indigo-50"
+            className="flex h-full w-40 shrink-0 flex-col items-center justify-center rounded-xl border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-4 text-center transition-colors hover:border-[#4f46e5] hover:bg-indigo-50"
           >
             <Plus className="mb-2 h-5 w-5 text-slate-400" />
             <span className="text-[10px] font-bold uppercase tracking-[0.24em] text-slate-400">Add Scene</span>
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AppProvider, useAppContext } from './AppContext';
 import { Toolbar } from './components/Toolbar';
 import { LeftSidebar } from './components/LeftSidebar';
@@ -16,6 +16,8 @@ import { ProjectsPage } from './components/ProjectsPage';
 
 function AppContent() {
   const { state } = useAppContext();
+  const [isSequenceTimelineCollapsed, setIsSequenceTimelineCollapsed] = useState(false);
+  const [isScenesTimelineCollapsed, setIsScenesTimelineCollapsed] = useState(false);
 
   if (state.mode === 'presentation') {
     return <PresentationView />;
@@ -32,8 +34,14 @@ function AppContent() {
         <LeftSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <Canvas />
-          <SceneSequenceTimeline />
-          <Timeline />
+          <SceneSequenceTimeline
+            collapsed={isSequenceTimelineCollapsed}
+            onToggleCollapse={() => setIsSequenceTimelineCollapsed((value) => !value)}
+          />
+          <Timeline
+            collapsed={isScenesTimelineCollapsed}
+            onToggleCollapse={() => setIsScenesTimelineCollapsed((value) => !value)}
+          />
         </div>
         <RightSidebar />
       </div>
