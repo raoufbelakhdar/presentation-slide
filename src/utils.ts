@@ -105,6 +105,43 @@ function renderTextElement(element: TextElement) {
 }
 
 function renderShapeElement(element: Extract<SceneElement, { type: 'shape' }>) {
+  if (element.shapeType === 'check') {
+    return `
+      <polyline
+        points="${element.x + element.width * 0.16},${element.y + element.height * 0.56} ${element.x + element.width * 0.4},${element.y + element.height * 0.8} ${element.x + element.width * 0.84},${element.y + element.height * 0.2}"
+        fill="none"
+        stroke="#0ea5e9"
+        stroke-width="${Math.max(16, Math.round(Math.min(element.width, element.height) * 0.12))}"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      />
+    `;
+  }
+
+  if (element.shapeType === 'cross') {
+    const strokeWidth = Math.max(16, Math.round(Math.min(element.width, element.height) * 0.12));
+    return `
+      <line
+        x1="${element.x + element.width * 0.2}"
+        y1="${element.y + element.height * 0.2}"
+        x2="${element.x + element.width * 0.8}"
+        y2="${element.y + element.height * 0.8}"
+        stroke="#ef4444"
+        stroke-width="${strokeWidth}"
+        stroke-linecap="round"
+      />
+      <line
+        x1="${element.x + element.width * 0.8}"
+        y1="${element.y + element.height * 0.2}"
+        x2="${element.x + element.width * 0.2}"
+        y2="${element.y + element.height * 0.8}"
+        stroke="#ef4444"
+        stroke-width="${strokeWidth}"
+        stroke-linecap="round"
+      />
+    `;
+  }
+
   const label = element.shapeType === 'yes' ? 'YES' : 'NO';
   const transliteration = element.shapeType === 'yes' ? 'NAAM' : 'LA';
   const fill = element.shapeType === 'yes' ? '#3b82f6' : '#ef4444';

@@ -80,6 +80,34 @@ export function LeftSidebar() {
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
 
+  const addCheckElement = () => {
+    const newElement: ShapeElement = {
+      id: generateId(),
+      type: 'shape',
+      shapeType: 'check',
+      x: 120,
+      y: 320,
+      width: 180,
+      height: 180,
+      revealStep: 1,
+    };
+    dispatch({ type: 'ADD_ELEMENT', payload: newElement });
+  };
+
+  const addCrossElement = () => {
+    const newElement: ShapeElement = {
+      id: generateId(),
+      type: 'shape',
+      shapeType: 'cross',
+      x: 340,
+      y: 320,
+      width: 180,
+      height: 180,
+      revealStep: 1,
+    };
+    dispatch({ type: 'ADD_ELEMENT', payload: newElement });
+  };
+
   const addImageElement = (assetId: string) => {
     const newElement: ImageElement = {
       id: generateId(),
@@ -170,6 +198,22 @@ export function LeftSidebar() {
                   >
                     <X className="w-4 h-4 text-rose-500" />
                     <span>No Badge</span>
+                  </button>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addCheckElement}
+                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Check className="w-4 h-4 text-sky-500" />
+                    <span>Blue Check</span>
+                  </button>
+                  <button
+                    onClick={addCrossElement}
+                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2"
+                  >
+                    <X className="w-4 h-4 text-rose-500" />
+                    <span>Red X</span>
                   </button>
                 </div>
               </div>

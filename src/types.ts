@@ -48,7 +48,7 @@ export interface TextElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
-  shapeType: 'yes' | 'no';
+  shapeType: 'yes' | 'no' | 'check' | 'cross';
 }
 
 export type SceneElement = ImageElement | TextElement | ShapeElement;

@@ -301,7 +301,9 @@ function PresentationShape({ element }: { element: ShapeElement }) {
         <span className="text-3xl font-bold mt-1">YES</span>
       </div>
     );
-  } else if (element.shapeType === 'no') {
+  }
+
+  if (element.shapeType === 'no') {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#ef4444] rounded-[100px] shadow-2xl text-white pointer-events-none">
         <X className="w-1/3 h-1/3" strokeWidth={3} />
@@ -310,5 +312,22 @@ function PresentationShape({ element }: { element: ShapeElement }) {
       </div>
     );
   }
+
+  if (element.shapeType === 'check') {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[#0ea5e9] pointer-events-none">
+        <Check className="h-full w-full drop-shadow-[0_18px_32px_rgba(14,165,233,0.3)]" strokeWidth={4} />
+      </div>
+    );
+  }
+
+  if (element.shapeType === 'cross') {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[#ef4444] pointer-events-none">
+        <X className="h-full w-full drop-shadow-[0_18px_32px_rgba(239,68,68,0.3)]" strokeWidth={4} />
+      </div>
+    );
+  }
+
   return null;
 }
