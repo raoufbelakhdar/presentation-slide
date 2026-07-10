@@ -50,7 +50,7 @@ export function Canvas() {
           backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', 
           backgroundSize: '20px 20px' 
         }}
-        onClick={(e) => e.stopPropagation()} // Prevent deselect when clicking canvas background
+        onClick={() => dispatch({ type: 'SELECT_ELEMENT', payload: null })}
       >
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[12px] border-transparent outline outline-1 outline-slate-200 outline-offset-[-12px]"></div>
         {activeScene.elements.map(element => {
