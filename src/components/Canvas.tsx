@@ -86,9 +86,15 @@ export function Canvas() {
 }
 
 function CanvasElement({ element, isSelected, scale }: { element: any, isSelected: boolean, scale: number, key?: React.Key }) {
-  const { state, dispatch } = useAppContext();
+  const { dispatch } = useAppContext();
+  type Frame = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
   const [isEditingText, setIsEditingText] = useState(false);
-  const [frame, setFrame] = useState({
+  const [frame, setFrame] = useState<Frame>({
     x: element.x,
     y: element.y,
     width: element.width,
@@ -101,12 +107,10 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
   const subtitleFontSize = element.type === 'text' ? (element.subtitleFontSize || element.fontSize * 0.6) : 0;
   const textPadding = element.type === 'text' ? getTextPadding(element) : 0;
 
-  const syncFrame = (nextFrame: typeof frame | ((current: typeof frame) => typeof frame)) => {
-    setFrame((current) => {
-      const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(current) : nextFrame;
-      frameRef.current = resolvedFrame;
-      return resolvedFrame;
-    });
+  const syncFrame = (nextFrame: Frame | ((current: Frame) => Frame)) => {
+    const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(frameRef.current) : nextFrame;
+    frameRef.current = resolvedFrame;
+    setFrame(resolvedFrame);
   };
 
   useEffect(() => {
