@@ -178,7 +178,7 @@ export function PresentationView() {
                     layout
                     initial={isCurrentStep ? initial : false}
                     animate={animate}
-                    exit={{ opacity: 0, scale: 0.9 }}
+                    exit={{ opacity: 0, y: 60 }}
                     transition={{ 
                       duration: animatesThisStep ? config.duration : 0.6, 
                       delay: animatesThisStep ? config.delay : 0, 

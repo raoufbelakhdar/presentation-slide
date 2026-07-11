@@ -2,7 +2,7 @@ export type ElementType = 'image' | 'text' | 'shape';
 
 export type AnimationType = 'fade' | 'slide-up' | 'slide-left' | 'scale' | 'none';
 
-export const DEFAULT_SEQUENCE_ANIMATION_TYPE: AnimationType = 'fade';
+export const DEFAULT_SEQUENCE_ANIMATION_TYPE: AnimationType = 'slide-up';
 export const DEFAULT_SEQUENCE_DURATION = 0.85;
 export const DEFAULT_SEQUENCE_DELAY = 0.08;
 
