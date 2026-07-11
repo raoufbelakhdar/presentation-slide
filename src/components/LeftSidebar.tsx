@@ -7,7 +7,10 @@ import { TextElement, ImageElement, ShapeElement } from '../types';
 export function LeftSidebar() {
   const { state, dispatch } = useAppContext();
   const { project, activeSceneIndex, templates } = state;
+  const sceneTemplates = templates.filter((template) => (template.kind || 'scene') === 'scene');
+  const branchTemplates = templates.filter((template) => template.kind === 'branch');
   const [activeTab, setActiveTab] = useState<'library' | 'templates'>('library');
+  const [templateTab, setTemplateTab] = useState<'scene' | 'branch'>('scene');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
 
@@ -155,6 +158,97 @@ export function LeftSidebar() {
   const useTemplate = (templateId: string) => {
     dispatch({ type: 'USE_TEMPLATE', payload: templateId });
   };
+
+  const activeTemplates = templateTab === 'scene' ? sceneTemplates : branchTemplates;
+
+  const renderTemplateCard = (template: typeof templates[number]) => (
+    <div key={template.id} className="w-full p-2 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm hover:border-[#4f46e5] flex flex-col gap-2">
+      <button
+        onClick={() => useTemplate(template.id)}
+        className="relative aspect-video overflow-hidden rounded-sm border border-[#e2e8f0] bg-white group"
+        title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
+      >
+        <img src={template.thumbnailDataUrl} alt={template.name} className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]" />
+        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors" />
+        <div className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${
+          template.kind === 'branch'
+            ? 'bg-indigo-600/90 text-white'
+            : 'bg-white/90 text-slate-700'
+        }`}>
+          {template.kind === 'branch' ? 'Branch' : 'Scene'}
+        </div>
+      </button>
+
+      {editingTemplateId === template.id ? (
+        <div className="flex items-center gap-1 w-full">
+          <input
+            type="text"
+            value={editingTemplateName}
+            onChange={(e) => setEditingTemplateName(e.target.value)}
+            className="flex-1 bg-white border border-[#e2e8f0] rounded-sm px-2 py-1 outline-none focus:border-[#4f46e5]"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                dispatch({ type: 'UPDATE_TEMPLATE', payload: { id: template.id, name: editingTemplateName } });
+                setEditingTemplateId(null);
+              } else if (e.key === 'Escape') {
+                setEditingTemplateId(null);
+              }
+            }}
+          />
+          <button 
+            onClick={() => {
+              dispatch({ type: 'UPDATE_TEMPLATE', payload: { id: template.id, name: editingTemplateName } });
+              setEditingTemplateId(null);
+            }}
+            className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-sm"
+          >
+            <Check className="w-3.5 h-3.5" />
+          </button>
+          <button 
+            onClick={() => setEditingTemplateId(null)}
+            className="p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-sm"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between w-full">
+          <div className="min-w-0 mr-2">
+            <span className="truncate block text-[#1e293b]" onDoubleClick={() => {
+              setEditingTemplateId(template.id);
+              setEditingTemplateName(template.name);
+            }}>{template.name}</span>
+            <span className="text-[10px] text-slate-400 font-medium">
+              {template.kind === 'branch' ? 'Branch' : 'Scene'} • {template.scene.elements.length} items • {template.assets.length} assets
+            </span>
+          </div>
+          <div className="flex items-center gap-0.5">
+            <button onClick={() => {
+                setEditingTemplateId(template.id);
+                setEditingTemplateName(template.name);
+              }} className="p-1 text-slate-400 hover:text-blue-500" title="Edit Name">
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => useTemplate(template.id)}
+              className="p-1 text-slate-400 hover:text-[#4f46e5]"
+              title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
+            >
+              {template.kind === 'branch' ? <GitBranch className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+            <button onClick={() => {
+              if (confirm('Are you sure you want to delete this template?')) {
+                dispatch({ type: 'DELETE_TEMPLATE', payload: template.id });
+              }
+            }} className="p-1 text-slate-400 hover:text-rose-500" title="Delete Template">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="w-60 bg-white border-r border-[#e2e8f0] flex flex-col h-full shrink-0">
@@ -316,95 +410,55 @@ export function LeftSidebar() {
               {templates.length === 0 ? (
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center py-4">No templates yet</p>
               ) : (
-                <div className="space-y-2">
-                  {templates.map(template => (
-                    <div key={template.id} className="w-full p-2 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm hover:border-[#4f46e5] flex flex-col gap-2">
-                      <button
-                        onClick={() => useTemplate(template.id)}
-                        className="relative aspect-video overflow-hidden rounded-sm border border-[#e2e8f0] bg-white group"
-                        title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
-                      >
-                        <img src={template.thumbnailDataUrl} alt={template.name} className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]" />
-                        <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors" />
-                        <div className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${
-                          template.kind === 'branch'
-                            ? 'bg-indigo-600/90 text-white'
-                            : 'bg-white/90 text-slate-700'
-                        }`}>
-                          {template.kind === 'branch' ? 'Branch' : 'Scene'}
-                        </div>
-                      </button>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 rounded-sm bg-[#f8fafc] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setTemplateTab('scene')}
+                      className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                        templateTab === 'scene'
+                          ? 'bg-white text-[#1e293b] shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        <span>Scenes</span>
+                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] text-slate-500">
+                          {sceneTemplates.length}
+                        </span>
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemplateTab('branch')}
+                      className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                        templateTab === 'branch'
+                          ? 'bg-white text-[#4f46e5] shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                    >
+                      <span className="flex items-center justify-center gap-1.5">
+                        <span>Branches</span>
+                        <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-[#4f46e5]">
+                          {branchTemplates.length}
+                        </span>
+                      </span>
+                    </button>
+                  </div>
 
-                      {editingTemplateId === template.id ? (
-                        <div className="flex items-center gap-1 w-full">
-                          <input
-                            type="text"
-                            value={editingTemplateName}
-                            onChange={(e) => setEditingTemplateName(e.target.value)}
-                            className="flex-1 bg-white border border-[#e2e8f0] rounded-sm px-2 py-1 outline-none focus:border-[#4f46e5]"
-                            autoFocus
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                dispatch({ type: 'UPDATE_TEMPLATE', payload: { id: template.id, name: editingTemplateName } });
-                                setEditingTemplateId(null);
-                              } else if (e.key === 'Escape') {
-                                setEditingTemplateId(null);
-                              }
-                            }}
-                          />
-                          <button 
-                            onClick={() => {
-                              dispatch({ type: 'UPDATE_TEMPLATE', payload: { id: template.id, name: editingTemplateName } });
-                              setEditingTemplateId(null);
-                            }}
-                            className="p-1 text-emerald-500 hover:bg-emerald-50 rounded-sm"
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button 
-                            onClick={() => setEditingTemplateId(null)}
-                            className="p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 rounded-sm"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-between w-full">
-                          <div className="min-w-0 mr-2">
-                            <span className="truncate block text-[#1e293b]" onDoubleClick={() => {
-                              setEditingTemplateId(template.id);
-                              setEditingTemplateName(template.name);
-                            }}>{template.name}</span>
-                            <span className="text-[10px] text-slate-400 font-medium">
-                              {template.kind === 'branch' ? 'Branch' : 'Scene'} • {template.scene.elements.length} items • {template.assets.length} assets
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-0.5">
-                            <button onClick={() => {
-                                setEditingTemplateId(template.id);
-                                setEditingTemplateName(template.name);
-                              }} className="p-1 text-slate-400 hover:text-blue-500" title="Edit Name">
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => useTemplate(template.id)}
-                              className="p-1 text-slate-400 hover:text-[#4f46e5]"
-                              title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
-                            >
-                              {template.kind === 'branch' ? <GitBranch className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                            </button>
-                            <button onClick={() => {
-                              if (confirm('Are you sure you want to delete this template?')) {
-                                dispatch({ type: 'DELETE_TEMPLATE', payload: template.id });
-                              }
-                            }} className="p-1 text-slate-400 hover:text-rose-500" title="Delete Template">
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      )}
+                  {activeTemplates.length === 0 ? (
+                    <p className={`rounded-sm border border-dashed px-3 py-3 text-[10px] font-bold uppercase tracking-wider ${
+                      templateTab === 'scene'
+                        ? 'border-[#dbe4f0] bg-white text-slate-300'
+                        : 'border-[#c7d2fe] bg-indigo-50/40 text-indigo-300'
+                    }`}>
+                      {templateTab === 'scene' ? 'No scene templates yet' : 'No branch templates yet'}
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {activeTemplates.map(renderTemplateCard)}
                     </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
