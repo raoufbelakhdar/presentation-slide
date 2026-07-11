@@ -2,15 +2,15 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { TextElement, ImageElement, ShapeElement, Scene } from '../types';
+import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene } from '../types';
 import { getEffectiveElementState, getTextPadding, splitTextContent } from '../utils';
 
 function getSequenceConfig(scene: Scene, step: number) {
   return scene.sequences?.find((sequence) => sequence.step === step) || {
     step,
-    animationType: 'fade',
-    duration: 0.4,
-    delay: 0,
+    animationType: DEFAULT_SEQUENCE_ANIMATION_TYPE,
+    duration: DEFAULT_SEQUENCE_DURATION,
+    delay: DEFAULT_SEQUENCE_DELAY,
   };
 }
 

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers } from 'lucide-react';
-import { TextElement } from '../types';
+import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement } from '../types';
 import { combineTextContent, splitTextContent } from '../utils';
 
 export function RightSidebar() {
@@ -16,9 +16,9 @@ export function RightSidebar() {
     if (selectedSequenceStep) {
       const config = activeScene?.sequences?.find(s => s.step === selectedSequenceStep) || {
         step: selectedSequenceStep,
-        animationType: 'fade',
-        duration: 0.4,
-        delay: 0,
+        animationType: DEFAULT_SEQUENCE_ANIMATION_TYPE,
+        duration: DEFAULT_SEQUENCE_DURATION,
+        delay: DEFAULT_SEQUENCE_DELAY,
       };
 
       return (

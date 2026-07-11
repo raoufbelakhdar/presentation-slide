@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useEffect, useReducer, ReactNode } from 'react';
-import { AppMode, AppScreen, Asset, Project, Scene, SceneElement, SceneTemplate } from './types';
+import {
+  AppMode,
+  AppScreen,
+  Asset,
+  DEFAULT_SEQUENCE_ANIMATION_TYPE,
+  DEFAULT_SEQUENCE_DELAY,
+  DEFAULT_SEQUENCE_DURATION,
+  Project,
+  Scene,
+  SceneElement,
+  SceneTemplate,
+} from './types';
 import { buildSceneTemplate, generateId } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
@@ -690,9 +701,9 @@ function appReducer(state: AppState, action: Action): AppState {
       } else {
         nextSequences.push({
           step,
-          animationType: 'fade',
-          duration: 0.4,
-          delay: 0,
+          animationType: DEFAULT_SEQUENCE_ANIMATION_TYPE,
+          duration: DEFAULT_SEQUENCE_DURATION,
+          delay: DEFAULT_SEQUENCE_DELAY,
           ...config,
         });
       }

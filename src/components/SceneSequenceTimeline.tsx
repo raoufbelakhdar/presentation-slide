@@ -1,7 +1,7 @@
 import React from 'react';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { useAppContext } from '../AppContext';
-import { AnimationType } from '../types';
+import { AnimationType, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION } from '../types';
 import { getSceneSequenceCount } from '../utils';
 
 const animationLabels: Record<AnimationType, string> = {
@@ -166,7 +166,7 @@ export function SceneSequenceTimeline({ collapsed, onToggleCollapse }: SceneSequ
                     {animationLabels[config?.animationType || 'fade']}
                   </span>
                   <span className={isSelected ? 'text-[#6366f1]' : 'text-slate-400'}>
-                    {config ? `${config.duration}s + ${config.delay}s` : '0.4s + 0s'}
+                    {config ? `${config.duration}s + ${config.delay}s` : `${DEFAULT_SEQUENCE_DURATION}s + ${DEFAULT_SEQUENCE_DELAY}s`}
                   </span>
                 </div>
               </button>
