@@ -11,7 +11,7 @@ import {
   SceneElement,
   SceneTemplate,
 } from './types';
-import { buildSceneTemplate, generateId } from './utils';
+import { buildSceneTemplate, generateId, getSceneSequenceCount } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
 const TEMPLATE_LIBRARY_KEY = 'visual-learning-templates';
@@ -161,6 +161,7 @@ function normalizeTemplate(template: Partial<SceneTemplate> | null | undefined, 
 
   return buildSceneTemplate(normalizedScene, assets, name, {
     id: template?.id,
+    kind: template?.kind || 'scene',
     createdAt: template?.createdAt,
     updatedAt: template?.updatedAt,
   });
@@ -241,6 +242,79 @@ function collectLegacyTemplates(rawProjects: Partial<Project>[]): SceneTemplate[
   return templates;
 }
 
+function buildBranchFromTemplate(project: Project, sceneIndex: number, template: SceneTemplate): Project {
+  const assetIdMap = new Map<string, string>();
+  const nextAssets = [...project.assets];
+
+  for (const templateAsset of template.assets) {
+    const existingAsset = nextAssets.find((asset) => asset.dataUrl === templateAsset.dataUrl && asset.name === templateAsset.name);
+    if (existingAsset) {
+      assetIdMap.set(templateAsset.id, existingAsset.id);
+      continue;
+    }
+
+    const nextAssetId = generateId();
+    assetIdMap.set(templateAsset.id, nextAssetId);
+    nextAssets.push({ ...templateAsset, id: nextAssetId });
+  }
+
+  const nextScenes = [...project.scenes];
+  const targetScene = nextScenes[sceneIndex];
+  if (!targetScene) {
+    return project;
+  }
+
+  const sequenceOffset = getSceneSequenceCount(targetScene);
+  const branchSequenceCount = getSceneSequenceCount(template.scene);
+  const currentMaxZIndex = targetScene.elements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1);
+  const templateMinZIndex = template.scene.elements.reduce((minZIndex, element) => Math.min(minZIndex, element.zIndex ?? 0), 0);
+
+  const appendedElements = template.scene.elements.map((element) => {
+    const shiftedKeyframes = element.keyframes
+      ? Object.fromEntries(
+          Object.entries(element.keyframes).map(([step, keyframe]) => [Number(step) + sequenceOffset, { ...keyframe }]),
+        )
+      : undefined;
+
+    if (element.type === 'image') {
+      return cloneElement(element, {
+        id: generateId(),
+        assetId: assetIdMap.get(element.assetId) || element.assetId,
+        revealStep: element.revealStep + sequenceOffset,
+        hideStep: element.hideStep != null ? element.hideStep + sequenceOffset : element.hideStep,
+        keyframes: shiftedKeyframes,
+        zIndex: currentMaxZIndex + 1 + ((element.zIndex ?? 0) - templateMinZIndex),
+      } as Partial<SceneElement>);
+    }
+
+    return cloneElement(element, {
+      id: generateId(),
+      revealStep: element.revealStep + sequenceOffset,
+      hideStep: element.hideStep != null ? element.hideStep + sequenceOffset : element.hideStep,
+      keyframes: shiftedKeyframes,
+      zIndex: currentMaxZIndex + 1 + ((element.zIndex ?? 0) - templateMinZIndex),
+    });
+  });
+
+  const appendedSequences = (template.scene.sequences || []).map((sequence) => ({
+    ...sequence,
+    step: sequence.step + sequenceOffset,
+  }));
+
+  nextScenes[sceneIndex] = {
+    ...targetScene,
+    elements: [...targetScene.elements, ...appendedElements],
+    sequenceCount: sequenceOffset + branchSequenceCount,
+    sequences: [...(targetScene.sequences || []), ...appendedSequences],
+  };
+
+  return {
+    ...project,
+    assets: nextAssets,
+    scenes: nextScenes,
+  };
+}
+
 function buildSceneFromTemplate(project: Project, template: SceneTemplate): Project {
   const assetIdMap = new Map<string, string>();
   const nextAssets = [...project.assets];
@@ -299,7 +373,9 @@ function appReducer(state: AppState, action: Action): AppState {
       const importedProject = createImportedProject(action.payload);
       const importedTemplates = Array.isArray(action.payload.templates)
         ? action.payload.templates.map((template) =>
-            buildSceneTemplate(normalizeScene(template), importedProject.assets, template.name || 'Imported Template'),
+            buildSceneTemplate(normalizeScene(template), importedProject.assets, template.name || 'Imported Template', {
+              kind: (template as Partial<SceneTemplate>).kind || 'scene',
+            }),
           )
         : [];
 
@@ -380,11 +456,16 @@ function appReducer(state: AppState, action: Action): AppState {
       const template = state.templates.find((entry) => entry.id === action.payload);
       if (!template) return state;
 
-      const nextProject = buildSceneFromTemplate(state.project, template);
+      const nextProject = template.kind === 'branch'
+        ? buildBranchFromTemplate(state.project, state.activeSceneIndex, template)
+        : buildSceneFromTemplate(state.project, template);
       return applyProjectUpdate(state, nextProject, {
-        activeSceneIndex: nextProject.scenes.length - 1,
+        activeSceneIndex: template.kind === 'branch' ? state.activeSceneIndex : nextProject.scenes.length - 1,
         selectedElementId: null,
-        selectedSequenceStep: null,
+        selectedSequenceStep:
+          template.kind === 'branch'
+            ? getSceneSequenceCount(state.project.scenes[state.activeSceneIndex]) + 1
+            : null,
       });
     }
     case 'SET_SCREEN':

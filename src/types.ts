@@ -74,6 +74,7 @@ export interface Asset {
 export interface SceneTemplate {
   id: string;
   name: string;
+  kind?: 'scene' | 'branch';
   scene: Scene;
   assets: Asset[];
   thumbnailDataUrl: string;

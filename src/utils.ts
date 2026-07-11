@@ -289,6 +289,7 @@ export function buildSceneTemplate(scene: Scene, assets: Asset[], name: string, 
   return {
     id: existingTemplate?.id || generateId(),
     name,
+    kind: existingTemplate?.kind || 'scene',
     scene: sceneCopy,
     assets: bundledAssets,
     thumbnailDataUrl: createSceneThumbnail(sceneCopy, bundledAssets),

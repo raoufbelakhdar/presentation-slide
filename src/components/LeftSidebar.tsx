@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { Type, Upload, Save, Copy, Plus, Trash2, Edit2, Check, X } from 'lucide-react';
+import { Type, Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch } from 'lucide-react';
 import { buildSceneTemplate, generateId } from '../utils';
 import { TextElement, ImageElement, ShapeElement } from '../types';
 
@@ -139,14 +139,16 @@ export function LeftSidebar() {
     dispatch({ type: 'DELETE_ASSET', payload: assetId });
   };
 
-  const saveCurrentAsTemplate = () => {
+  const saveCurrentAsTemplate = (kind: 'scene' | 'branch') => {
     const currentScene = project.scenes[activeSceneIndex];
     if (!currentScene) return;
 
-    const templateName = `${currentScene.name} Template`;
+    const templateName = kind === 'branch'
+      ? `${currentScene.name} Branch`
+      : `${currentScene.name} Template`;
     dispatch({
       type: 'ADD_TEMPLATE',
-      payload: buildSceneTemplate(currentScene, project.assets, templateName),
+      payload: buildSceneTemplate(currentScene, project.assets, templateName, { kind }),
     });
   };
 
@@ -288,19 +290,28 @@ export function LeftSidebar() {
               <div className="mb-4 flex items-center justify-between gap-2">
                 <div>
                   <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Template Library</h3>
-                  <p className="mt-1 text-[10px] font-medium text-slate-400">Shared across all projects and scenes</p>
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">Scene templates create scenes. Branches append sequences into the current scene.</p>
                 </div>
                 <div className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#4f46e5]">
                   {templates.length}
                 </div>
               </div>
-              <button
-                onClick={saveCurrentAsTemplate}
-                className="w-full p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2 mb-4 text-[#4f46e5]"
-              >
-                <Save className="w-4 h-4" />
-                <span>Save Scene as Template</span>
-              </button>
+              <div className="mb-4 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => saveCurrentAsTemplate('scene')}
+                  className="w-full p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2 text-[#4f46e5]"
+                >
+                  <Save className="w-4 h-4" />
+                  <span>Save Template</span>
+                </button>
+                <button
+                  onClick={() => saveCurrentAsTemplate('branch')}
+                  className="w-full p-3 border border-[#c7d2fe] bg-indigo-50 text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2 text-[#4f46e5]"
+                >
+                  <GitBranch className="w-4 h-4" />
+                  <span>Save Branch</span>
+                </button>
+              </div>
 
               {templates.length === 0 ? (
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center py-4">No templates yet</p>
@@ -311,10 +322,17 @@ export function LeftSidebar() {
                       <button
                         onClick={() => useTemplate(template.id)}
                         className="relative aspect-video overflow-hidden rounded-sm border border-[#e2e8f0] bg-white group"
-                        title="Use Template"
+                        title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
                       >
                         <img src={template.thumbnailDataUrl} alt={template.name} className="w-full h-full object-cover transition-transform group-hover:scale-[1.02]" />
                         <div className="absolute inset-0 bg-slate-900/0 group-hover:bg-slate-900/10 transition-colors" />
+                        <div className={`absolute left-1.5 top-1.5 rounded-full px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.18em] ${
+                          template.kind === 'branch'
+                            ? 'bg-indigo-600/90 text-white'
+                            : 'bg-white/90 text-slate-700'
+                        }`}>
+                          {template.kind === 'branch' ? 'Branch' : 'Scene'}
+                        </div>
                       </button>
 
                       {editingTemplateId === template.id ? (
@@ -358,7 +376,7 @@ export function LeftSidebar() {
                               setEditingTemplateName(template.name);
                             }}>{template.name}</span>
                             <span className="text-[10px] text-slate-400 font-medium">
-                              {template.scene.elements.length} items • {template.assets.length} assets
+                              {template.kind === 'branch' ? 'Branch' : 'Scene'} • {template.scene.elements.length} items • {template.assets.length} assets
                             </span>
                           </div>
                           <div className="flex items-center gap-0.5">
@@ -368,8 +386,12 @@ export function LeftSidebar() {
                               }} className="p-1 text-slate-400 hover:text-blue-500" title="Edit Name">
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
-                            <button onClick={() => useTemplate(template.id)} className="p-1 text-slate-400 hover:text-[#4f46e5]" title="Use Template">
-                              <Copy className="w-3.5 h-3.5" />
+                            <button
+                              onClick={() => useTemplate(template.id)}
+                              className="p-1 text-slate-400 hover:text-[#4f46e5]"
+                              title={template.kind === 'branch' ? 'Apply Branch To Current Scene' : 'Use Template As New Scene'}
+                            >
+                              {template.kind === 'branch' ? <GitBranch className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                             </button>
                             <button onClick={() => {
                               if (confirm('Are you sure you want to delete this template?')) {
