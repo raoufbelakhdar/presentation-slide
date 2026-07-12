@@ -18,6 +18,7 @@ function AppContent() {
   const { state, dispatch, canUndo, canRedo } = useAppContext();
   const [isSequenceTimelineCollapsed, setIsSequenceTimelineCollapsed] = useState(false);
   const [isScenesTimelineCollapsed, setIsScenesTimelineCollapsed] = useState(false);
+  const activeScene = state.project.scenes[state.activeSceneIndex];
 
   useEffect(() => {
     if (state.mode === 'presentation' || state.currentScreen !== 'editor') {
@@ -25,7 +26,57 @@ function AppContent() {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+      const target = event.target;
+      const isFormField =
+        target instanceof HTMLInputElement ||
+        target instanceof HTMLTextAreaElement ||
+        target instanceof HTMLSelectElement ||
+        (target instanceof HTMLElement && target.isContentEditable);
+
+      if (isFormField) {
+        return;
+      }
+
+      if (!event.ctrlKey && !event.metaKey && !event.altKey) {
+        const isDeleteKey = event.key === 'Delete' || event.key === 'Backspace';
+        if (!isDeleteKey) {
+          return;
+        }
+
+        if (state.selectedElementId) {
+          event.preventDefault();
+          dispatch({ type: 'DELETE_ELEMENT', payload: state.selectedElementId });
+          return;
+        }
+
+        if (
+          state.selectedSequenceStep !== null &&
+          activeScene &&
+          state.selectedSequenceStep >= 1 &&
+          activeScene.elements.length >= 0
+        ) {
+          const sequenceCount = Math.max(
+            activeScene.sequenceCount || 1,
+            ...activeScene.elements.map((element) => element.revealStep),
+            1,
+          );
+
+          if (sequenceCount > 1) {
+            event.preventDefault();
+            dispatch({
+              type: 'DELETE_SEQUENCE',
+              payload: {
+                sceneIndex: state.activeSceneIndex,
+                sequenceStep: state.selectedSequenceStep,
+              },
+            });
+          }
+        }
+
+        return;
+      }
+
+      if (event.altKey) {
         return;
       }
 
@@ -39,10 +90,6 @@ function AppContent() {
         return;
       }
 
-      if (event.target instanceof HTMLInputElement && event.target.type === 'file') {
-        return;
-      }
-
       if ((isUndoShortcut && !canUndo) || (isRedoShortcut && !canRedo)) {
         return;
       }
@@ -53,7 +100,17 @@ function AppContent() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [canRedo, canUndo, dispatch, state.currentScreen, state.mode]);
+  }, [
+    activeScene,
+    canRedo,
+    canUndo,
+    dispatch,
+    state.activeSceneIndex,
+    state.currentScreen,
+    state.mode,
+    state.selectedElementId,
+    state.selectedSequenceStep,
+  ]);
 
   if (state.mode === 'presentation') {
     return <PresentationView />;
