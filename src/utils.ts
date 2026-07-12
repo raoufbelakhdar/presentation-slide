@@ -23,8 +23,16 @@ export function combineTextContent(title: string, subtitle: string) {
   return [title.trimEnd(), subtitle.trim()].filter(Boolean).join('\n');
 }
 
+export function getTextVariant(element: Pick<TextElement, 'variant'>) {
+  return element.variant === 'free' ? 'free' : 'block';
+}
+
 export function getTextPadding(element: Pick<TextElement, 'padding'>) {
   return Math.max(8, Math.round(element.padding || 24));
+}
+
+export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 'subtitleFontSize'>) {
+  return Math.max(8, Math.round(element.subtitleFontSize || element.fontSize * 0.6));
 }
 
 export function getSceneSequenceCount(scene: Scene) {
@@ -60,41 +68,49 @@ export function getSceneTemplateAssets(scene: Scene, assets: Asset[]): Asset[] {
 }
 
 function renderTextElement(element: TextElement) {
+  const textVariant = getTextVariant(element);
   const { title, subtitle } = splitTextContent(element.text);
-  const lines = [title, ...subtitle.split('\n').filter(Boolean)].filter(Boolean);
+  const lines = textVariant === 'free'
+    ? element.text.split('\n')
+    : [title, ...subtitle.split('\n').filter(Boolean)].filter(Boolean);
   const baseFontSize = Math.max(18, Math.round(element.fontSize));
-  const subtitleFontSize = Math.max(16, Math.round(element.subtitleFontSize || element.fontSize * 0.6));
+  const subtitleFontSize = getTextSubtitleFontSize(element);
   const textPadding = getTextPadding(element);
-  const innerX = element.x + textPadding;
-  const innerY = element.y + textPadding;
-  const innerWidth = Math.max(1, element.width - textPadding * 2);
-  const innerHeight = Math.max(1, element.height - textPadding * 2);
+  const innerX = textVariant === 'free' ? element.x : element.x + textPadding;
+  const innerY = textVariant === 'free' ? element.y : element.y + textPadding;
+  const innerWidth = textVariant === 'free' ? Math.max(1, element.width) : Math.max(1, element.width - textPadding * 2);
+  const innerHeight = textVariant === 'free' ? Math.max(1, element.height) : Math.max(1, element.height - textPadding * 2);
   const subtitleLineHeight = subtitleFontSize * 1.08;
   const lineHeight = baseFontSize * 1.08;
   const totalHeight = lines.reduce((height, _, index) => {
-    if (index === 0) return height + lineHeight;
+    if (textVariant === 'free' || index === 0) return height + lineHeight;
     return height + subtitleLineHeight;
   }, 0);
-  let currentY = innerY + innerHeight / 2 - totalHeight / 2 + lineHeight / 2;
+  let currentY = textVariant === 'free'
+    ? innerY + lineHeight / 2
+    : innerY + innerHeight / 2 - totalHeight / 2 + lineHeight / 2;
 
   return `
-    <rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="${Math.min(element.height / 2, 64)}" fill="#3b82f6" />
+    ${textVariant === 'block'
+      ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="${Math.min(element.height / 2, 64)}" fill="#3b82f6" />`
+      : ''
+    }
     ${lines.map((line, index) => {
-      const isHeadline = index === 0;
+      const isHeadline = textVariant === 'free' || index === 0;
       const fontSize = isHeadline ? baseFontSize : subtitleFontSize;
-      const fontWeight = isHeadline ? element.fontWeight : 'normal';
-      const opacity = isHeadline ? 1 : 0.9;
+      const fontWeight = textVariant === 'free' ? element.fontWeight : isHeadline ? element.fontWeight : 'normal';
+      const opacity = textVariant === 'free' ? 1 : isHeadline ? 1 : 0.9;
       const y = currentY;
-      currentY += isHeadline ? lineHeight : subtitleLineHeight;
+      currentY += textVariant === 'free' || isHeadline ? lineHeight : subtitleLineHeight;
 
       return `
         <text
-          x="${innerX + innerWidth / 2}"
+          x="${textVariant === 'free' ? innerX : innerX + innerWidth / 2}"
           y="${y}"
           fill="${escapeXml(element.color)}"
           font-size="${fontSize}"
           font-weight="${fontWeight}"
-          text-anchor="middle"
+          text-anchor="${textVariant === 'free' ? 'start' : 'middle'}"
           dominant-baseline="middle"
           opacity="${opacity}"
           font-family="Arial, sans-serif"

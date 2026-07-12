@@ -42,6 +42,7 @@ export interface ImageElement extends BaseElement {
 
 export interface TextElement extends BaseElement {
   type: 'text';
+  variant?: 'block' | 'free';
   text: string;
   fontSize: number;
   subtitleFontSize?: number;

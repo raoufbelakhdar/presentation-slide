@@ -2,12 +2,15 @@ import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
 import { Asset, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
-import { combineTextContent, getEffectiveElementState, splitTextContent } from '../utils';
+import { combineTextContent, getEffectiveElementState, getTextVariant, splitTextContent } from '../utils';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
-    const title = splitTextContent(element.text).title.trim();
-    return title || 'Text';
+    const textVariant = getTextVariant(element);
+    const title = textVariant === 'free'
+      ? element.text.split('\n').find((line) => line.trim())?.trim()
+      : splitTextContent(element.text).title.trim();
+    return title || (textVariant === 'free' ? 'Free Text' : 'Text Block');
   }
 
   if (element.type === 'image') {
@@ -21,7 +24,7 @@ function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
 }
 
 function getElementTypeLabel(element: SceneElement) {
-  if (element.type === 'text') return 'Text';
+  if (element.type === 'text') return getTextVariant(element) === 'free' ? 'Text' : 'Text Block';
   if (element.type === 'image') return 'Image';
   if (element.shapeType === 'yes') return 'Yes';
   if (element.shapeType === 'no') return 'No';
@@ -289,6 +292,7 @@ export function RightSidebar() {
   const imageElement = selectedElement.type === 'image' ? (selectedElement as import('../types').ImageElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
+  const textVariant = textElement ? getTextVariant(textElement) : null;
   const otherElements = activeScene.elements.filter((element) => element.id !== selectedElement.id);
   const maxOtherZIndex = otherElements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1);
   const minOtherZIndex = otherElements.reduce((minZIndex, element) => Math.min(minZIndex, element.zIndex ?? 0), 0);
@@ -395,27 +399,52 @@ export function RightSidebar() {
         {selectedElement.type === 'text' && textElement && (
           <>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Title</label>
-              <input
-                type="text"
-                value={textParts?.title || ''}
-                onChange={(e) => handleUpdate({ text: combineTextContent(e.target.value, textParts?.subtitle || '') })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
-              />
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text Style</label>
+              <select
+                value={textVariant || 'block'}
+                onChange={(e) => handleUpdate({ variant: e.target.value as TextElement['variant'] })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+              >
+                <option value="free">Free Text</option>
+                <option value="block">Text Block</option>
+              </select>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle</label>
-              <textarea 
-                value={textParts?.subtitle || ''} 
-                onChange={(e) => handleUpdate({ text: combineTextContent(textParts?.title || '', e.target.value) })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[84px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
+            {textVariant === 'free' ? (
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text</label>
+                <textarea 
+                  value={textElement.text} 
+                  onChange={(e) => handleUpdate({ text: e.target.value })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[120px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+            ) : (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Title</label>
+                  <input
+                    type="text"
+                    value={textParts?.title || ''}
+                    onChange={(e) => handleUpdate({ text: combineTextContent(e.target.value, textParts?.subtitle || '') })}
+                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle</label>
+                  <textarea 
+                    value={textParts?.subtitle || ''} 
+                    onChange={(e) => handleUpdate({ text: combineTextContent(textParts?.title || '', e.target.value) })}
+                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[84px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
+                  />
+                </div>
+              </>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Title Size</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{textVariant === 'free' ? 'Text Size' : 'Title Size'}</label>
                 <input 
                   type="number" 
                   min={8} 
@@ -440,27 +469,31 @@ export function RightSidebar() {
               </div>
             </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle Size</label>
-              <input 
-                type="number" 
-                min={8}
-                value={textElement.subtitleFontSize || Math.max(16, Math.round(textElement.fontSize * 0.6))}
-                onChange={(e) => handleUpdate({ subtitleFontSize: Math.max(8, parseInt(e.target.value) || 16) })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
+            {textVariant === 'block' && (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle Size</label>
+                  <input 
+                    type="number" 
+                    min={8}
+                    value={textElement.subtitleFontSize || Math.max(16, Math.round(textElement.fontSize * 0.6))}
+                    onChange={(e) => handleUpdate({ subtitleFontSize: Math.max(8, parseInt(e.target.value) || 16) })}
+                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                  />
+                </div>
 
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Padding</label>
-              <input 
-                type="number" 
-                min={8}
-                value={textElement.padding || 24}
-                onChange={(e) => handleUpdate({ padding: Math.max(8, parseInt(e.target.value) || 24) })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Padding</label>
+                  <input 
+                    type="number" 
+                    min={8}
+                    value={textElement.padding || 24}
+                    onChange={(e) => handleUpdate({ padding: Math.max(8, parseInt(e.target.value) || 24) })}
+                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                  />
+                </div>
+              </>
+            )}
 
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Color</label>

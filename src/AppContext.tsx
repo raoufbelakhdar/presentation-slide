@@ -108,7 +108,7 @@ function cloneElement(element: SceneElement, overrides: Partial<SceneElement> = 
     ? overrides.zIndex
     : element.zIndex;
 
-  return {
+  const clonedElement = {
     ...element,
     ...overrides,
     zIndex: zIndex ?? 0,
@@ -118,6 +118,12 @@ function cloneElement(element: SceneElement, overrides: Partial<SceneElement> = 
         )
       : undefined,
   } as SceneElement;
+
+  if (clonedElement.type === 'text' && !clonedElement.variant) {
+    clonedElement.variant = 'block';
+  }
+
+  return clonedElement;
 }
 
 function cloneScene(scene: Scene, overrides: Partial<Scene> = {}): Scene {

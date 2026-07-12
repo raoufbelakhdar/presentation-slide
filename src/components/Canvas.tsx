@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement } from '../types';
-import { getEffectiveElementState, getTextPadding, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 
 export function Canvas() {
@@ -117,9 +117,11 @@ function CanvasElement({
   const frameRef = useRef(frame);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textParts = element.type === 'text' ? splitTextContent(element.text) : null;
+  const textVariant = element.type === 'text' ? getTextVariant(element) : 'block';
   const subtitleLines = textParts?.subtitle ? textParts.subtitle.split('\n').filter(Boolean) : [];
-  const subtitleFontSize = element.type === 'text' ? (element.subtitleFontSize || element.fontSize * 0.6) : 0;
-  const textPadding = element.type === 'text' ? getTextPadding(element) : 0;
+  const freeTextLines = element.type === 'text' ? element.text.split('\n') : [];
+  const subtitleFontSize = element.type === 'text' ? getTextSubtitleFontSize(element) : 0;
+  const textPadding = element.type === 'text' && textVariant === 'block' ? getTextPadding(element) : 0;
 
   const syncFrame = (nextFrame: Frame | ((current: Frame) => Frame)) => {
     const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(frameRef.current) : nextFrame;
@@ -227,13 +229,16 @@ function CanvasElement({
           isEditingText ? (
             <textarea
               autoFocus
-              className="w-full h-full text-center whitespace-pre-wrap break-words outline-none resize-none shadow-2xl rounded-[100px]"
+              className={`w-full h-full whitespace-pre-wrap break-words outline-none resize-none ${
+                textVariant === 'block' ? 'text-center shadow-2xl rounded-[100px]' : 'bg-transparent text-left'
+              }`}
               style={{ 
-                padding: `${textPadding}px`,
+                padding: textVariant === 'block' ? `${textPadding}px` : '0px',
                 fontSize: `${element.fontSize}px`, 
                 fontWeight: element.fontWeight, 
                 color: element.color,
-                backgroundColor: '#3b82f6'
+                backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                lineHeight: 1.12,
               }}
               value={element.text}
               onChange={(e) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { text: e.target.value } } })}
@@ -244,10 +249,18 @@ function CanvasElement({
             />
           ) : (
             <div 
-              className="w-full h-full flex flex-col items-center justify-center text-center shadow-2xl pointer-events-none rounded-[100px]"
-              style={{ backgroundColor: '#3b82f6', color: element.color, padding: `${textPadding}px` }}
+              className={`w-full h-full pointer-events-none ${
+                textVariant === 'block'
+                  ? 'flex flex-col items-center justify-center text-center shadow-2xl rounded-[100px]'
+                  : 'flex flex-col items-start justify-start text-left'
+              }`}
+              style={{
+                backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                color: element.color,
+                padding: textVariant === 'block' ? `${textPadding}px` : '0px',
+              }}
             >
-              {textParts && (
+              {textVariant === 'block' && textParts && (
                 <>
                   <div style={{ 
                     fontSize: `${element.fontSize}px`,
@@ -269,6 +282,20 @@ function CanvasElement({
                     </div>
                   ))}
                 </>
+              )}
+              {textVariant === 'free' && (
+                <div
+                  className="w-full whitespace-pre-wrap break-words"
+                  style={{
+                    fontSize: `${element.fontSize}px`,
+                    fontWeight: element.fontWeight,
+                    lineHeight: 1.12,
+                  }}
+                >
+                  {freeTextLines.map((line: string, index: number) => (
+                    <div key={index}>{line || '\u00a0'}</div>
+                  ))}
+                </div>
               )}
             </div>
           )

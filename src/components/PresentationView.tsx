@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene } from '../types';
-import { getEffectiveElementState, getTextPadding, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 
 function getSequenceConfig(scene: Scene, step: number) {
   return scene.sequences?.find((sequence) => sequence.step === step) || {
@@ -188,42 +188,67 @@ export function PresentationView() {
                     style={{ zIndex: effectiveElement.zIndex ?? 0 }}
                   >
                   {effectiveElement.type === 'text' && (
-                    <div 
-                      className="w-full h-full flex flex-col items-center justify-center text-center shadow-2xl pointer-events-none rounded-[100px]"
-                      style={{ backgroundColor: '#3b82f6', color: (effectiveElement as TextElement).color }}
-                    >
-                      {(() => {
-                        const textElement = effectiveElement as TextElement;
-                        const { title, subtitle } = splitTextContent(textElement.text);
-                        const subtitleLines = subtitle.split('\n').filter(Boolean);
-                        const subtitleFontSize = textElement.subtitleFontSize || textElement.fontSize * 0.6;
-                        const textPadding = getTextPadding(textElement);
+                    (() => {
+                      const textElement = effectiveElement as TextElement;
+                      const textVariant = getTextVariant(textElement);
+                      const { title, subtitle } = splitTextContent(textElement.text);
+                      const subtitleLines = subtitle.split('\n').filter(Boolean);
+                      const freeTextLines = textElement.text.split('\n');
+                      const subtitleFontSize = getTextSubtitleFontSize(textElement);
+                      const textPadding = textVariant === 'block' ? getTextPadding(textElement) : 0;
 
-                        return (
-                          <div style={{ padding: `${textPadding}px` }} className="w-full h-full flex flex-col items-center justify-center">
-                            <div style={{ 
-                              fontSize: `${textElement.fontSize}px`,
-                              fontWeight: textElement.fontWeight,
-                              opacity: 1,
-                              lineHeight: 1.1,
-                            }}>
-                              {title}
-                            </div>
-                            {subtitleLines.map((line: string, i: number) => (
-                              <div key={i} style={{ 
-                                fontSize: `${subtitleFontSize}px`,
-                                fontWeight: 'normal',
-                                opacity: 0.9,
+                      return (
+                        <div 
+                          className={`w-full h-full pointer-events-none ${
+                            textVariant === 'block'
+                              ? 'flex flex-col items-center justify-center text-center shadow-2xl rounded-[100px]'
+                              : 'flex flex-col items-start justify-start text-left'
+                          }`}
+                          style={{
+                            backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                            color: textElement.color,
+                            padding: textVariant === 'block' ? `${textPadding}px` : '0px',
+                          }}
+                        >
+                          {textVariant === 'block' ? (
+                            <div className="w-full h-full flex flex-col items-center justify-center">
+                              <div style={{ 
+                                fontSize: `${textElement.fontSize}px`,
+                                fontWeight: textElement.fontWeight,
+                                opacity: 1,
                                 lineHeight: 1.1,
-                                marginTop: i === 0 ? '6px' : '2px'
                               }}>
-                                {line}
+                                {title}
                               </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
-                    </div>
+                              {subtitleLines.map((line: string, i: number) => (
+                                <div key={i} style={{ 
+                                  fontSize: `${subtitleFontSize}px`,
+                                  fontWeight: 'normal',
+                                  opacity: 0.9,
+                                  lineHeight: 1.1,
+                                  marginTop: i === 0 ? '6px' : '2px'
+                                }}>
+                                  {line}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div
+                              className="w-full whitespace-pre-wrap break-words"
+                              style={{
+                                fontSize: `${textElement.fontSize}px`,
+                                fontWeight: textElement.fontWeight,
+                                lineHeight: 1.12,
+                              }}
+                            >
+                              {freeTextLines.map((line: string, index: number) => (
+                                <div key={index}>{line || '\u00a0'}</div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()
                   )}
 
                   {effectiveElement.type === 'image' && (
