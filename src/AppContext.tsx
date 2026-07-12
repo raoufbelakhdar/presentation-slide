@@ -669,34 +669,11 @@ function appReducer(state: AppState, action: Action): AppState {
     }
     case 'UPDATE_ELEMENT': {
       const activeScene = state.project.scenes[state.activeSceneIndex];
-      const sequenceStep = state.selectedSequenceStep;
 
       const nextElements = activeScene.elements.map((element) => {
         if (element.id !== action.payload.id) return element;
 
-        const updates = { ...action.payload.updates };
-
-        if (sequenceStep !== null && sequenceStep > element.revealStep) {
-          const layoutKeys = ['x', 'y', 'width', 'height', 'hidden'];
-          const keyframeUpdates: Partial<SceneElement> = {};
-          let hasKeyframeUpdates = false;
-
-          for (const key of layoutKeys) {
-            if (key in updates) {
-              keyframeUpdates[key as keyof SceneElement] = updates[key as keyof typeof updates] as never;
-              delete updates[key as keyof typeof updates];
-              hasKeyframeUpdates = true;
-            }
-          }
-
-          if (hasKeyframeUpdates) {
-            const nextKeyframes = { ...(element.keyframes || {}) };
-            nextKeyframes[sequenceStep] = { ...(nextKeyframes[sequenceStep] || {}), ...keyframeUpdates };
-            updates.keyframes = nextKeyframes;
-          }
-        }
-
-        return cloneElement(element, updates);
+        return cloneElement(element, action.payload.updates);
       });
 
       const nextScenes = [...state.project.scenes];
