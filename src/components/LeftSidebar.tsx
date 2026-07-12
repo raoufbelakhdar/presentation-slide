@@ -86,13 +86,14 @@ function PresetButton({
 
 export function LeftSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, templates } = state;
+  const { project, activeSceneIndex, templates, selectedSequenceStep } = state;
   const sceneTemplates = templates.filter((template) => (template.kind || 'scene') === 'scene');
   const branchTemplates = templates.filter((template) => template.kind === 'branch');
   const [activeTab, setActiveTab] = useState<'library' | 'templates'>('library');
   const [templateTab, setTemplateTab] = useState<'scene' | 'branch'>('scene');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
+  const defaultRevealStep = selectedSequenceStep ?? 1;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -126,7 +127,7 @@ export function LeftSidebar() {
       y: 100,
       width: 400,
       height: 120,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
       fontSize: 48,
       subtitleFontSize: 24,
       padding: 24,
@@ -146,7 +147,7 @@ export function LeftSidebar() {
       y: 120,
       width: 520,
       height: 140,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
       fontSize: 64,
       fontWeight: 'bold',
       color: '#0f172a',
@@ -163,7 +164,7 @@ export function LeftSidebar() {
       y: 100,
       width: 160,
       height: 160,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
@@ -177,7 +178,7 @@ export function LeftSidebar() {
       y: 100,
       width: 160,
       height: 160,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
@@ -191,7 +192,7 @@ export function LeftSidebar() {
       y: 320,
       width: 180,
       height: 180,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
@@ -205,7 +206,7 @@ export function LeftSidebar() {
       y: 320,
       width: 180,
       height: 180,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
@@ -220,7 +221,7 @@ export function LeftSidebar() {
       y: 150,
       width: 300,
       height: 300,
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
@@ -235,7 +236,7 @@ export function LeftSidebar() {
       y: 150,
       width: 300,
       height: 300, // proportional scaling handled via resizer if needed, defaults are fine
-      revealStep: 1,
+      revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
