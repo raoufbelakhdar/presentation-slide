@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2 } from 'lucide-react';
+import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2, Home } from 'lucide-react';
 import { generateId, exportProject, readTextFile } from '../utils';
 
 export function Toolbar() {
@@ -41,6 +41,13 @@ export function Toolbar() {
   return (
     <div className="flex items-center justify-between h-14 bg-white border-b border-[#e2e8f0] px-6 shadow-sm shrink-0 z-30">
       <div className="flex items-center gap-2">
+        <button onClick={() => dispatch({ type: 'SET_SCREEN', payload: 'projects' })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Project Library">
+          <Home className="w-4 h-4" />
+          <span className="hidden sm:inline">Projects</span>
+        </button>
+
+        <div className="h-6 w-px bg-[#e2e8f0] mx-2" />
+
         <input 
           type="text"
           value={project.name}
@@ -103,11 +110,6 @@ export function Toolbar() {
           <button onClick={() => dispatch({ type: 'SAVE_PROJECT' })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Save Project">
             <Save className="w-4 h-4" />
             <span className="hidden sm:inline">Save</span>
-          </button>
-
-          <button onClick={() => dispatch({ type: 'SET_SCREEN', payload: 'projects' })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Project Library">
-            <FolderOpen className="w-4 h-4" />
-            <span className="hidden sm:inline">Projects</span>
           </button>
 
           <label className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm cursor-pointer flex items-center gap-1.5" title="Load Project">
