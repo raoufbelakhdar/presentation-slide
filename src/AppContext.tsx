@@ -64,6 +64,38 @@ type Action =
   | { type: 'DELETE_TEMPLATE'; payload: string }
   | { type: 'UPDATE_TEMPLATE'; payload: { id: string; name: string } };
 
+type HistoryAction = Action | { type: 'UNDO' } | { type: 'REDO' };
+
+interface HistoryState {
+  past: AppState[];
+  present: AppState;
+  future: AppState[];
+}
+
+const HISTORY_LIMIT = 100;
+
+const TRACKED_ACTIONS = new Set<Action['type']>([
+  'USE_TEMPLATE',
+  'ADD_SCENE',
+  'DUPLICATE_SCENE',
+  'MOVE_SCENE',
+  'DELETE_SCENE',
+  'UPDATE_SCENE',
+  'ADD_ASSET',
+  'DELETE_ASSET',
+  'UPDATE_PROJECT_NAME',
+  'ADD_TEMPLATE',
+  'DELETE_TEMPLATE',
+  'UPDATE_TEMPLATE',
+  'ADD_ELEMENT',
+  'UPDATE_ELEMENT',
+  'DELETE_ELEMENT',
+  'DUPLICATE_ELEMENT',
+  'ADD_SEQUENCE',
+  'DELETE_SEQUENCE',
+  'UPDATE_SEQUENCE_CONFIG',
+]);
+
 function getTimestamp() {
   return new Date().toISOString();
 }
@@ -798,13 +830,82 @@ function appReducer(state: AppState, action: Action): AppState {
   }
 }
 
+function shouldTrackHistory(action: Action) {
+  return TRACKED_ACTIONS.has(action.type);
+}
+
+function createHistoryState(present: AppState): HistoryState {
+  return {
+    past: [],
+    present,
+    future: [],
+  };
+}
+
+function historyReducer(state: HistoryState, action: HistoryAction): HistoryState {
+  if (action.type === 'UNDO') {
+    const previousState = state.past[state.past.length - 1];
+    if (!previousState) {
+      return state;
+    }
+
+    return {
+      past: state.past.slice(0, -1),
+      present: previousState,
+      future: [state.present, ...state.future],
+    };
+  }
+
+  if (action.type === 'REDO') {
+    const nextState = state.future[0];
+    if (!nextState) {
+      return state;
+    }
+
+    return {
+      past: [...state.past, state.present],
+      present: nextState,
+      future: state.future.slice(1),
+    };
+  }
+
+  const nextPresent = appReducer(state.present, action);
+  if (nextPresent === state.present) {
+    return state;
+  }
+
+  if (nextPresent.activeProjectId !== state.present.activeProjectId) {
+    return createHistoryState(nextPresent);
+  }
+
+  if (!shouldTrackHistory(action)) {
+    return {
+      ...state,
+      present: nextPresent,
+    };
+  }
+
+  const nextPast =
+    state.past.length >= HISTORY_LIMIT
+      ? [...state.past.slice(1), state.present]
+      : [...state.past, state.present];
+
+  return {
+    past: nextPast,
+    present: nextPresent,
+    future: [],
+  };
+}
+
 const AppContext = createContext<{
   state: AppState;
-  dispatch: React.Dispatch<Action>;
+  dispatch: React.Dispatch<HistoryAction>;
+  canUndo: boolean;
+  canRedo: boolean;
 } | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(appReducer, initialState, (initial) => {
+  const [historyState, dispatch] = useReducer(historyReducer, initialState, (initial) => {
     try {
       const storedProjects = localStorage.getItem(PROJECT_LIBRARY_KEY);
       const storedTemplates = localStorage.getItem(TEMPLATE_LIBRARY_KEY);
@@ -835,26 +936,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
         templates = collectLegacyTemplates(rawProjects);
       }
 
-      return {
+      return createHistoryState({
         ...initial,
         projects,
         templates,
         project: projects[0] || initial.project,
-      };
+      });
     } catch (error) {
       console.error('Failed to load projects from local storage', error);
-      return initial;
+      return createHistoryState(initial);
     }
   });
 
+  const { past, present, future } = historyState;
+
   useEffect(() => {
-    localStorage.setItem(PROJECT_LIBRARY_KEY, JSON.stringify(state.projects));
-    localStorage.setItem(TEMPLATE_LIBRARY_KEY, JSON.stringify(state.templates));
+    localStorage.setItem(PROJECT_LIBRARY_KEY, JSON.stringify(present.projects));
+    localStorage.setItem(TEMPLATE_LIBRARY_KEY, JSON.stringify(present.templates));
     localStorage.removeItem(LEGACY_PROJECT_KEY);
-  }, [state.projects, state.templates]);
+  }, [present.projects, present.templates]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch }}>
+    <AppContext.Provider
+      value={{
+        state: present,
+        dispatch,
+        canUndo: past.length > 0,
+        canRedo: future.length > 0,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

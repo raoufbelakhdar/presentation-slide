@@ -1,10 +1,10 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download } from 'lucide-react';
+import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2 } from 'lucide-react';
 import { generateId, exportProject, readTextFile } from '../utils';
 
 export function Toolbar() {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, canUndo, canRedo } = useAppContext();
   const { project, activeSceneIndex, mode } = state;
 
   const handleNewScene = () => {
@@ -80,6 +80,26 @@ export function Toolbar() {
 
       <div className="flex items-center gap-2">
         <div className="flex items-center gap-1 border-r border-[#e2e8f0] pr-4 mr-2">
+          <button
+            onClick={() => dispatch({ type: 'UNDO' })}
+            disabled={!canUndo}
+            className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            title="Undo (Ctrl/Cmd+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Undo</span>
+          </button>
+
+          <button
+            onClick={() => dispatch({ type: 'REDO' })}
+            disabled={!canRedo}
+            className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+            title="Redo (Ctrl+Y / Cmd+Shift+Z)"
+          >
+            <Redo2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Redo</span>
+          </button>
+
           <button onClick={() => dispatch({ type: 'SAVE_PROJECT' })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Save Project">
             <Save className="w-4 h-4" />
             <span className="hidden sm:inline">Save</span>

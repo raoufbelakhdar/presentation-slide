@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppProvider, useAppContext } from './AppContext';
 import { Toolbar } from './components/Toolbar';
 import { LeftSidebar } from './components/LeftSidebar';
@@ -15,9 +15,45 @@ import { PresentationView } from './components/PresentationView';
 import { ProjectsPage } from './components/ProjectsPage';
 
 function AppContent() {
-  const { state } = useAppContext();
+  const { state, dispatch, canUndo, canRedo } = useAppContext();
   const [isSequenceTimelineCollapsed, setIsSequenceTimelineCollapsed] = useState(false);
   const [isScenesTimelineCollapsed, setIsScenesTimelineCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (state.mode === 'presentation' || state.currentScreen !== 'editor') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey) {
+        return;
+      }
+
+      const key = event.key.toLowerCase();
+      const isUndoShortcut = key === 'z' && !event.shiftKey;
+      const isRedoShortcut =
+        (key === 'z' && event.shiftKey) ||
+        (key === 'y' && event.ctrlKey && !event.metaKey && !event.shiftKey);
+
+      if (!isUndoShortcut && !isRedoShortcut) {
+        return;
+      }
+
+      if (event.target instanceof HTMLInputElement && event.target.type === 'file') {
+        return;
+      }
+
+      if ((isUndoShortcut && !canUndo) || (isRedoShortcut && !canRedo)) {
+        return;
+      }
+
+      event.preventDefault();
+      dispatch({ type: isUndoShortcut ? 'UNDO' : 'REDO' });
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [canRedo, canUndo, dispatch, state.currentScreen, state.mode]);
 
   if (state.mode === 'presentation') {
     return <PresentationView />;
