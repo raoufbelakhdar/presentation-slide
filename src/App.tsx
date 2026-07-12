@@ -112,6 +112,14 @@ function AppContent() {
     state.selectedSequenceStep,
   ]);
 
+  if (!state.isHydrated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#f8fafc] text-sm font-medium tracking-[0.08em] text-slate-500 uppercase">
+        Loading local library...
+      </div>
+    );
+  }
+
   if (state.mode === 'presentation') {
     return <PresentationView />;
   }

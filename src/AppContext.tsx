@@ -11,6 +11,7 @@ import {
   SceneElement,
   SceneTemplate,
 } from './types';
+import { loadPersistedLibrary, PersistedLibraryRecord, savePersistedLibrary } from './persistence';
 import { buildSceneTemplate, generateId, getSceneSequenceCount } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
@@ -18,6 +19,7 @@ const TEMPLATE_LIBRARY_KEY = 'visual-learning-templates';
 const LEGACY_PROJECT_KEY = 'visual-learning-project';
 
 interface AppState {
+  isHydrated: boolean;
   projects: Project[];
   templates: SceneTemplate[];
   project: Project;
@@ -32,6 +34,7 @@ interface AppState {
 }
 
 type Action =
+  | { type: 'HYDRATE'; payload: PersistedLibraryRecord | null }
   | { type: 'LOAD_PROJECT'; payload: Project }
   | { type: 'CREATE_PROJECT' }
   | { type: 'OPEN_PROJECT'; payload: string }
@@ -191,6 +194,18 @@ function createEmptyProject(name = 'Untitled Project'): Project {
     createdAt: now,
     updatedAt: now,
   };
+}
+
+function parseStoredJson<T>(value: string | null): T | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 function normalizeProject(project: Partial<Project> | null | undefined): Project {
@@ -411,7 +426,72 @@ function buildSceneFromTemplate(project: Project, template: SceneTemplate): Proj
   };
 }
 
+function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord | null): AppState {
+  const rawProjects = Array.isArray(payload?.projects) ? payload.projects : [];
+  const projects = rawProjects.map((project) => normalizeProject(project));
+
+  let templates: SceneTemplate[] = [];
+  if (Array.isArray(payload?.templates)) {
+    templates = payload.templates.map((template) => normalizeTemplate(template));
+  }
+
+  if (templates.length === 0 && rawProjects.length > 0) {
+    templates = collectLegacyTemplates(rawProjects);
+  }
+
+  const requestedProjectId = payload?.activeProjectId || null;
+  const activeProjectId = requestedProjectId && projects.some((project) => project.id === requestedProjectId)
+    ? requestedProjectId
+    : projects[0]?.id || null;
+  const activeProject = activeProjectId
+    ? projects.find((project) => project.id === activeProjectId) || null
+    : null;
+
+  return {
+    ...baseState,
+    isHydrated: true,
+    projects,
+    templates,
+    project: activeProject || baseState.project,
+    activeProjectId,
+  };
+}
+
+function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
+  const storedProjects = parseStoredJson<Partial<Project>[]>(localStorage.getItem(PROJECT_LIBRARY_KEY));
+  const storedTemplates = parseStoredJson<SceneTemplate[]>(localStorage.getItem(TEMPLATE_LIBRARY_KEY));
+  const legacyProject = parseStoredJson<Partial<Project>>(localStorage.getItem(LEGACY_PROJECT_KEY));
+
+  const rawProjects = Array.isArray(storedProjects)
+    ? storedProjects
+    : legacyProject
+      ? [legacyProject]
+      : [];
+
+  if (rawProjects.length === 0 && !Array.isArray(storedTemplates)) {
+    return null;
+  }
+
+  const projects = rawProjects.map((project) => normalizeProject(project));
+  const templates = Array.isArray(storedTemplates)
+    ? storedTemplates.map((template) => normalizeTemplate(template))
+    : collectLegacyTemplates(rawProjects);
+
+  return {
+    activeProjectId: projects[0]?.id || null,
+    projects,
+    templates,
+  };
+}
+
+function clearLegacyLocalStorage() {
+  localStorage.removeItem(PROJECT_LIBRARY_KEY);
+  localStorage.removeItem(TEMPLATE_LIBRARY_KEY);
+  localStorage.removeItem(LEGACY_PROJECT_KEY);
+}
+
 const initialState: AppState = {
+  isHydrated: false,
   projects: [],
   templates: [],
   project: createEmptyProject(),
@@ -427,6 +507,8 @@ const initialState: AppState = {
 
 function appReducer(state: AppState, action: Action): AppState {
   switch (action.type) {
+    case 'HYDRATE':
+      return buildHydratedState(initialState, action.payload);
     case 'LOAD_PROJECT': {
       const importedProject = createImportedProject(action.payload);
       const importedTemplates = Array.isArray(action.payload.templates)
@@ -926,56 +1008,66 @@ const AppContext = createContext<{
 } | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [historyState, dispatch] = useReducer(historyReducer, initialState, (initial) => {
-    try {
-      const storedProjects = localStorage.getItem(PROJECT_LIBRARY_KEY);
-      const storedTemplates = localStorage.getItem(TEMPLATE_LIBRARY_KEY);
-      const legacyProject = localStorage.getItem(LEGACY_PROJECT_KEY);
-
-      let rawProjects: Partial<Project>[] = [];
-
-      if (storedProjects) {
-        const parsedProjects = JSON.parse(storedProjects);
-        if (Array.isArray(parsedProjects)) {
-          rawProjects = parsedProjects;
-        }
-      } else if (legacyProject) {
-        rawProjects = [JSON.parse(legacyProject)];
-      }
-
-      const projects = rawProjects.map((project) => normalizeProject(project));
-      let templates: SceneTemplate[] = [];
-
-      if (storedTemplates) {
-        const parsedTemplates = JSON.parse(storedTemplates);
-        if (Array.isArray(parsedTemplates)) {
-          templates = parsedTemplates.map((template) => normalizeTemplate(template));
-        }
-      }
-
-      if (templates.length === 0 && rawProjects.length > 0) {
-        templates = collectLegacyTemplates(rawProjects);
-      }
-
-      return createHistoryState({
-        ...initial,
-        projects,
-        templates,
-        project: projects[0] || initial.project,
-      });
-    } catch (error) {
-      console.error('Failed to load projects from local storage', error);
-      return createHistoryState(initial);
-    }
-  });
+  const [historyState, dispatch] = useReducer(historyReducer, initialState, createHistoryState);
 
   const { past, present, future } = historyState;
 
   useEffect(() => {
-    localStorage.setItem(PROJECT_LIBRARY_KEY, JSON.stringify(present.projects));
-    localStorage.setItem(TEMPLATE_LIBRARY_KEY, JSON.stringify(present.templates));
-    localStorage.removeItem(LEGACY_PROJECT_KEY);
-  }, [present.projects, present.templates]);
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const persistedLibrary = await loadPersistedLibrary();
+        if (cancelled) {
+          return;
+        }
+
+        if (persistedLibrary) {
+          dispatch({ type: 'HYDRATE', payload: persistedLibrary });
+          clearLegacyLocalStorage();
+          return;
+        }
+
+        const legacyLibrary = loadLegacyLibraryFromLocalStorage();
+        if (cancelled) {
+          return;
+        }
+
+        if (legacyLibrary) {
+          await savePersistedLibrary(legacyLibrary);
+          if (cancelled) {
+            return;
+          }
+        }
+
+        dispatch({ type: 'HYDRATE', payload: legacyLibrary });
+        clearLegacyLocalStorage();
+      } catch (error) {
+        console.error('Failed to hydrate local project library', error);
+        dispatch({ type: 'HYDRATE', payload: loadLegacyLibraryFromLocalStorage() });
+      }
+    };
+
+    hydrate();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!present.isHydrated) {
+      return;
+    }
+
+    savePersistedLibrary({
+      activeProjectId: present.activeProjectId,
+      projects: present.projects,
+      templates: present.templates,
+    }).catch((error) => {
+      console.error('Failed to persist local project library', error);
+    });
+  }, [present.activeProjectId, present.isHydrated, present.projects, present.templates]);
 
   return (
     <AppContext.Provider
