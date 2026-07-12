@@ -5,6 +5,8 @@ import { buildSceneTemplate, generateId } from '../utils';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { FEATURED_ICON_NAMES, LUCIDE_ICON_NAMES, searchLucideIcons } from '../iconLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
+import { FEATURED_OPENMOJI_HEXCODES, getOpenMojiByHexcode, getOpenMojiDataUrl, OPENMOJI_EMOJIS, searchOpenMojis } from '../emojiLibrary';
+import { OpenMojiGlyph } from './OpenMojiGlyph';
 
 const FAVORITE_COMPONENTS_STORAGE_KEY = 'visual-learning-favorite-components';
 
@@ -20,6 +22,7 @@ type PresetId =
 type FavoriteComponent =
   | { type: 'preset'; id: PresetId }
   | { type: 'icon'; id: string }
+  | { type: 'emoji'; id: string }
   | { type: 'asset'; id: string };
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
@@ -89,6 +92,14 @@ function IconPresetPreview({ iconName }: { iconName: string }) {
   );
 }
 
+function EmojiPresetPreview({ hexcode, emoji }: { hexcode: string; emoji: string }) {
+  return (
+    <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <OpenMojiGlyph hexcode={hexcode} emoji={emoji} className="h-6 w-6 text-xl" />
+    </div>
+  );
+}
+
 function PresetButton({
   label,
   onClick,
@@ -140,11 +151,12 @@ export function LeftSidebar() {
   const sceneTemplates = templates.filter((template) => (template.kind || 'scene') === 'scene');
   const branchTemplates = templates.filter((template) => template.kind === 'branch');
   const [activeTab, setActiveTab] = useState<'library' | 'templates'>('library');
-  const [componentTab, setComponentTab] = useState<'favorites' | 'presets' | 'icons' | 'assets'>('favorites');
+  const [componentTab, setComponentTab] = useState<'favorites' | 'presets' | 'icons' | 'emojis' | 'assets'>('favorites');
   const [templateTab, setTemplateTab] = useState<'scene' | 'branch'>('scene');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
   const [iconQuery, setIconQuery] = useState('');
+  const [emojiQuery, setEmojiQuery] = useState('');
   const [favoriteComponents, setFavoriteComponents] = useState<FavoriteComponent[]>(() => {
     if (typeof window === 'undefined') {
       return [];
@@ -164,9 +176,15 @@ export function LeftSidebar() {
   });
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
+  const deferredEmojiQuery = useDeferredValue(emojiQuery);
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
     : FEATURED_ICON_NAMES;
+  const filteredEmojis = deferredEmojiQuery.trim()
+    ? searchOpenMojis(deferredEmojiQuery, 72)
+    : FEATURED_OPENMOJI_HEXCODES
+        .map((hexcode) => getOpenMojiByHexcode(hexcode))
+        .filter((entry): entry is NonNullable<ReturnType<typeof getOpenMojiByHexcode>> => Boolean(entry));
 
   useEffect(() => {
     window.localStorage.setItem(FAVORITE_COMPONENTS_STORAGE_KEY, JSON.stringify(favoriteComponents));
@@ -335,6 +353,31 @@ export function LeftSidebar() {
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
 
+  const addOpenMojiElement = async (hexcode: string) => {
+    const emojiEntry = getOpenMojiByHexcode(hexcode);
+    const dataUrl = await getOpenMojiDataUrl(hexcode);
+    if (!emojiEntry || !dataUrl) {
+      return;
+    }
+
+    const assetName = `OpenMoji ${emojiEntry.emoji} ${emojiEntry.annotation}`;
+    const existingAsset = project.assets.find((asset) => asset.dataUrl === dataUrl);
+    const assetId = existingAsset?.id || generateId();
+
+    if (!existingAsset) {
+      dispatch({
+        type: 'ADD_ASSET',
+        payload: {
+          id: assetId,
+          name: assetName,
+          dataUrl,
+        },
+      });
+    }
+
+    addImageElement(assetId);
+  };
+
   const presetDefinitions: Array<{
     id: PresetId;
     label: string;
@@ -372,6 +415,10 @@ export function LeftSidebar() {
   const favoriteIcons = favoriteComponents.filter(
     (favorite): favorite is Extract<FavoriteComponent, { type: 'icon' }> => favorite.type === 'icon',
   );
+  const favoriteEmojis = favoriteComponents
+    .filter((favorite): favorite is Extract<FavoriteComponent, { type: 'emoji' }> => favorite.type === 'emoji')
+    .map((favorite) => getOpenMojiByHexcode(favorite.id))
+    .filter((entry): entry is NonNullable<ReturnType<typeof getOpenMojiByHexcode>> => Boolean(entry));
   const favoriteAssets = favoriteComponents
     .filter((favorite): favorite is Extract<FavoriteComponent, { type: 'asset' }> => favorite.type === 'asset')
     .map((favorite) => project.assets.find((asset) => asset.id === favorite.id))
@@ -526,15 +573,15 @@ export function LeftSidebar() {
                 <div>
                   <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Components</h3>
                   <p className="mt-1 text-[10px] font-medium text-slate-400">
-                    Presets, searchable icons, and room for more component libraries later.
+                    Presets, searchable icons, OpenMoji emojis, and room for more component libraries later.
                   </p>
                 </div>
                 <div className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#4f46e5]">
-                  {LUCIDE_ICON_NAMES.length}
+                  {LUCIDE_ICON_NAMES.length + OPENMOJI_EMOJIS.length}
                 </div>
               </div>
 
-              <div className="mb-4 grid grid-cols-4 gap-2 rounded-sm bg-[#f8fafc] p-1">
+              <div className="mb-4 grid grid-cols-5 gap-2 rounded-sm bg-[#f8fafc] p-1">
                 <button
                   type="button"
                   onClick={() => setComponentTab('favorites')}
@@ -578,6 +625,17 @@ export function LeftSidebar() {
                   }`}
                 >
                   Assets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentTab('emojis')}
+                  className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    componentTab === 'emojis'
+                      ? 'bg-white text-[#1e293b] shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Emoji
                 </button>
               </div>
 
@@ -646,6 +704,37 @@ export function LeftSidebar() {
                                   className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
                                 >
                                   <IconPresetPreview iconName={favorite.id} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {favoriteEmojis.length > 0 && (
+                        <div>
+                          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Emojis</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {favoriteEmojis.map((emojiEntry) => (
+                              <div key={emojiEntry.hexcode} className="relative">
+                                <FavoriteToggleButton
+                                  active
+                                  title="Remove emoji from favorites"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite({ type: 'emoji', id: emojiEntry.hexcode });
+                                  }}
+                                  className="right-1 top-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void addOpenMojiElement(emojiEntry.hexcode);
+                                  }}
+                                  className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
+                                  title={`${emojiEntry.emoji} ${emojiEntry.annotation}`}
+                                >
+                                  <EmojiPresetPreview hexcode={emojiEntry.hexcode} emoji={emojiEntry.emoji} />
                                 </button>
                               </div>
                             ))}
@@ -779,6 +868,63 @@ export function LeftSidebar() {
                             className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
                           >
                             <IconPresetPreview iconName={iconName} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : componentTab === 'emojis' ? (
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">OpenMoji Library</h3>
+                    <p className="mt-1 text-[10px] font-medium text-slate-400">
+                      Search OpenMoji emojis and add them as SVG image components.
+                    </p>
+                  </div>
+
+                  <label className="flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
+                    <Search className="h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={emojiQuery}
+                      onChange={(event) => setEmojiQuery(event.target.value)}
+                      placeholder="Search emojis..."
+                      className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+                    />
+                  </label>
+
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    <span>{deferredEmojiQuery.trim() ? 'Search Results' : 'Featured Emojis'}</span>
+                    <span className="text-[#4f46e5]">{filteredEmojis.length}</span>
+                  </div>
+
+                  {filteredEmojis.length === 0 ? (
+                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      No emojis match that search
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-3 gap-2">
+                      {filteredEmojis.map((emojiEntry) => (
+                        <div key={emojiEntry.hexcode} className="relative">
+                          <FavoriteToggleButton
+                            active={isFavorite({ type: 'emoji', id: emojiEntry.hexcode })}
+                            title={`${isFavorite({ type: 'emoji', id: emojiEntry.hexcode }) ? 'Remove' : 'Add'} emoji ${isFavorite({ type: 'emoji', id: emojiEntry.hexcode }) ? 'from' : 'to'} favorites`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleFavorite({ type: 'emoji', id: emojiEntry.hexcode });
+                            }}
+                            className="right-1 top-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void addOpenMojiElement(emojiEntry.hexcode);
+                            }}
+                            className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
+                            title={`${emojiEntry.emoji} ${emojiEntry.annotation}`}
+                          >
+                            <EmojiPresetPreview hexcode={emojiEntry.hexcode} emoji={emojiEntry.emoji} />
                           </button>
                         </div>
                       ))}
