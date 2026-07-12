@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { LucideIconGlyph } from './LucideIconGlyph';
+import { EmojiGlyph } from './EmojiGlyph';
 
 function getSequenceConfig(scene: Scene, step: number) {
   return scene.sequences?.find((sequence) => sequence.step === step) || {
@@ -341,6 +342,18 @@ function PresentationColorCard({ element }: { element: ColorElement }) {
 }
 
 function PresentationShape({ element }: { element: ShapeElement }) {
+  if (element.shapeType === 'emoji') {
+    return (
+      <div className="w-full h-full flex items-center justify-center pointer-events-none">
+        <EmojiGlyph
+          id={element.emojiHexcode || 'grinning-face'}
+          fallback={element.emojiChar || '😀'}
+          className="h-full w-full object-contain drop-shadow-[0_18px_32px_rgba(15,23,42,0.16)]"
+        />
+      </div>
+    );
+  }
+
   if (element.shapeType === 'icon') {
     return (
       <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">

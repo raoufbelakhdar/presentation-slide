@@ -1,55 +1,43 @@
 import openmojiEntries from 'openmoji/data/openmoji.json';
 
-export type OpenMojiEntry = import('openmoji/data/openmoji.json').OpenMojiEntry;
+type OpenMojiEntry = import('openmoji/data/openmoji.json').OpenMojiEntry;
 
-const RAW_FEATURED_OPENMOJI_HEXCODES = [
-  '1F600',
-  '1F389',
-  '2728',
-  '1F680',
-  '1F4A1',
-  '1F4DA',
-  '1F4BB',
-  '1F3AF',
-  '1F3A8',
-  '1F9E0',
-  '1F525',
-  '1F44D',
-  '1F44F',
-  '1F4CC',
-  '1F984',
-  '1F31F',
+export interface EmojiEntry {
+  id: string;
+  label: string;
+  assetUrl: string;
+  emoji?: string;
+  legacyHexcodes: string[];
+  searchText: string;
+}
+
+const RAW_FEATURED_EMOJI_IDS = [
+  'grinning-face',
+  'party-popper',
+  'sparkles',
+  'rocket',
+  'light-bulb',
+  'books',
+  'laptop',
+  'bullseye',
+  'artist-palette',
+  'brain',
+  'fire',
+  'thumbs-up-default',
+  'clapping-hands-default',
+  'pushpin',
+  'unicorn',
+  'glowing-star',
 ] as const;
 
-const openMojiSvgLoaders = import.meta.glob('/node_modules/openmoji/src/**/*.svg', {
-  query: '?raw',
+const fluentEmojiAssets = import.meta.glob('/node_modules/fluentui-emoji/icons/flat/*.svg', {
+  eager: true,
   import: 'default',
-}) as Record<string, () => Promise<string>>;
+}) as Record<string, string>;
 
-const svgLoaderByHexcode = new Map(
-  Object.entries(openMojiSvgLoaders).map(([path, loader]) => {
-    const hexcode = path.split('/').pop()?.replace(/\.svg$/i, '') || '';
-    return [hexcode.toUpperCase(), loader] as const;
-  }),
-);
-
-const svgDataUrlCache = new Map<string, string>();
-const svgPromiseCache = new Map<string, Promise<string | null>>();
-
-const OPENMOJI_ENTRIES = Array.from(
-  new Map(
-    openmojiEntries
-      .filter((entry) => entry.hexcode && entry.annotation && svgLoaderByHexcode.has(entry.hexcode.toUpperCase()))
-      .sort((a, b) => (a.order || 0) - (b.order || 0))
-      .map((entry) => [entry.hexcode.toUpperCase(), { ...entry, hexcode: entry.hexcode.toUpperCase() }]),
-  ).values(),
-);
-
-const OPENMOJI_BY_HEXCODE = new Map(OPENMOJI_ENTRIES.map((entry) => [entry.hexcode, entry]));
-const FEATURED_HEXCODE_SET = new Set<string>(RAW_FEATURED_OPENMOJI_HEXCODES);
-
-export const OPENMOJI_EMOJIS = OPENMOJI_ENTRIES;
-export const FEATURED_OPENMOJI_HEXCODES = RAW_FEATURED_OPENMOJI_HEXCODES.filter((hexcode) => OPENMOJI_BY_HEXCODE.has(hexcode));
+function normalizeEmojiId(value: string) {
+  return value.trim().toLowerCase().replace(/_/g, '-');
+}
 
 function normalizeSearchValue(value: string) {
   return value
@@ -58,110 +46,147 @@ function normalizeSearchValue(value: string) {
     .trim();
 }
 
-function svgToDataUrl(svg: string) {
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+function slugifyLabel(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/['’]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
 }
 
-export function getOpenMojiByHexcode(hexcode: string) {
-  return OPENMOJI_BY_HEXCODE.get(hexcode.toUpperCase()) || null;
+export function formatEmojiName(id: string) {
+  return id
+    .split('-')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
 }
 
-export function getOpenMojiLabel(entry: Pick<OpenMojiEntry, 'emoji' | 'annotation'>) {
-  return `${entry.emoji} ${entry.annotation}`;
-}
-
-export async function getOpenMojiDataUrl(hexcode: string) {
-  const normalizedHexcode = hexcode.toUpperCase();
-  const cached = svgDataUrlCache.get(normalizedHexcode);
-  if (cached) {
-    return cached;
+const openMojiBySlug = openmojiEntries.reduce((map, entry) => {
+  const annotation = entry.annotation?.trim();
+  if (!annotation) {
+    return map;
   }
 
-  const existingPromise = svgPromiseCache.get(normalizedHexcode);
-  if (existingPromise) {
-    return existingPromise;
+  const slug = slugifyLabel(annotation);
+  const matches = map.get(slug) || [];
+  matches.push({ ...entry, hexcode: entry.hexcode.toUpperCase() });
+  map.set(slug, matches);
+  return map;
+}, new Map<string, OpenMojiEntry[]>());
+
+const emojiEntries = Object.entries(fluentEmojiAssets)
+  .map(([path, assetUrl]) => {
+    const id = normalizeEmojiId(path.split('/').pop()?.replace(/\.svg$/i, '') || '');
+    const legacyMatches = openMojiBySlug.get(id) || [];
+    const primaryLegacyMatch = legacyMatches[0];
+    const label = formatEmojiName(id);
+    const searchParts = new Set<string>([
+      id,
+      id.replaceAll('-', ' '),
+      label.toLowerCase(),
+      ...(primaryLegacyMatch?.annotation ? [primaryLegacyMatch.annotation.toLowerCase()] : []),
+      ...legacyMatches.flatMap((entry) => [entry.tags || '', entry.openmoji_tags || '', entry.group, entry.subgroups]),
+    ]);
+
+    return {
+      id,
+      label,
+      assetUrl,
+      emoji: primaryLegacyMatch?.emoji,
+      legacyHexcodes: Array.from(new Set(legacyMatches.map((entry) => entry.hexcode.toUpperCase()))),
+      searchText: Array.from(searchParts).join(' ').toLowerCase(),
+      order: primaryLegacyMatch?.order ?? Number.MAX_SAFE_INTEGER,
+    };
+  })
+  .sort((a, b) => {
+    if (a.order !== b.order) {
+      return a.order - b.order;
+    }
+
+    return a.label.localeCompare(b.label);
+  });
+
+const EMOJI_BY_ID = new Map<string, EmojiEntry>(emojiEntries.map(({ order: _order, ...entry }) => [entry.id, entry]));
+const LEGACY_HEXCODE_TO_ID = new Map<string, string>();
+
+emojiEntries.forEach((entry) => {
+  entry.legacyHexcodes.forEach((hexcode) => {
+    if (!LEGACY_HEXCODE_TO_ID.has(hexcode)) {
+      LEGACY_HEXCODE_TO_ID.set(hexcode, entry.id);
+    }
+  });
+});
+
+function resolveEmojiId(id: string) {
+  const normalizedId = normalizeEmojiId(id);
+  if (EMOJI_BY_ID.has(normalizedId)) {
+    return normalizedId;
   }
 
-  const loader = svgLoaderByHexcode.get(normalizedHexcode);
-  if (!loader) {
-    return null;
-  }
-
-  const promise = loader()
-    .then((svg) => {
-      const dataUrl = svgToDataUrl(svg);
-      svgDataUrlCache.set(normalizedHexcode, dataUrl);
-      return dataUrl;
-    })
-    .catch(() => null)
-    .finally(() => {
-      svgPromiseCache.delete(normalizedHexcode);
-    });
-
-  svgPromiseCache.set(normalizedHexcode, promise);
-  return promise;
+  return LEGACY_HEXCODE_TO_ID.get(id.trim().toUpperCase()) || null;
 }
 
-export function searchOpenMojis(query: string, limit = 72) {
+export const EMOJI_LIBRARY = Array.from(EMOJI_BY_ID.values());
+export const FEATURED_EMOJI_IDS = RAW_FEATURED_EMOJI_IDS.filter((id) => EMOJI_BY_ID.has(id));
+
+export function getEmojiById(id: string) {
+  const resolvedId = resolveEmojiId(id);
+  return resolvedId ? EMOJI_BY_ID.get(resolvedId) || null : null;
+}
+
+export function getEmojiDataUrl(id: string) {
+  return getEmojiById(id)?.assetUrl || null;
+}
+
+export function getEmojiLabel(entry: Pick<EmojiEntry, 'label' | 'emoji'>) {
+  return entry.emoji ? `${entry.emoji} ${entry.label}` : entry.label;
+}
+
+export function searchEmojis(query: string, limit = 72) {
   const normalizedQuery = normalizeSearchValue(query);
   if (!normalizedQuery) {
-    return FEATURED_OPENMOJI_HEXCODES
-      .map((hexcode) => OPENMOJI_BY_HEXCODE.get(hexcode))
-      .filter((entry): entry is OpenMojiEntry => Boolean(entry))
+    return FEATURED_EMOJI_IDS
+      .map((id) => EMOJI_BY_ID.get(id))
+      .filter((entry): entry is EmojiEntry => Boolean(entry))
       .slice(0, limit);
   }
 
   const tokens = normalizedQuery.split(' ').filter(Boolean);
 
-  return OPENMOJI_ENTRIES
+  return EMOJI_LIBRARY
     .map((entry) => {
-      const searchableText = [
-        entry.emoji,
-        entry.annotation,
-        entry.hexcode,
-        entry.group,
-        entry.subgroups,
-        entry.tags || '',
-        entry.openmoji_tags || '',
-      ]
-        .join(' ')
-        .toLowerCase();
-
-      if (!tokens.every((token) => searchableText.includes(token))) {
+      if (!tokens.every((token) => entry.searchText.includes(token))) {
         return null;
       }
 
       let score = 0;
-      const annotation = entry.annotation.toLowerCase();
-      const group = entry.group.toLowerCase();
-      const subgroup = entry.subgroups.toLowerCase();
-      const hexcode = entry.hexcode.toLowerCase();
+      const normalizedId = entry.id;
+      const normalizedLabel = entry.label.toLowerCase();
 
-      if (annotation === normalizedQuery) score += 360;
-      if (annotation.startsWith(normalizedQuery)) score += 240;
-      if (subgroup.startsWith(normalizedQuery)) score += 200;
-      if (group.startsWith(normalizedQuery)) score += 160;
-      if (hexcode === normalizedQuery.replaceAll(' ', '-')) score += 180;
-      if (FEATURED_HEXCODE_SET.has(entry.hexcode)) score += 12;
+      if (normalizedId === normalizedQuery.replaceAll(' ', '-')) score += 320;
+      if (normalizedLabel === normalizedQuery) score += 280;
+      if (normalizedId.startsWith(normalizedQuery.replaceAll(' ', '-'))) score += 220;
+      if (normalizedLabel.startsWith(normalizedQuery)) score += 200;
+      if (entry.id.endsWith('-default')) score += 24;
+      if (FEATURED_EMOJI_IDS.includes(entry.id as (typeof RAW_FEATURED_EMOJI_IDS)[number])) score += 12;
 
       score += tokens.reduce((total, token) => {
-        if (annotation.startsWith(token)) return total + 36;
-        if (annotation.includes(token)) return total + 20;
-        if (subgroup.includes(token)) return total + 16;
-        if (group.includes(token)) return total + 14;
-        if (hexcode.includes(token)) return total + 10;
-        return total + 6;
+        if (normalizedLabel.startsWith(token)) return total + 36;
+        if (normalizedLabel.includes(token)) return total + 22;
+        if (normalizedId.includes(token)) return total + 18;
+        return total + 8;
       }, 0);
 
       return { entry, score };
     })
-    .filter((result): result is { entry: OpenMojiEntry; score: number } => Boolean(result))
+    .filter((result): result is { entry: EmojiEntry; score: number } => Boolean(result))
     .sort((a, b) => {
       if (b.score !== a.score) {
         return b.score - a.score;
       }
 
-      return (a.entry.order || 0) - (b.entry.order || 0);
+      return a.entry.label.localeCompare(b.entry.label);
     })
     .slice(0, limit)
     .map((result) => result.entry);

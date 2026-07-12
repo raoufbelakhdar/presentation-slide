@@ -8,6 +8,7 @@ function getElementTone(element: SceneElement) {
   if (element.type === 'text') return 'bg-sky-400';
   if (element.type === 'image') return 'bg-amber-400';
   if (element.type === 'color') return 'bg-violet-400';
+  if (element.shapeType === 'emoji') return 'bg-amber-300';
   if (element.shapeType === 'icon') return 'bg-slate-400';
   if (element.shapeType === 'yes') return 'bg-emerald-400';
   if (element.shapeType === 'check') return 'bg-sky-400';

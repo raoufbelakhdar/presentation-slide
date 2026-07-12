@@ -4,6 +4,7 @@ import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
 import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
+import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -22,6 +23,11 @@ function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
     return element.captionText?.trim() || 'Color Card';
   }
 
+  if (element.shapeType === 'emoji') {
+    const emojiEntry = getEmojiById(element.emojiHexcode || '');
+    return emojiEntry ? getEmojiLabel(emojiEntry) : element.emojiChar || 'Emoji';
+  }
+
   if (element.shapeType === 'icon') {
     return formatIconName(element.iconName || 'Icon');
   }
@@ -36,6 +42,7 @@ function getElementTypeLabel(element: SceneElement) {
   if (element.type === 'text') return getTextVariant(element) === 'free' ? 'Text' : 'Text Block';
   if (element.type === 'image') return 'Image';
   if (element.type === 'color') return 'Color';
+  if (element.shapeType === 'emoji') return 'Emoji';
   if (element.shapeType === 'icon') return 'Icon';
   if (element.shapeType === 'yes') return 'Yes';
   if (element.shapeType === 'no') return 'No';
@@ -314,10 +321,15 @@ export function RightSidebar() {
     selectedSequenceStep !== null &&
     selectedElement.revealStep <= selectedSequenceStep &&
     Boolean(getEffectiveElementState(selectedElement, selectedSequenceStep).hidden);
+  const selectedEmoji = shapeElement?.shapeType === 'emoji'
+    ? getEmojiById(shapeElement.emojiHexcode || '')
+    : null;
   const propertiesTitle =
-    selectedElement.type === 'shape' && selectedElement.shapeType === 'icon'
-      ? 'Icon Properties'
-      : `${selectedElement.type} Properties`;
+    selectedElement.type === 'shape' && selectedElement.shapeType === 'emoji'
+      ? 'Emoji Properties'
+      : selectedElement.type === 'shape' && selectedElement.shapeType === 'icon'
+        ? 'Icon Properties'
+        : `${selectedElement.type} Properties`;
 
   return (
     <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
@@ -574,6 +586,22 @@ export function RightSidebar() {
                   onChange={(e) => handleUpdate({ color: e.target.value })}
                   className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
                 />
+              </div>
+            </div>
+          </>
+        )}
+
+        {selectedElement.type === 'shape' && shapeElement?.shapeType === 'emoji' && !selectedElementHiddenInSequence && (
+          <>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Emoji</label>
+              <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+                <div className="text-xs font-semibold text-[#0f172a]">
+                  {selectedEmoji ? getEmojiLabel(selectedEmoji) : shapeElement.emojiChar || 'Emoji'}
+                </div>
+                <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+                  {selectedEmoji?.id || shapeElement.emojiHexcode || 'emoji'}
+                </div>
               </div>
             </div>
           </>

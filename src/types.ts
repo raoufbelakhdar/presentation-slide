@@ -61,10 +61,12 @@ export interface TextElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
-  shapeType: 'yes' | 'no' | 'check' | 'cross' | 'icon';
+  shapeType: 'yes' | 'no' | 'check' | 'cross' | 'icon' | 'emoji';
   iconName?: string;
   iconColor?: string;
   iconStrokeWidth?: number;
+  emojiHexcode?: string;
+  emojiChar?: string;
 }
 
 export type SceneElement = ImageElement | ColorElement | TextElement | ShapeElement;

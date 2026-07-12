@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Asset, ColorElement, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
 import { formatIconName } from "./iconLibrary";
+import { getEmojiById } from "./emojiLibrary";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -138,6 +139,23 @@ function renderTextElement(element: TextElement) {
 }
 
 function renderShapeElement(element: Extract<SceneElement, { type: 'shape' }>) {
+  if (element.shapeType === 'emoji') {
+    const emojiEntry = getEmojiById(element.emojiHexcode || '');
+    const emojiChar = emojiEntry?.emoji || element.emojiChar || '😀';
+    const fontSize = Math.max(48, Math.round(Math.min(element.width, element.height) * 0.78));
+
+    return `
+      <text
+        x="${element.x + element.width / 2}"
+        y="${element.y + element.height / 2}"
+        font-size="${fontSize}"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif"
+      >${escapeXml(emojiChar)}</text>
+    `;
+  }
+
   if (element.shapeType === 'icon') {
     const iconColor = element.iconColor || '#0f172a';
     const iconLabel = formatIconName(element.iconName || 'shape').slice(0, 24);

@@ -5,6 +5,7 @@ import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types'
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 import { LucideIconGlyph } from './LucideIconGlyph';
+import { EmojiGlyph } from './EmojiGlyph';
 
 type CanvasBackgroundMode = 'light' | 'gray' | 'dark';
 
@@ -486,6 +487,18 @@ function ColorCardRenderer({ element }: { element: ColorElement }) {
 }
 
 function ShapeRenderer({ element }: { element: ShapeElement }) {
+  if (element.shapeType === 'emoji') {
+    return (
+      <div className="w-full h-full flex items-center justify-center pointer-events-none">
+        <EmojiGlyph
+          id={element.emojiHexcode || 'grinning-face'}
+          fallback={element.emojiChar || '😀'}
+          className="h-full w-full object-contain drop-shadow-[0_12px_20px_rgba(15,23,42,0.14)]"
+        />
+      </div>
+    );
+  }
+
   if (element.shapeType === 'icon') {
     return (
       <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
