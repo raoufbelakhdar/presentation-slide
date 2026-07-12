@@ -54,7 +54,7 @@ export function Canvas() {
   const [scale, setScale] = useState(1);
   const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>(() => {
     if (typeof window === 'undefined') {
-      return 'light';
+      return 'gray';
     }
 
     const storedMode = window.localStorage.getItem(CANVAS_BACKGROUND_STORAGE_KEY);
@@ -62,7 +62,7 @@ export function Canvas() {
       return storedMode;
     }
 
-    return 'light';
+    return 'gray';
   });
 
   useEffect(() => {
