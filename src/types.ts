@@ -1,4 +1,5 @@
 export type ElementType = 'image' | 'text' | 'shape' | 'color';
+export type TextAlign = 'left' | 'center' | 'right';
 
 export type AnimationType = 'fade' | 'slide-up' | 'slide-left' | 'scale' | 'none';
 
@@ -49,6 +50,7 @@ export interface ColorElement extends BaseElement {
 export interface TextElement extends BaseElement {
   type: 'text';
   variant?: 'block' | 'free';
+  align?: TextAlign;
   text: string;
   fontSize: number;
   subtitleFontSize?: number;

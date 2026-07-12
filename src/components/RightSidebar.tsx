@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
-import { combineTextContent, getEffectiveElementState, getTextVariant, splitTextContent } from '../utils';
+import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -299,6 +299,7 @@ export function RightSidebar() {
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
+  const textAlign = textElement ? getTextAlign(textElement) : null;
   const otherElements = activeScene.elements.filter((element) => element.id !== selectedElement.id);
   const maxOtherZIndex = otherElements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1);
   const minOtherZIndex = otherElements.reduce((minZIndex, element) => Math.min(minZIndex, element.zIndex ?? 0), 0);
@@ -504,8 +505,21 @@ export function RightSidebar() {
                   <option value="bold">Bold</option>
                   <option value="lighter">Lighter</option>
                   <option value="bolder">Bolder</option>
-                </select>
+                  </select>
               </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Alignment</label>
+              <select
+                value={textAlign || 'center'}
+                onChange={(e) => handleUpdate({ align: e.target.value as TextElement['align'] })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+              >
+                <option value="left">Left</option>
+                <option value="center">Center</option>
+                <option value="right">Right</option>
+              </select>
             </div>
 
             {textVariant === 'block' && (

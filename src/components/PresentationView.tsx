@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
-import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 
 function getSequenceConfig(scene: Scene, step: number) {
   return scene.sequences?.find((sequence) => sequence.step === step) || {
@@ -191,9 +191,9 @@ export function PresentationView() {
                     (() => {
                       const textElement = effectiveElement as TextElement;
                       const textVariant = getTextVariant(textElement);
+                      const textAlign = getTextAlign(textElement);
                       const { title, subtitle } = splitTextContent(textElement.text);
                       const subtitleLines = subtitle.split('\n').filter(Boolean);
-                      const freeTextLines = textElement.text.split('\n');
                       const subtitleFontSize = getTextSubtitleFontSize(textElement);
                       const textPadding = textVariant === 'block' ? getTextPadding(textElement) : 0;
 
@@ -211,7 +211,7 @@ export function PresentationView() {
                           }}
                         >
                           {textVariant === 'block' ? (
-                            <div className="w-full h-full flex flex-col items-center justify-center">
+                            <div className="w-full h-full flex flex-col justify-center" style={{ textAlign }}>
                               <div style={{ 
                                 fontSize: `${textElement.fontSize}px`,
                                 fontWeight: textElement.fontWeight,
@@ -239,11 +239,10 @@ export function PresentationView() {
                                 fontSize: `${textElement.fontSize}px`,
                                 fontWeight: textElement.fontWeight,
                                 lineHeight: 1.12,
+                                textAlign,
                               }}
                             >
-                              {freeTextLines.map((line: string, index: number) => (
-                                <div key={index}>{line || '\u00a0'}</div>
-                              ))}
+                              {textElement.text}
                             </div>
                           )}
                         </div>

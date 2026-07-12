@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
-import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 
 export function Canvas() {
@@ -118,8 +118,8 @@ function CanvasElement({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textParts = element.type === 'text' ? splitTextContent(element.text) : null;
   const textVariant = element.type === 'text' ? getTextVariant(element) : 'block';
+  const textAlign = element.type === 'text' ? getTextAlign(element) : 'center';
   const subtitleLines = textParts?.subtitle ? textParts.subtitle.split('\n').filter(Boolean) : [];
-  const freeTextLines = element.type === 'text' ? element.text.split('\n') : [];
   const subtitleFontSize = element.type === 'text' ? getTextSubtitleFontSize(element) : 0;
   const textPadding = element.type === 'text' && textVariant === 'block' ? getTextPadding(element) : 0;
 
@@ -239,6 +239,7 @@ function CanvasElement({
                 color: element.color,
                 backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
                 lineHeight: 1.12,
+                textAlign,
               }}
               value={element.text}
               onChange={(e) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { text: e.target.value } } })}
@@ -261,8 +262,8 @@ function CanvasElement({
               }}
             >
               {textVariant === 'block' && textParts && (
-                <>
-                  <div style={{ 
+                <div className="w-full h-full flex flex-col justify-center" style={{ textAlign }}>
+                  <div style={{
                     fontSize: `${element.fontSize}px`,
                     fontWeight: element.fontWeight,
                     opacity: 1,
@@ -281,7 +282,7 @@ function CanvasElement({
                       {line}
                     </div>
                   ))}
-                </>
+                </div>
               )}
               {textVariant === 'free' && (
                 <div
@@ -290,11 +291,10 @@ function CanvasElement({
                     fontSize: `${element.fontSize}px`,
                     fontWeight: element.fontWeight,
                     lineHeight: 1.12,
+                    textAlign,
                   }}
                 >
-                  {freeTextLines.map((line: string, index: number) => (
-                    <div key={index}>{line || '\u00a0'}</div>
-                  ))}
+                  {element.text}
                 </div>
               )}
             </div>

@@ -27,6 +27,14 @@ export function getTextVariant(element: Pick<TextElement, 'variant'>) {
   return element.variant === 'free' ? 'free' : 'block';
 }
 
+export function getTextAlign(element: Pick<TextElement, 'align' | 'variant'>) {
+  if (element.align) {
+    return element.align;
+  }
+
+  return getTextVariant(element) === 'free' ? 'left' : 'center';
+}
+
 export function getTextPadding(element: Pick<TextElement, 'padding'>) {
   return Math.max(8, Math.round(element.padding || 24));
 }
@@ -69,6 +77,7 @@ export function getSceneTemplateAssets(scene: Scene, assets: Asset[]): Asset[] {
 
 function renderTextElement(element: TextElement) {
   const textVariant = getTextVariant(element);
+  const textAlign = getTextAlign(element);
   const { title, subtitle } = splitTextContent(element.text);
   const lines = textVariant === 'free'
     ? element.text.split('\n')
@@ -103,14 +112,21 @@ function renderTextElement(element: TextElement) {
       const y = currentY;
       currentY += textVariant === 'free' || isHeadline ? lineHeight : subtitleLineHeight;
 
+      const textX = textAlign === 'left'
+        ? innerX
+        : textAlign === 'right'
+          ? innerX + innerWidth
+          : innerX + innerWidth / 2;
+      const textAnchor = textAlign === 'left' ? 'start' : textAlign === 'right' ? 'end' : 'middle';
+
       return `
         <text
-          x="${textVariant === 'free' ? innerX : innerX + innerWidth / 2}"
+          x="${textX}"
           y="${y}"
           fill="${escapeXml(element.color)}"
           font-size="${fontSize}"
           font-weight="${fontWeight}"
-          text-anchor="${textVariant === 'free' ? 'start' : 'middle'}"
+          text-anchor="${textAnchor}"
           dominant-baseline="middle"
           opacity="${opacity}"
           font-family="Arial, sans-serif"
