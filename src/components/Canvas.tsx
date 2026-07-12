@@ -59,13 +59,15 @@ export function Canvas() {
             if (element.revealStep > selectedSequenceStep) return null;
             
             const effectiveElement = getEffectiveElementState(element, selectedSequenceStep);
-            if (effectiveElement.hidden) return null;
+            const isSelected = element.id === selectedElementId;
+            if (effectiveElement.hidden && !isSelected) return null;
 
             return (
               <CanvasElement
                 key={`${element.id}-${currentStep}`}
                 element={effectiveElement}
-                isSelected={element.id === selectedElementId}
+                isSelected={isSelected}
+                isHiddenPreview={Boolean(effectiveElement.hidden && isSelected)}
                 scale={scale}
               />
             );
@@ -75,6 +77,7 @@ export function Canvas() {
                 key={`${element.id}-${currentStep}`}
                 element={element}
                 isSelected={element.id === selectedElementId}
+                isHiddenPreview={false}
                 scale={scale}
               />
             );
@@ -85,7 +88,18 @@ export function Canvas() {
   );
 }
 
-function CanvasElement({ element, isSelected, scale }: { element: any, isSelected: boolean, scale: number, key?: React.Key }) {
+function CanvasElement({
+  element,
+  isSelected,
+  isHiddenPreview,
+  scale,
+}: {
+  element: any,
+  isSelected: boolean,
+  isHiddenPreview: boolean,
+  scale: number,
+  key?: React.Key
+}) {
   const { dispatch } = useAppContext();
   type Frame = {
     x: number;
@@ -192,7 +206,9 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
       dragHandleClassName="drag-handle"
     >
       <div 
-        className={`w-full h-full drag-handle cursor-move flex relative ${isSelected ? 'ring-2 ring-[#4f46e5]' : 'hover:ring-1 hover:ring-[#4f46e5]/50'}`} 
+        className={`w-full h-full drag-handle cursor-move flex relative ${
+          isSelected ? 'ring-2 ring-[#4f46e5]' : 'hover:ring-1 hover:ring-[#4f46e5]/50'
+        } ${isHiddenPreview ? 'opacity-40 border-2 border-dashed border-rose-400' : ''}`} 
         onDoubleClick={handleDoubleClick}
         onClick={(e) => {
           e.stopPropagation();
@@ -200,8 +216,10 @@ function CanvasElement({ element, isSelected, scale }: { element: any, isSelecte
         }}
       >
         {isSelected && (
-          <div className="absolute -top-4 right-0 bg-[#4f46e5] text-white text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider">
-            SEQ {element.revealStep}
+          <div className={`absolute -top-4 right-0 text-white text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider ${
+            isHiddenPreview ? 'bg-rose-500' : 'bg-[#4f46e5]'
+          }`}>
+            {isHiddenPreview ? 'HIDDEN' : `SEQ ${element.revealStep}`}
           </div>
         )}
         

@@ -54,10 +54,11 @@ function SequenceLayersPanel({
   const managedElements = elements
     .filter((element) => element.revealStep <= step)
     .sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
-  const visibleElements = managedElements.filter((element) => !getEffectiveElementState(element, step).hidden);
-  const hiddenElements = managedElements.filter((element) => getEffectiveElementState(element, step).hidden);
 
-  const renderElementRow = (element: SceneElement, hidden: boolean) => (
+  const renderElementRow = (element: SceneElement) => {
+    const hidden = getEffectiveElementState(element, step).hidden;
+
+    return (
     <div
       key={element.id}
       className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
@@ -77,6 +78,11 @@ function SequenceLayersPanel({
         <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
           {getElementTypeLabel(element)}
         </div>
+        <div className={`mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
+          hidden ? 'text-rose-400' : 'text-emerald-500'
+        }`}>
+          {hidden ? 'Hidden' : 'Visible'}
+        </div>
       </button>
 
       <button
@@ -95,7 +101,8 @@ function SequenceLayersPanel({
         {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
       </button>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="border-b border-[#f1f5f9] bg-[#fcfdff] p-4">
@@ -108,34 +115,12 @@ function SequenceLayersPanel({
         </div>
       </div>
 
-      <div className="space-y-3">
-        <div>
-          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            <span>Visible</span>
-            <span>{visibleElements.length}</span>
+      <div className="space-y-2">
+        {managedElements.length > 0 ? managedElements.map((element) => renderElementRow(element)) : (
+          <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
+            No components available in this sequence
           </div>
-          <div className="space-y-2">
-            {visibleElements.length > 0 ? visibleElements.map((element) => renderElementRow(element, false)) : (
-              <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
-                No visible components
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div>
-          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-            <span>Hidden</span>
-            <span>{hiddenElements.length}</span>
-          </div>
-          <div className="space-y-2">
-            {hiddenElements.length > 0 ? hiddenElements.map((element) => renderElementRow(element, true)) : (
-              <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
-                No hidden components
-              </div>
-            )}
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
