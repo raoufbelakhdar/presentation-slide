@@ -5,12 +5,65 @@ import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types'
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 
+type CanvasBackgroundMode = 'light' | 'gray' | 'dark';
+
+const CANVAS_BACKGROUND_STORAGE_KEY = 'visual-learning-canvas-background-mode';
+
+const CANVAS_BACKGROUND_MODES: Record<
+  CanvasBackgroundMode,
+  {
+    label: string;
+    shellBackground: string;
+    stageBackground: string;
+    stageBorder: string;
+    stageOutline: string;
+    gridColor: string;
+  }
+> = {
+  light: {
+    label: 'Light',
+    shellBackground: '#f1f5f9',
+    stageBackground: '#ffffff',
+    stageBorder: '#cbd5e1',
+    stageOutline: '#e2e8f0',
+    gridColor: '#e2e8f0',
+  },
+  gray: {
+    label: 'Gray',
+    shellBackground: '#d7dde5',
+    stageBackground: '#94a3b8',
+    stageBorder: '#64748b',
+    stageOutline: '#cbd5e1',
+    gridColor: '#cbd5e1',
+  },
+  dark: {
+    label: 'Dark',
+    shellBackground: '#0f172a',
+    stageBackground: '#1e293b',
+    stageBorder: '#475569',
+    stageOutline: '#64748b',
+    gridColor: '#334155',
+  },
+};
+
 export function Canvas() {
   const { state, dispatch } = useAppContext();
   const { project, activeSceneIndex, selectedElementId, selectedSequenceStep } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
+  const [backgroundMode, setBackgroundMode] = useState<CanvasBackgroundMode>(() => {
+    if (typeof window === 'undefined') {
+      return 'light';
+    }
+
+    const storedMode = window.localStorage.getItem(CANVAS_BACKGROUND_STORAGE_KEY);
+    if (storedMode === 'gray' || storedMode === 'dark' || storedMode === 'light') {
+      return storedMode;
+    }
+
+    return 'light';
+  });
 
   useEffect(() => {
     const handleResize = () => {
@@ -30,30 +83,71 @@ export function Canvas() {
     return () => observer.disconnect();
   }, []);
 
+  useEffect(() => {
+    window.localStorage.setItem(CANVAS_BACKGROUND_STORAGE_KEY, backgroundMode);
+  }, [backgroundMode]);
+
   if (!activeScene) return null;
 
   const currentStep = selectedSequenceStep !== null ? selectedSequenceStep : 0;
   const orderedElements = [...activeScene.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0));
+  const backgroundConfig = CANVAS_BACKGROUND_MODES[backgroundMode];
 
   return (
     <div 
       ref={containerRef}
-      className="flex-1 bg-[#f1f5f9] relative p-12 overflow-hidden flex items-center justify-center"
+      className="flex-1 relative p-12 overflow-hidden flex items-center justify-center"
+      style={{ backgroundColor: backgroundConfig.shellBackground }}
       onClick={() => dispatch({ type: 'SELECT_ELEMENT', payload: null })}
     >
+      <div className="absolute right-4 top-4 z-20 flex items-center gap-2 rounded-full border border-white/40 bg-white/80 px-2 py-1 shadow-sm backdrop-blur">
+        {(['light', 'gray', 'dark'] as CanvasBackgroundMode[]).map((mode) => {
+          const modeConfig = CANVAS_BACKGROUND_MODES[mode];
+          const isActive = backgroundMode === mode;
+
+          return (
+            <button
+              key={mode}
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setBackgroundMode(mode);
+              }}
+              className={`flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                isActive
+                  ? 'bg-[#0f172a] text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+              }`}
+              title={`${modeConfig.label} canvas background`}
+            >
+              <span
+                className="h-3 w-3 rounded-full border border-black/10"
+                style={{ backgroundColor: modeConfig.stageBackground }}
+              />
+              {modeConfig.label}
+            </button>
+          );
+        })}
+      </div>
+
       <div 
-        className="bg-white border border-[#cbd5e1] relative shadow-2xl shrink-0"
+        className="relative shadow-2xl shrink-0"
         style={{ 
           width: '1920px', 
           height: '1080px',
           transform: `scale(${scale})`,
           transformOrigin: 'center center',
-          backgroundImage: 'radial-gradient(#e2e8f0 1px, transparent 1px)', 
-          backgroundSize: '20px 20px' 
+          backgroundColor: backgroundConfig.stageBackground,
+          border: `1px solid ${backgroundConfig.stageBorder}`,
+          backgroundImage: `radial-gradient(${backgroundConfig.gridColor} 1px, transparent 1px)`,
+          backgroundSize: '20px 20px',
         }}
         onClick={() => dispatch({ type: 'SELECT_ELEMENT', payload: null })}
       >
-        <div className="absolute top-0 left-0 w-full h-full pointer-events-none border-[12px] border-transparent outline outline-1 outline-slate-200 outline-offset-[-12px]"></div>
+        <div
+          className="absolute top-0 left-0 w-full h-full pointer-events-none border-[12px] border-transparent outline outline-1 outline-offset-[-12px]"
+          style={{ outlineColor: backgroundConfig.stageOutline }}
+        ></div>
         {orderedElements.map(element => {
           if (selectedSequenceStep !== null) {
             if (element.revealStep > selectedSequenceStep) return null;
