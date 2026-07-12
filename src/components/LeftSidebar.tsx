@@ -16,6 +16,8 @@ import {
   Image,
   Smile,
   Lightbulb,
+  Loader2,
+  WifiOff,
 } from "lucide-react";
 import { buildSceneTemplate, generateId } from "../utils";
 import {
@@ -37,8 +39,53 @@ import {
   searchEmojis,
 } from "../emojiLibrary";
 import { EmojiGlyph } from "./EmojiGlyph";
+import {
+  convertRemoteImageToDataUrl,
+  getPexelsAssetUrl,
+  getPexelsPhotoLabel,
+  getPexelsThumbnailUrl,
+  PEXELS_IS_CONFIGURED,
+  PexelsColor,
+  PexelsOrientation,
+  PexelsPhoto,
+  PexelsSize,
+  searchPexelsPhotos,
+} from "../pexels";
 
 const FAVORITE_COMPONENTS_STORAGE_KEY = "visual-learning-favorite-components";
+
+const PEXELS_ORIENTATION_OPTIONS: Array<{
+  value: PexelsOrientation;
+  label: string;
+}> = [
+  { value: "all", label: "Any shape" },
+  { value: "landscape", label: "Landscape" },
+  { value: "portrait", label: "Portrait" },
+  { value: "square", label: "Square" },
+];
+
+const PEXELS_SIZE_OPTIONS: Array<{ value: PexelsSize; label: string }> = [
+  { value: "all", label: "Any size" },
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+];
+
+const PEXELS_COLOR_OPTIONS: Array<{ value: PexelsColor; label: string }> = [
+  { value: "all", label: "Any color" },
+  { value: "white", label: "White" },
+  { value: "gray", label: "Gray" },
+  { value: "black", label: "Black" },
+  { value: "blue", label: "Blue" },
+  { value: "green", label: "Green" },
+  { value: "yellow", label: "Yellow" },
+  { value: "orange", label: "Orange" },
+  { value: "red", label: "Red" },
+  { value: "pink", label: "Pink" },
+  { value: "violet", label: "Violet" },
+  { value: "brown", label: "Brown" },
+  { value: "turquoise", label: "Turquoise" },
+];
 
 type PresetId =
   | "free-text"
@@ -222,6 +269,25 @@ export function LeftSidebar() {
   const [editingTemplateName, setEditingTemplateName] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [emojiQuery, setEmojiQuery] = useState("");
+  const [assetQuery, setAssetQuery] = useState("");
+  const [pexelsOrientation, setPexelsOrientation] =
+    useState<PexelsOrientation>("all");
+  const [pexelsSize, setPexelsSize] = useState<PexelsSize>("all");
+  const [pexelsColor, setPexelsColor] = useState<PexelsColor>("all");
+  const [pexelsPage, setPexelsPage] = useState(1);
+  const [pexelsPhotos, setPexelsPhotos] = useState<PexelsPhoto[]>([]);
+  const [pexelsTotalResults, setPexelsTotalResults] = useState(0);
+  const [pexelsHasNextPage, setPexelsHasNextPage] = useState(false);
+  const [pexelsStatus, setPexelsStatus] = useState<
+    "idle" | "loading" | "success" | "error"
+  >("idle");
+  const [pexelsError, setPexelsError] = useState("");
+  const [isImportingPexelsId, setIsImportingPexelsId] = useState<number | null>(
+    null,
+  );
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator === "undefined" ? true : navigator.onLine,
+  );
   const [favoriteComponents, setFavoriteComponents] = useState<
     FavoriteComponent[]
   >(() => {
@@ -246,6 +312,7 @@ export function LeftSidebar() {
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
+  const deferredAssetQuery = useDeferredValue(assetQuery);
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
     : FEATURED_ICON_NAMES;
@@ -255,6 +322,14 @@ export function LeftSidebar() {
         (entry): entry is NonNullable<ReturnType<typeof getEmojiById>> =>
           Boolean(entry),
       );
+  const normalizedAssetQuery = deferredAssetQuery.trim().toLowerCase();
+  const filteredProjectAssets = project.assets.filter((asset) => {
+    if (!normalizedAssetQuery) {
+      return true;
+    }
+
+    return asset.name.toLowerCase().includes(normalizedAssetQuery);
+  });
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -262,6 +337,106 @@ export function LeftSidebar() {
       JSON.stringify(favoriteComponents),
     );
   }, [favoriteComponents]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    setPexelsPage(1);
+  }, [deferredAssetQuery, pexelsOrientation, pexelsSize, pexelsColor]);
+
+  useEffect(() => {
+    if (componentTab !== "assets") {
+      return;
+    }
+
+    if (!PEXELS_IS_CONFIGURED) {
+      setPexelsStatus("idle");
+      setPexelsPhotos([]);
+      setPexelsError("");
+      setPexelsTotalResults(0);
+      setPexelsHasNextPage(false);
+      return;
+    }
+
+    if (!isOnline) {
+      setPexelsStatus("error");
+      setPexelsPhotos([]);
+      setPexelsError("Offline. Your uploaded assets are still available.");
+      setPexelsTotalResults(0);
+      setPexelsHasNextPage(false);
+      return;
+    }
+
+    const abortController = new AbortController();
+    setPexelsStatus("loading");
+    setPexelsError("");
+
+    searchPexelsPhotos({
+      query: deferredAssetQuery,
+      page: pexelsPage,
+      perPage: 18,
+      orientation: pexelsOrientation,
+      size: pexelsSize,
+      color: pexelsColor,
+      signal: abortController.signal,
+    })
+      .then((result) => {
+        setPexelsStatus("success");
+        setPexelsTotalResults(result.totalResults);
+        setPexelsHasNextPage(result.hasNextPage);
+        setPexelsPhotos((currentPhotos) =>
+          pexelsPage === 1
+            ? result.photos
+            : [
+                ...currentPhotos,
+                ...result.photos.filter(
+                  (photo) =>
+                    !currentPhotos.some(
+                      (currentPhoto) => currentPhoto.id === photo.id,
+                    ),
+                ),
+              ],
+        );
+      })
+      .catch((error) => {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setPexelsStatus("error");
+        setPexelsPhotos([]);
+        setPexelsTotalResults(0);
+        setPexelsHasNextPage(false);
+        setPexelsError(
+          error instanceof Error
+            ? error.message
+            : "Pexels search is unavailable right now.",
+        );
+      });
+
+    return () => {
+      abortController.abort();
+    };
+  }, [
+    componentTab,
+    deferredAssetQuery,
+    isOnline,
+    pexelsColor,
+    pexelsOrientation,
+    pexelsPage,
+    pexelsSize,
+  ]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -569,6 +744,31 @@ export function LeftSidebar() {
 
     if (!confirm(message)) return;
     dispatch({ type: "DELETE_ASSET", payload: assetId });
+  };
+
+  const importPexelsPhoto = async (photo: PexelsPhoto) => {
+    setIsImportingPexelsId(photo.id);
+
+    try {
+      const dataUrl = await convertRemoteImageToDataUrl(getPexelsAssetUrl(photo));
+
+      dispatch({
+        type: "ADD_ASSET",
+        payload: {
+          id: generateId(),
+          name: getPexelsPhotoLabel(photo),
+          dataUrl,
+        },
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to import image from Pexels.";
+      window.alert(message);
+    } finally {
+      setIsImportingPexelsId(null);
+    }
   };
 
   const saveCurrentAsTemplate = (kind: "scene" | "branch") => {
@@ -1147,112 +1347,307 @@ export function LeftSidebar() {
                 </div>
               ) : (
                 <div>
-                  <div className="mb-4 flex items-center justify-end">
-                    <label
-                      className="cursor-pointer text-slate-400 hover:text-[#4f46e5] transition-colors"
-                      title="Upload Images"
-                    >
-                      <Upload className="w-4 h-4" />
-                      <input
-                        type="file"
-                        accept="image/*"
-                        multiple
-                        className="hidden"
-                        onChange={handleImageUpload}
-                      />
-                    </label>
-                  </div>
+                  <div className="space-y-5">
+                    <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                            Asset Search
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-500">
+                            Search local assets and optionally browse Pexels.
+                          </div>
+                        </div>
+                        {!isOnline && (
+                          <div className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-amber-700">
+                            <WifiOff className="h-3 w-3" />
+                            Offline
+                          </div>
+                        )}
+                      </div>
 
-                  {project.assets.length === 0 ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
-                        <Upload className="w-5 h-5 mb-1" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">
-                          Upload
-                        </span>
+                      <label className="flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-white px-3 py-2 focus-within:border-[#4f46e5]">
+                        <Search className="h-3.5 w-3.5 text-slate-400" />
                         <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={handleImageUpload}
+                          type="text"
+                          value={assetQuery}
+                          onChange={(event) => setAssetQuery(event.target.value)}
+                          placeholder="Search assets or Pexels photos..."
+                          className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
                         />
                       </label>
+
+                      <div className="mt-3 grid grid-cols-3 gap-2">
+                        <select
+                          value={pexelsOrientation}
+                          onChange={(event) =>
+                            setPexelsOrientation(
+                              event.target.value as PexelsOrientation,
+                            )
+                          }
+                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                        >
+                          {PEXELS_ORIENTATION_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={pexelsSize}
+                          onChange={(event) =>
+                            setPexelsSize(event.target.value as PexelsSize)
+                          }
+                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                        >
+                          {PEXELS_SIZE_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={pexelsColor}
+                          onChange={(event) =>
+                            setPexelsColor(event.target.value as PexelsColor)
+                          }
+                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                        >
+                          {PEXELS_COLOR_OPTIONS.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
-                        <Upload className="w-5 h-5 mb-1" />
-                        <span className="text-[9px] font-bold uppercase tracking-wider">
-                          Upload
-                        </span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          className="hidden"
-                          onChange={handleImageUpload}
-                        />
-                      </label>
-                      {project.assets.map((asset) => {
-                        const usageCount = getAssetUsageCount(asset.id);
 
-                        return (
-                          <div
-                            key={asset.id}
-                            className="relative aspect-square group"
-                          >
-                            <FavoriteToggleButton
-                              active={isFavorite({
-                                type: "asset",
-                                id: asset.id,
-                              })}
-                              title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleFavorite({ type: "asset", id: asset.id });
-                              }}
-                              className="left-1.5 top-1.5"
-                            />
-                            <button
-                              onClick={() => addImageElement(asset.id)}
-                              className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
-                              title={asset.name}
+                    <div>
+                      <div className="mb-3 flex items-center justify-between">
+                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                          Local Assets
+                        </div>
+                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                          {filteredProjectAssets.length}
+                        </div>
+                      </div>
+
+                      <div className="mb-4 flex items-center justify-end">
+                        <label
+                          className="cursor-pointer text-slate-400 hover:text-[#4f46e5] transition-colors"
+                          title="Upload Images"
+                        >
+                          <Upload className="w-4 h-4" />
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleImageUpload}
+                          />
+                        </label>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">
+                            Upload
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={handleImageUpload}
+                          />
+                        </label>
+
+                        {filteredProjectAssets.map((asset) => {
+                          const usageCount = getAssetUsageCount(asset.id);
+
+                          return (
+                            <div
+                              key={asset.id}
+                              className="relative aspect-square group"
                             >
-                              <img
-                                src={asset.dataUrl}
-                                alt={asset.name}
-                                className="w-full h-full object-cover"
+                              <FavoriteToggleButton
+                                active={isFavorite({
+                                  type: "asset",
+                                  id: asset.id,
+                                })}
+                                title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleFavorite({
+                                    type: "asset",
+                                    id: asset.id,
+                                  });
+                                }}
+                                className="left-1.5 top-1.5"
                               />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                <Plus className="w-6 h-6 text-white" />
-                              </div>
-                            </button>
+                              <button
+                                onClick={() => addImageElement(asset.id)}
+                                className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
+                                title={asset.name}
+                              >
+                                <img
+                                  src={asset.dataUrl}
+                                  alt={asset.name}
+                                  className="w-full h-full object-cover"
+                                />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Plus className="w-6 h-6 text-white" />
+                                </div>
+                              </button>
 
-                            <button
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                deleteAsset(asset.id);
-                              }}
-                              className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
-                              title={
-                                usageCount > 0
-                                  ? `Delete Asset (${usageCount} uses)`
-                                  : "Delete Asset"
-                              }
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
+                              <button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  deleteAsset(asset.id);
+                                }}
+                                className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
+                                title={
+                                  usageCount > 0
+                                    ? `Delete Asset (${usageCount} uses)`
+                                    : "Delete Asset"
+                                }
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
 
-                            {usageCount > 0 && (
-                              <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                                {usageCount} use{usageCount === 1 ? "" : "s"}
+                              {usageCount > 0 && (
+                                <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                  {usageCount} use
+                                  {usageCount === 1 ? "" : "s"}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+
+                        {filteredProjectAssets.length === 0 &&
+                          project.assets.length > 0 && (
+                            <div className="col-span-2 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                              No local assets match that search
+                            </div>
+                          )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="mb-3 flex items-center justify-between">
+                        <div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Pexels
+                          </div>
+                          <div className="mt-1 text-[11px] text-slate-500">
+                            Imports a compressed cropped copy into your local
+                            assets.
+                          </div>
+                        </div>
+                        {pexelsStatus === "loading" ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-[#4f46e5]" />
+                        ) : (
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                            {pexelsTotalResults > 0
+                              ? `${pexelsPhotos.length}/${pexelsTotalResults}`
+                              : pexelsPhotos.length}
+                          </div>
+                        )}
+                      </div>
+
+                      {!PEXELS_IS_CONFIGURED ? (
+                        <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          Add `VITE_PEXELS_API_KEY` to enable Pexels search
+                        </div>
+                      ) : !isOnline ? (
+                        <div className="rounded-sm border border-dashed border-amber-200 bg-amber-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
+                          Offline mode: local assets still work
+                        </div>
+                      ) : pexelsStatus === "error" ? (
+                        <div className="rounded-sm border border-dashed border-rose-200 bg-rose-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-rose-600">
+                          {pexelsError || "Pexels search is unavailable"}
+                        </div>
+                      ) : pexelsStatus === "success" &&
+                        pexelsPhotos.length === 0 ? (
+                        <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                          No Pexels images match these filters
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {pexelsStatus === "loading" &&
+                            pexelsPhotos.length === 0 && (
+                              <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                Loading Pexels images...
                               </div>
                             )}
+
+                          <div className="grid grid-cols-2 gap-3">
+                            {pexelsPhotos.map((photo) => (
+                              <div
+                                key={photo.id}
+                                className="overflow-hidden rounded-sm border border-[#e2e8f0] bg-white"
+                              >
+                                <div
+                                  className="relative aspect-square overflow-hidden bg-slate-100"
+                                  style={{
+                                    backgroundColor:
+                                      photo.avg_color || "#e2e8f0",
+                                  }}
+                                >
+                                  <img
+                                    src={getPexelsThumbnailUrl(photo)}
+                                    alt={photo.alt || "Pexels photo"}
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => importPexelsPhoto(photo)}
+                                    disabled={isImportingPexelsId === photo.id}
+                                    className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700 shadow-sm transition-colors hover:bg-white disabled:cursor-wait disabled:opacity-70"
+                                    title="Import into asset library"
+                                  >
+                                    {isImportingPexelsId === photo.id ? (
+                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    ) : (
+                                      <Plus className="h-3.5 w-3.5" />
+                                    )}
+                                    Import
+                                  </button>
+                                </div>
+                                <div className="space-y-1 p-2">
+                                  <div
+                                    className="line-clamp-2 text-[11px] font-semibold text-slate-700"
+                                    title={photo.alt || "Pexels photo"}
+                                  >
+                                    {photo.alt || "Untitled photo"}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    {photo.photographer}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        );
-                      })}
+
+                          {pexelsHasNextPage && pexelsPhotos.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setPexelsPage((page) => page + 1)}
+                              disabled={pexelsStatus === "loading"}
+                              className="w-full rounded-sm border border-[#dbe4f0] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-wait disabled:opacity-70"
+                            >
+                              {pexelsStatus === "loading"
+                                ? "Loading..."
+                                : "Load More"}
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
             </div>
