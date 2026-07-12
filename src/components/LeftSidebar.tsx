@@ -269,7 +269,10 @@ export function LeftSidebar() {
   const [editingTemplateName, setEditingTemplateName] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [emojiQuery, setEmojiQuery] = useState("");
-  const [assetQuery, setAssetQuery] = useState("");
+  const [assetLibraryTab, setAssetLibraryTab] = useState<"local" | "pexels">(
+    "local",
+  );
+  const [pexelsQuery, setPexelsQuery] = useState("");
   const [pexelsOrientation, setPexelsOrientation] =
     useState<PexelsOrientation>("all");
   const [pexelsSize, setPexelsSize] = useState<PexelsSize>("all");
@@ -312,7 +315,7 @@ export function LeftSidebar() {
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
-  const deferredAssetQuery = useDeferredValue(assetQuery);
+  const deferredPexelsQuery = useDeferredValue(pexelsQuery);
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
     : FEATURED_ICON_NAMES;
@@ -322,14 +325,6 @@ export function LeftSidebar() {
         (entry): entry is NonNullable<ReturnType<typeof getEmojiById>> =>
           Boolean(entry),
       );
-  const normalizedAssetQuery = deferredAssetQuery.trim().toLowerCase();
-  const filteredProjectAssets = project.assets.filter((asset) => {
-    if (!normalizedAssetQuery) {
-      return true;
-    }
-
-    return asset.name.toLowerCase().includes(normalizedAssetQuery);
-  });
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -353,10 +348,10 @@ export function LeftSidebar() {
 
   useEffect(() => {
     setPexelsPage(1);
-  }, [deferredAssetQuery, pexelsOrientation, pexelsSize, pexelsColor]);
+  }, [deferredPexelsQuery, pexelsOrientation, pexelsSize, pexelsColor]);
 
   useEffect(() => {
-    if (componentTab !== "assets") {
+    if (componentTab !== "assets" || assetLibraryTab !== "pexels") {
       return;
     }
 
@@ -383,7 +378,7 @@ export function LeftSidebar() {
     setPexelsError("");
 
     searchPexelsPhotos({
-      query: deferredAssetQuery,
+      query: deferredPexelsQuery,
       page: pexelsPage,
       perPage: 18,
       orientation: pexelsOrientation,
@@ -429,8 +424,9 @@ export function LeftSidebar() {
       abortController.abort();
     };
   }, [
+    assetLibraryTab,
     componentTab,
-    deferredAssetQuery,
+    deferredPexelsQuery,
     isOnline,
     pexelsColor,
     pexelsOrientation,
@@ -1352,10 +1348,11 @@ export function LeftSidebar() {
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <div>
                           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                            Asset Search
+                            Assets
                           </div>
                           <div className="mt-1 text-[11px] text-slate-500">
-                            Search local assets and optionally browse Pexels.
+                            Keep your uploaded assets visible and browse Pexels
+                            separately.
                           </div>
                         </div>
                         {!isOnline && (
@@ -1366,287 +1363,323 @@ export function LeftSidebar() {
                         )}
                       </div>
 
-                      <label className="flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-white px-3 py-2 focus-within:border-[#4f46e5]">
-                        <Search className="h-3.5 w-3.5 text-slate-400" />
-                        <input
-                          type="text"
-                          value={assetQuery}
-                          onChange={(event) => setAssetQuery(event.target.value)}
-                          placeholder="Search assets or Pexels photos..."
-                          className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
-                        />
-                      </label>
-
-                      <div className="mt-3 grid grid-cols-3 gap-2">
-                        <select
-                          value={pexelsOrientation}
-                          onChange={(event) =>
-                            setPexelsOrientation(
-                              event.target.value as PexelsOrientation,
-                            )
-                          }
-                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                      <div className="grid grid-cols-2 gap-2 rounded-sm bg-white p-1">
+                        <button
+                          type="button"
+                          onClick={() => setAssetLibraryTab("local")}
+                          className={`rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                            assetLibraryTab === "local"
+                              ? "bg-[#4f46e5] text-white"
+                              : "text-slate-500 hover:bg-[#eef2ff] hover:text-[#4f46e5]"
+                          }`}
                         >
-                          {PEXELS_ORIENTATION_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={pexelsSize}
-                          onChange={(event) =>
-                            setPexelsSize(event.target.value as PexelsSize)
-                          }
-                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                          Local
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAssetLibraryTab("pexels")}
+                          className={`rounded-sm px-3 py-2 text-[11px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                            assetLibraryTab === "pexels"
+                              ? "bg-[#4f46e5] text-white"
+                              : "text-slate-500 hover:bg-[#eef2ff] hover:text-[#4f46e5]"
+                          }`}
                         >
-                          {PEXELS_SIZE_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                        <select
-                          value={pexelsColor}
-                          onChange={(event) =>
-                            setPexelsColor(event.target.value as PexelsColor)
-                          }
-                          className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
-                        >
-                          {PEXELS_COLOR_OPTIONS.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
+                          Pexels
+                        </button>
                       </div>
+
+                      {assetLibraryTab === "pexels" && (
+                        <>
+                          <label className="mt-3 flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-white px-3 py-2 focus-within:border-[#4f46e5]">
+                            <Search className="h-3.5 w-3.5 text-slate-400" />
+                            <input
+                              type="text"
+                              value={pexelsQuery}
+                              onChange={(event) =>
+                                setPexelsQuery(event.target.value)
+                              }
+                              placeholder="Search Pexels photos..."
+                              className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+                            />
+                          </label>
+
+                          <div className="mt-3 grid grid-cols-3 gap-2">
+                            <select
+                              value={pexelsOrientation}
+                              onChange={(event) =>
+                                setPexelsOrientation(
+                                  event.target.value as PexelsOrientation,
+                                )
+                              }
+                              className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                            >
+                              {PEXELS_ORIENTATION_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={pexelsSize}
+                              onChange={(event) =>
+                                setPexelsSize(event.target.value as PexelsSize)
+                              }
+                              className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                            >
+                              {PEXELS_SIZE_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={pexelsColor}
+                              onChange={(event) =>
+                                setPexelsColor(event.target.value as PexelsColor)
+                              }
+                              className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-2 text-[11px] text-slate-600 outline-none focus:border-[#4f46e5]"
+                            >
+                              {PEXELS_COLOR_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </>
+                      )}
                     </div>
 
-                    <div>
-                      <div className="mb-3 flex items-center justify-between">
-                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                          Local Assets
+                    {assetLibraryTab === "local" ? (
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Local Assets
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                            {project.assets.length}
+                          </div>
                         </div>
-                        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                          {filteredProjectAssets.length}
+
+                        <div className="mb-4 flex items-center justify-end">
+                          <label
+                            className="cursor-pointer text-slate-400 transition-colors hover:text-[#4f46e5]"
+                            title="Upload Images"
+                          >
+                            <Upload className="h-4 w-4" />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={handleImageUpload}
+                            />
+                          </label>
                         </div>
-                      </div>
 
-                      <div className="mb-4 flex items-center justify-end">
-                        <label
-                          className="cursor-pointer text-slate-400 hover:text-[#4f46e5] transition-colors"
-                          title="Upload Images"
-                        >
-                          <Upload className="w-4 h-4" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={handleImageUpload}
-                          />
-                        </label>
-                      </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <label className="flex aspect-square cursor-pointer flex-col items-center justify-center border border-dashed border-[#cbd5e1] text-[#64748b] transition-all hover:bg-slate-50">
+                            <Upload className="mb-1 h-5 w-5" />
+                            <span className="text-[9px] font-bold uppercase tracking-wider">
+                              Upload
+                            </span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={handleImageUpload}
+                            />
+                          </label>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
-                          <Upload className="w-5 h-5 mb-1" />
-                          <span className="text-[9px] font-bold uppercase tracking-wider">
-                            Upload
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            multiple
-                            className="hidden"
-                            onChange={handleImageUpload}
-                          />
-                        </label>
+                          {project.assets.map((asset) => {
+                            const usageCount = getAssetUsageCount(asset.id);
 
-                        {filteredProjectAssets.map((asset) => {
-                          const usageCount = getAssetUsageCount(asset.id);
-
-                          return (
-                            <div
-                              key={asset.id}
-                              className="relative aspect-square group"
-                            >
-                              <FavoriteToggleButton
-                                active={isFavorite({
-                                  type: "asset",
-                                  id: asset.id,
-                                })}
-                                title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleFavorite({
+                            return (
+                              <div
+                                key={asset.id}
+                                className="relative aspect-square group"
+                              >
+                                <FavoriteToggleButton
+                                  active={isFavorite({
                                     type: "asset",
                                     id: asset.id,
-                                  });
-                                }}
-                                className="left-1.5 top-1.5"
-                              />
-                              <button
-                                onClick={() => addImageElement(asset.id)}
-                                className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
-                                title={asset.name}
-                              >
-                                <img
-                                  src={asset.dataUrl}
-                                  alt={asset.name}
-                                  className="w-full h-full object-cover"
+                                  })}
+                                  title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite({
+                                      type: "asset",
+                                      id: asset.id,
+                                    });
+                                  }}
+                                  className="left-1.5 top-1.5"
                                 />
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                  <Plus className="w-6 h-6 text-white" />
-                                </div>
-                              </button>
+                                <button
+                                  onClick={() => addImageElement(asset.id)}
+                                  className="relative flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden border border-[#e2e8f0] bg-[#f1f5f9] transition-colors hover:border-[#4f46e5]"
+                                  title={asset.name}
+                                >
+                                  <img
+                                    src={asset.dataUrl}
+                                    alt={asset.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <Plus className="h-6 w-6 text-white" />
+                                  </div>
+                                </button>
 
-                              <button
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  deleteAsset(asset.id);
-                                }}
-                                className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
-                                title={
-                                  usageCount > 0
-                                    ? `Delete Asset (${usageCount} uses)`
-                                    : "Delete Asset"
-                                }
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteAsset(asset.id);
+                                  }}
+                                  className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
+                                  title={
+                                    usageCount > 0
+                                      ? `Delete Asset (${usageCount} uses)`
+                                      : "Delete Asset"
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
 
-                              {usageCount > 0 && (
-                                <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                                  {usageCount} use
-                                  {usageCount === 1 ? "" : "s"}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        {filteredProjectAssets.length === 0 &&
-                          project.assets.length > 0 && (
-                            <div className="col-span-2 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                              No local assets match that search
-                            </div>
-                          )}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="mb-3 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                            Pexels
-                          </div>
-                          <div className="mt-1 text-[11px] text-slate-500">
-                            Imports a compressed cropped copy into your local
-                            assets.
-                          </div>
+                                {usageCount > 0 && (
+                                  <div className="absolute bottom-1.5 left-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                    {usageCount} use
+                                    {usageCount === 1 ? "" : "s"}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        {pexelsStatus === "loading" ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-[#4f46e5]" />
-                        ) : (
-                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                            {pexelsTotalResults > 0
-                              ? `${pexelsPhotos.length}/${pexelsTotalResults}`
-                              : pexelsPhotos.length}
+
+                        {project.assets.length === 0 && (
+                          <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            Upload images to start your local asset library
                           </div>
                         )}
                       </div>
-
-                      {!PEXELS_IS_CONFIGURED ? (
-                        <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                          Add `VITE_PEXELS_API_KEY` to enable Pexels search
-                        </div>
-                      ) : !isOnline ? (
-                        <div className="rounded-sm border border-dashed border-amber-200 bg-amber-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
-                          Offline mode: local assets still work
-                        </div>
-                      ) : pexelsStatus === "error" ? (
-                        <div className="rounded-sm border border-dashed border-rose-200 bg-rose-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-rose-600">
-                          {pexelsError || "Pexels search is unavailable"}
-                        </div>
-                      ) : pexelsStatus === "success" &&
-                        pexelsPhotos.length === 0 ? (
-                        <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                          No Pexels images match these filters
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          {pexelsStatus === "loading" &&
-                            pexelsPhotos.length === 0 && (
-                              <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                                Loading Pexels images...
-                              </div>
-                            )}
-
-                          <div className="grid grid-cols-2 gap-3">
-                            {pexelsPhotos.map((photo) => (
-                              <div
-                                key={photo.id}
-                                className="overflow-hidden rounded-sm border border-[#e2e8f0] bg-white"
-                              >
-                                <div
-                                  className="relative aspect-square overflow-hidden bg-slate-100"
-                                  style={{
-                                    backgroundColor:
-                                      photo.avg_color || "#e2e8f0",
-                                  }}
-                                >
-                                  <img
-                                    src={getPexelsThumbnailUrl(photo)}
-                                    alt={photo.alt || "Pexels photo"}
-                                    loading="lazy"
-                                    className="h-full w-full object-cover"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => importPexelsPhoto(photo)}
-                                    disabled={isImportingPexelsId === photo.id}
-                                    className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700 shadow-sm transition-colors hover:bg-white disabled:cursor-wait disabled:opacity-70"
-                                    title="Import into asset library"
-                                  >
-                                    {isImportingPexelsId === photo.id ? (
-                                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      <Plus className="h-3.5 w-3.5" />
-                                    )}
-                                    Import
-                                  </button>
-                                </div>
-                                <div className="space-y-1 p-2">
-                                  <div
-                                    className="line-clamp-2 text-[11px] font-semibold text-slate-700"
-                                    title={photo.alt || "Pexels photo"}
-                                  >
-                                    {photo.alt || "Untitled photo"}
-                                  </div>
-                                  <div className="text-[10px] text-slate-500">
-                                    {photo.photographer}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
+                    ) : (
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <div>
+                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              Pexels
+                            </div>
+                            <div className="mt-1 text-[11px] text-slate-500">
+                              Search Pexels and import a cropped copy into your
+                              local assets.
+                            </div>
                           </div>
-
-                          {pexelsHasNextPage && pexelsPhotos.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => setPexelsPage((page) => page + 1)}
-                              disabled={pexelsStatus === "loading"}
-                              className="w-full rounded-sm border border-[#dbe4f0] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-wait disabled:opacity-70"
-                            >
-                              {pexelsStatus === "loading"
-                                ? "Loading..."
-                                : "Load More"}
-                            </button>
+                          {pexelsStatus === "loading" ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-[#4f46e5]" />
+                          ) : (
+                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                              {pexelsTotalResults > 0
+                                ? `${pexelsPhotos.length}/${pexelsTotalResults}`
+                                : pexelsPhotos.length}
+                            </div>
                           )}
                         </div>
-                      )}
-                    </div>
+
+                        {!PEXELS_IS_CONFIGURED ? (
+                          <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            Add `VITE_PEXELS_API_KEY` to enable Pexels search
+                          </div>
+                        ) : !isOnline ? (
+                          <div className="rounded-sm border border-dashed border-amber-200 bg-amber-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-amber-700">
+                            Offline mode: local assets still work
+                          </div>
+                        ) : pexelsStatus === "error" ? (
+                          <div className="rounded-sm border border-dashed border-rose-200 bg-rose-50 px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-rose-600">
+                            {pexelsError || "Pexels search is unavailable"}
+                          </div>
+                        ) : pexelsStatus === "success" &&
+                          pexelsPhotos.length === 0 ? (
+                          <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            No Pexels images match these filters
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {pexelsStatus === "loading" &&
+                              pexelsPhotos.length === 0 && (
+                                <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                                  Loading Pexels images...
+                                </div>
+                              )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                              {pexelsPhotos.map((photo) => (
+                                <div
+                                  key={photo.id}
+                                  className="overflow-hidden rounded-sm border border-[#e2e8f0] bg-white"
+                                >
+                                  <div
+                                    className="relative aspect-square overflow-hidden bg-slate-100"
+                                    style={{
+                                      backgroundColor:
+                                        photo.avg_color || "#e2e8f0",
+                                    }}
+                                  >
+                                    <img
+                                      src={getPexelsThumbnailUrl(photo)}
+                                      alt={photo.alt || "Pexels photo"}
+                                      loading="lazy"
+                                      className="h-full w-full object-cover"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => importPexelsPhoto(photo)}
+                                      disabled={
+                                        isImportingPexelsId === photo.id
+                                      }
+                                      className="absolute inset-x-2 bottom-2 flex items-center justify-center gap-1 rounded-sm bg-white/95 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-700 shadow-sm transition-colors hover:bg-white disabled:cursor-wait disabled:opacity-70"
+                                      title="Import into asset library"
+                                    >
+                                      {isImportingPexelsId === photo.id ? (
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                      ) : (
+                                        <Plus className="h-3.5 w-3.5" />
+                                      )}
+                                      Import
+                                    </button>
+                                  </div>
+                                  <div className="space-y-1 p-2">
+                                    <div
+                                      className="line-clamp-2 text-[11px] font-semibold text-slate-700"
+                                      title={photo.alt || "Pexels photo"}
+                                    >
+                                      {photo.alt || "Untitled photo"}
+                                    </div>
+                                    <div className="text-[10px] text-slate-500">
+                                      {photo.photographer}
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            {pexelsHasNextPage && pexelsPhotos.length > 0 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPexelsPage((page) => page + 1)
+                                }
+                                disabled={pexelsStatus === "loading"}
+                                className="w-full rounded-sm border border-[#dbe4f0] bg-[#f8fafc] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-wait disabled:opacity-70"
+                              >
+                                {pexelsStatus === "loading"
+                                  ? "Loading..."
+                                  : "Load More"}
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
