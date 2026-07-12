@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
+import { Copy, Trash2, Layers, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
 import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
@@ -328,6 +328,15 @@ export function RightSidebar() {
   const selectedEmoji = shapeElement?.shapeType === 'emoji'
     ? getEmojiById(shapeElement.emojiHexcode || '')
     : null;
+  const canResetToInitialFrame =
+    selectedSequenceStep !== null &&
+    selectedSequenceStep > selectedElement.revealStep &&
+    (
+      displayedElement.x !== selectedElement.x ||
+      displayedElement.y !== selectedElement.y ||
+      displayedElement.width !== selectedElement.width ||
+      displayedElement.height !== selectedElement.height
+    );
   const propertiesTitle =
     selectedElement.type === 'shape' && selectedElement.shapeType === 'emoji'
       ? 'Emoji Properties'
@@ -660,6 +669,23 @@ export function RightSidebar() {
              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Position</span>
              <span className="text-[10px] font-mono text-[#4f46e5]">X: {Math.round(displayedElement.x)} | Y: {Math.round(displayedElement.y)}</span>
           </div>
+          {canResetToInitialFrame && (
+            <button
+              onClick={() =>
+                handleUpdate({
+                  x: selectedElement.x,
+                  y: selectedElement.y,
+                  width: selectedElement.width,
+                  height: selectedElement.height,
+                })
+              }
+              className="mb-3 flex w-full items-center justify-center gap-2 rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
+              title="Reset this sequence frame to the element's initial placement"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Reset To Initial Frame
+            </button>
+          )}
           <div className="mb-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Layer Order</span>
