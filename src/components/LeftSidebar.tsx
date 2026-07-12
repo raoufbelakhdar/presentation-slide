@@ -19,16 +19,26 @@ import {
   Loader2,
   WifiOff,
 } from "lucide-react";
-import { buildSceneTemplate, generateId } from "../utils";
 import {
+  Asset,
+  SceneElement,
   TextElement,
   ImageElement,
   ShapeElement,
   ColorElement,
 } from "../types";
 import {
+  buildSceneTemplate,
+  generateId,
+  getTextAlign,
+  getTextSubtitleFontSize,
+  getTextVariant,
+  splitTextContent,
+} from "../utils";
+import {
   FEATURED_ICON_NAMES,
   LUCIDE_ICON_NAMES,
+  formatIconName,
   searchLucideIcons,
 } from "../iconLibrary";
 import { LucideIconGlyph } from "./LucideIconGlyph";
@@ -100,7 +110,235 @@ type FavoriteComponent =
   | { type: "preset"; id: PresetId }
   | { type: "icon"; id: string }
   | { type: "emoji"; id: string }
-  | { type: "asset"; id: string };
+  | { type: "asset"; id: string }
+  | {
+      type: "saved-element";
+      id: string;
+      name: string;
+      element: SceneElement;
+      asset?: Asset;
+    };
+
+function cloneFavoriteElement(element: SceneElement): SceneElement {
+  return {
+    ...element,
+    keyframes: element.keyframes
+      ? Object.fromEntries(
+          Object.entries(element.keyframes).map(([step, keyframe]) => [
+            Number(step),
+            { ...keyframe },
+          ]),
+        )
+      : undefined,
+  } as SceneElement;
+}
+
+function getSavedFavoriteId(
+  projectId: string,
+  sceneId: string,
+  elementId: string,
+) {
+  return `saved:${projectId}:${sceneId}:${elementId}`;
+}
+
+function getSavedFavoriteName(
+  element: SceneElement,
+  assetsById: Map<string, Asset>,
+) {
+  if (element.type === "text") {
+    const textVariant = getTextVariant(element);
+    const title =
+      textVariant === "free"
+        ? element.text
+            .split("\n")
+            .find((line) => line.trim())
+            ?.trim()
+        : splitTextContent(element.text).title.trim();
+
+    return title || (textVariant === "free" ? "Free Text" : "Text Block");
+  }
+
+  if (element.type === "image") {
+    return (
+      element.captionText?.trim() ||
+      assetsById.get(element.assetId)?.name ||
+      "Image"
+    );
+  }
+
+  if (element.type === "color") {
+    return element.captionText?.trim() || "Color Card";
+  }
+
+  if (element.shapeType === "emoji") {
+    const emojiEntry = getEmojiById(element.emojiHexcode || "");
+    return emojiEntry ? getEmojiLabel(emojiEntry) : element.emojiChar || "Emoji";
+  }
+
+  if (element.shapeType === "icon") {
+    return formatIconName(element.iconName || "Icon");
+  }
+
+  if (element.shapeType === "yes") return "Yes Badge";
+  if (element.shapeType === "no") return "No Badge";
+  if (element.shapeType === "check") return "Check Mark";
+  return "Cross Mark";
+}
+
+function getSavedFavoriteTypeLabel(element: SceneElement) {
+  if (element.type === "text") {
+    return getTextVariant(element) === "free" ? "Text" : "Text Block";
+  }
+
+  if (element.type === "image") return "Image";
+  if (element.type === "color") return "Color";
+  if (element.shapeType === "emoji") return "Emoji";
+  if (element.shapeType === "icon") return "Icon";
+  if (element.shapeType === "yes") return "Yes";
+  if (element.shapeType === "no") return "No";
+  if (element.shapeType === "check") return "Check";
+  return "Cross";
+}
+
+function SavedElementFavoritePreview({
+  favorite,
+}: {
+  favorite: Extract<FavoriteComponent, { type: "saved-element" }>;
+}) {
+  const { element, asset } = favorite;
+
+  if (element.type === "text") {
+    const textVariant = getTextVariant(element);
+    const textAlign = getTextAlign(element);
+    const textParts = splitTextContent(element.text);
+    const title =
+      textVariant === "free"
+        ? element.text
+            .split("\n")
+            .find((line) => line.trim())
+            ?.trim() || "Add your text here"
+        : textParts.title.trim() || "Main Title";
+    const subtitleLines =
+      textVariant === "block"
+        ? textParts.subtitle.split("\n").filter(Boolean).slice(0, 2)
+        : [];
+
+    return (
+      <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] bg-white p-2.5">
+        {textVariant === "block" ? (
+          <div
+            className="flex h-full w-full flex-col justify-center rounded-[24px] bg-[#3b82f6] px-3 text-white"
+            style={{ textAlign }}
+          >
+            <div
+              className="truncate text-[11px] font-bold leading-tight"
+              style={{ fontSize: Math.min(11, Math.max(8, element.fontSize / 6)) }}
+            >
+              {title}
+            </div>
+            {subtitleLines.map((line, index) => (
+              <div
+                key={`${favorite.id}-${index}`}
+                className="truncate opacity-90"
+                style={{
+                  fontSize: `${Math.min(
+                    9,
+                    Math.max(7, getTextSubtitleFontSize(element) / 5),
+                  )}px`,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div
+            className="w-full whitespace-pre-wrap break-words text-[11px] font-bold leading-tight text-slate-800"
+            style={{
+              textAlign,
+              color: element.color,
+              fontWeight: element.fontWeight,
+              fontSize: `${Math.min(12, Math.max(8, element.fontSize / 5.5))}px`,
+            }}
+          >
+            {title}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (element.type === "image") {
+    return (
+      <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] bg-[#f8fafc]">
+        {asset ? (
+          <img
+            src={asset.dataUrl}
+            alt={favorite.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="px-3 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            Missing image asset
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (element.type === "color") {
+    return (
+      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white p-3">
+        <div
+          className="h-full w-full rounded-sm border border-slate-100 shadow-sm"
+          style={{ backgroundColor: element.fillColor }}
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === "emoji") {
+    const emojiEntry = getEmojiById(element.emojiHexcode || "");
+    return (
+      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+        <EmojiGlyph
+          id={element.emojiHexcode || "grinning-face"}
+          fallback={emojiEntry?.emoji || element.emojiChar || "😀"}
+          className="h-12 w-12 text-5xl"
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === "icon") {
+    return (
+      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white p-4">
+        <LucideIconGlyph
+          name={element.iconName || "circle"}
+          className="h-full w-full"
+          color={element.iconColor || "#0f172a"}
+          strokeWidth={element.iconStrokeWidth || 2.25}
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === "yes" || element.shapeType === "no") {
+    return (
+      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+        <BadgePresetPreview type={element.shapeType} />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <MarkPresetPreview
+        type={element.shapeType === "check" ? "check" : "cross"}
+      />
+    </div>
+  );
+}
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
   return (
@@ -249,7 +487,20 @@ function FavoriteToggleButton({
 
 export function LeftSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, templates, selectedSequenceStep } = state;
+  const {
+    project,
+    activeSceneIndex,
+    templates,
+    selectedElementId,
+    selectedSequenceStep,
+  } = state;
+  const activeScene = project.scenes[activeSceneIndex];
+  const selectedElement =
+    activeScene?.elements.find((element) => element.id === selectedElementId) ||
+    null;
+  const projectAssetsById = new Map<string, Asset>(
+    project.assets.map((asset) => [asset.id, asset]),
+  );
   const sceneTemplates = templates.filter(
     (template) => (template.kind || "scene") === "scene",
   );
@@ -719,6 +970,25 @@ export function LeftSidebar() {
     .filter((asset): asset is (typeof project.assets)[number] =>
       Boolean(asset),
     );
+  const favoriteSavedElements = favoriteComponents.filter(
+    (
+      favorite,
+    ): favorite is Extract<FavoriteComponent, { type: "saved-element" }> =>
+      favorite.type === "saved-element",
+  );
+  const selectedSavedFavoriteId =
+    selectedElement && activeScene
+      ? getSavedFavoriteId(project.id, activeScene.id, selectedElement.id)
+      : null;
+  const isSelectedElementSaved = Boolean(
+    selectedSavedFavoriteId &&
+      favoriteSavedElements.some(
+        (favorite) => favorite.id === selectedSavedFavoriteId,
+      ),
+  );
+  const selectedElementFavoriteName = selectedElement
+    ? getSavedFavoriteName(selectedElement, projectAssetsById)
+    : "";
 
   const getAssetUsageCount = (assetId: string) => {
     return project.scenes.reduce((count, scene) => {
@@ -785,6 +1055,104 @@ export function LeftSidebar() {
 
   const useTemplate = (templateId: string) => {
     dispatch({ type: "USE_TEMPLATE", payload: templateId });
+  };
+
+  const saveSelectedElementToFavorites = () => {
+    if (!activeScene || !selectedElement) {
+      return;
+    }
+
+    const favorite: Extract<FavoriteComponent, { type: "saved-element" }> = {
+      type: "saved-element",
+      id: getSavedFavoriteId(project.id, activeScene.id, selectedElement.id),
+      name: getSavedFavoriteName(selectedElement, projectAssetsById),
+      element: cloneFavoriteElement(selectedElement),
+      asset:
+        selectedElement.type === "image"
+          ? projectAssetsById.get(selectedElement.assetId)
+          : undefined,
+    };
+
+    setFavoriteComponents((currentFavorites) => {
+      const existingIndex = currentFavorites.findIndex(
+        (entry) => entry.type === "saved-element" && entry.id === favorite.id,
+      );
+
+      if (existingIndex === -1) {
+        return [favorite, ...currentFavorites];
+      }
+
+      const nextFavorites = [...currentFavorites];
+      nextFavorites[existingIndex] = favorite;
+      return nextFavorites;
+    });
+  };
+
+  const addSavedFavoriteElement = (
+    favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
+  ) => {
+    const nextElement = cloneFavoriteElement(favorite.element);
+    const nextWidth = Math.max(1, Math.round(nextElement.width));
+    const nextHeight = Math.max(1, Math.round(nextElement.height));
+    const nextX = Math.min(
+      Math.max(Math.round((1920 - nextWidth) / 2), 0),
+      Math.max(0, 1920 - nextWidth),
+    );
+    const nextY = Math.min(
+      Math.max(Math.round((1080 - nextHeight) / 2), 0),
+      Math.max(0, 1080 - nextHeight),
+    );
+
+    if (nextElement.type === "image") {
+      let assetId = nextElement.assetId;
+      const existingAsset = projectAssetsById.get(assetId);
+
+      if (!existingAsset) {
+        if (!favorite.asset) {
+          window.alert(
+            "This saved component is missing its image asset, so it can't be added right now.",
+          );
+          return;
+        }
+
+        assetId = generateId();
+        dispatch({
+          type: "ADD_ASSET",
+          payload: {
+            ...favorite.asset,
+            id: assetId,
+          },
+        });
+      }
+
+      dispatch({
+        type: "ADD_ELEMENT",
+        payload: {
+          ...nextElement,
+          id: generateId(),
+          assetId,
+          x: nextX,
+          y: nextY,
+          revealStep: defaultRevealStep,
+          hideStep: null,
+          keyframes: undefined,
+        },
+      });
+      return;
+    }
+
+    dispatch({
+      type: "ADD_ELEMENT",
+      payload: {
+        ...nextElement,
+        id: generateId(),
+        x: nextX,
+        y: nextY,
+        revealStep: defaultRevealStep,
+        hideStep: null,
+        keyframes: undefined,
+      },
+    });
   };
 
   const activeTemplates =
@@ -1007,12 +1375,86 @@ export function LeftSidebar() {
 
               {componentTab === "favorites" ? (
                 <div className="space-y-6">
+                  {selectedElement ? (
+                    <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        Selected On Canvas
+                      </div>
+                      <div className="mt-3 flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate text-xs font-semibold text-[#0f172a]">
+                            {selectedElementFavoriteName}
+                          </div>
+                          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            {getSavedFavoriteTypeLabel(selectedElement)}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={saveSelectedElementToFavorites}
+                          className="rounded-sm border border-[#dbe4f0] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                        >
+                          {isSelectedElementSaved ? "Update" : "Save"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      Select a canvas component to save it here
+                    </div>
+                  )}
+
                   {favoriteComponents.length === 0 ? (
                     <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                       No favorites yet
                     </div>
                   ) : (
                     <div className="space-y-5">
+                      {favoriteSavedElements.length > 0 && (
+                        <div>
+                          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Saved Components
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {favoriteSavedElements.map((favorite) => (
+                              <div key={favorite.id} className="relative">
+                                <FavoriteToggleButton
+                                  active
+                                  title={`Remove ${favorite.name} from favorites`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite({
+                                      type: "saved-element",
+                                      id: favorite.id,
+                                      name: favorite.name,
+                                      element: favorite.element,
+                                      asset: favorite.asset,
+                                    });
+                                  }}
+                                  className="right-1.5 top-1.5"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => addSavedFavoriteElement(favorite)}
+                                  title={favorite.name}
+                                  className="flex h-full w-full flex-col rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
+                                >
+                                  <SavedElementFavoritePreview
+                                    favorite={favorite}
+                                  />
+                                  <div className="mt-2 truncate text-[11px] font-semibold text-[#0f172a]">
+                                    {favorite.name}
+                                  </div>
+                                  <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                    {getSavedFavoriteTypeLabel(favorite.element)}
+                                  </div>
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
                       {favoritePresets.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
