@@ -5,7 +5,6 @@ type OpenMojiEntry = import('openmoji/data/openmoji.json').OpenMojiEntry;
 export interface EmojiEntry {
   id: string;
   label: string;
-  assetUrl: string;
   emoji?: string;
   legacyHexcodes: string[];
   searchText: string;
@@ -30,10 +29,12 @@ const RAW_FEATURED_EMOJI_IDS = [
   'glowing-star',
 ] as const;
 
-const fluentEmojiAssets = import.meta.glob('/node_modules/fluentui-emoji/icons/flat/*.svg', {
-  eager: true,
-  import: 'default',
-}) as Record<string, string>;
+const fluentEmojiAssetLoaders = import.meta.glob(
+  '/node_modules/fluentui-emoji/icons/flat/*.svg',
+  {
+    import: 'default',
+  },
+) as Record<string, () => Promise<string>>;
 
 function normalizeEmojiId(value: string) {
   return value.trim().toLowerCase().replace(/_/g, '-');
@@ -75,9 +76,13 @@ const openMojiBySlug = openmojiEntries.reduce((map, entry) => {
   return map;
 }, new Map<string, OpenMojiEntry[]>());
 
-const emojiEntries = Object.entries(fluentEmojiAssets)
-  .map(([path, assetUrl]) => {
+const EMOJI_ASSET_LOADERS = new Map<string, () => Promise<string>>();
+const EMOJI_ASSET_URL_CACHE = new Map<string, Promise<string | null>>();
+
+const emojiEntries = Object.entries(fluentEmojiAssetLoaders)
+  .map(([path, loadAssetUrl]) => {
     const id = normalizeEmojiId(path.split('/').pop()?.replace(/\.svg$/i, '') || '');
+    EMOJI_ASSET_LOADERS.set(id, loadAssetUrl);
     const legacyMatches = openMojiBySlug.get(id) || [];
     const primaryLegacyMatch = legacyMatches[0];
     const label = formatEmojiName(id);
@@ -92,7 +97,6 @@ const emojiEntries = Object.entries(fluentEmojiAssets)
     return {
       id,
       label,
-      assetUrl,
       emoji: primaryLegacyMatch?.emoji,
       legacyHexcodes: Array.from(new Set(legacyMatches.map((entry) => entry.hexcode.toUpperCase()))),
       searchText: Array.from(searchParts).join(' ').toLowerCase(),
@@ -135,8 +139,28 @@ export function getEmojiById(id: string) {
   return resolvedId ? EMOJI_BY_ID.get(resolvedId) || null : null;
 }
 
-export function getEmojiDataUrl(id: string) {
-  return getEmojiById(id)?.assetUrl || null;
+export async function loadEmojiAssetUrl(id: string) {
+  const resolvedId = resolveEmojiId(id);
+  if (!resolvedId) {
+    return null;
+  }
+
+  const existingRequest = EMOJI_ASSET_URL_CACHE.get(resolvedId);
+  if (existingRequest) {
+    return existingRequest;
+  }
+
+  const loadAssetUrl = EMOJI_ASSET_LOADERS.get(resolvedId);
+  if (!loadAssetUrl) {
+    return null;
+  }
+
+  const assetRequest = loadAssetUrl()
+    .then((assetUrl) => assetUrl || null)
+    .catch(() => null);
+
+  EMOJI_ASSET_URL_CACHE.set(resolvedId, assetRequest);
+  return assetRequest;
 }
 
 export function getEmojiLabel(entry: Pick<EmojiEntry, 'label' | 'emoji'>) {

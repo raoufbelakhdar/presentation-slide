@@ -31,7 +31,6 @@ import {
 } from "../iconLibrary";
 import { LucideIconGlyph } from "./LucideIconGlyph";
 import {
-  EMOJI_LIBRARY,
   FEATURED_EMOJI_IDS,
   getEmojiById,
   getEmojiLabel,
