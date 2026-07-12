@@ -1,8 +1,9 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
-import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
 import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
+import { formatIconName } from '../iconLibrary';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -21,6 +22,10 @@ function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
     return element.captionText?.trim() || 'Color Card';
   }
 
+  if (element.shapeType === 'icon') {
+    return formatIconName(element.iconName || 'Icon');
+  }
+
   if (element.shapeType === 'yes') return 'Yes Badge';
   if (element.shapeType === 'no') return 'No Badge';
   if (element.shapeType === 'check') return 'Check Mark';
@@ -31,6 +36,7 @@ function getElementTypeLabel(element: SceneElement) {
   if (element.type === 'text') return getTextVariant(element) === 'free' ? 'Text' : 'Text Block';
   if (element.type === 'image') return 'Image';
   if (element.type === 'color') return 'Color';
+  if (element.shapeType === 'icon') return 'Icon';
   if (element.shapeType === 'yes') return 'Yes';
   if (element.shapeType === 'no') return 'No';
   if (element.shapeType === 'check') return 'Check';
@@ -297,6 +303,7 @@ export function RightSidebar() {
   const imageElement = selectedElement.type === 'image' ? (selectedElement as import('../types').ImageElement) : null;
   const colorElement = selectedElement.type === 'color' ? (selectedElement as ColorElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
+  const shapeElement = selectedElement.type === 'shape' ? (selectedElement as ShapeElement) : null;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
   const textAlign = textElement ? getTextAlign(textElement) : null;
@@ -307,11 +314,15 @@ export function RightSidebar() {
     selectedSequenceStep !== null &&
     selectedElement.revealStep <= selectedSequenceStep &&
     Boolean(getEffectiveElementState(selectedElement, selectedSequenceStep).hidden);
+  const propertiesTitle =
+    selectedElement.type === 'shape' && selectedElement.shapeType === 'icon'
+      ? 'Icon Properties'
+      : `${selectedElement.type} Properties`;
 
   return (
     <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
       <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
-        <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">{selectedElement.type} Properties</h3>
+        <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">{propertiesTitle}</h3>
         <button 
           onClick={() => dispatch({ type: 'DELETE_ELEMENT', payload: selectedElement.id })}
           className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
@@ -564,6 +575,50 @@ export function RightSidebar() {
                   className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
                 />
               </div>
+            </div>
+          </>
+        )}
+
+        {selectedElement.type === 'shape' && shapeElement?.shapeType === 'icon' && !selectedElementHiddenInSequence && (
+          <>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Icon</label>
+              <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+                <div className="text-xs font-semibold text-[#0f172a]">{formatIconName(shapeElement.iconName || 'Icon')}</div>
+                <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+                  {shapeElement.iconName || 'icon'}
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={shapeElement.iconColor || '#0f172a'}
+                  onChange={(e) => handleUpdate({ iconColor: e.target.value })}
+                  className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+                />
+                <input
+                  type="text"
+                  value={shapeElement.iconColor || '#0f172a'}
+                  onChange={(e) => handleUpdate({ iconColor: e.target.value })}
+                  className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Width</label>
+              <input
+                type="number"
+                min={0.5}
+                step={0.1}
+                value={shapeElement.iconStrokeWidth || 2.25}
+                onChange={(e) => handleUpdate({ iconStrokeWidth: Math.max(0.5, parseFloat(e.target.value) || 0.5) })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+              />
             </div>
           </>
         )}

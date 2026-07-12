@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useDeferredValue, useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch } from 'lucide-react';
+import { Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch, Search } from 'lucide-react';
 import { buildSceneTemplate, generateId } from '../utils';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
+import { FEATURED_ICON_NAMES, LUCIDE_ICON_NAMES, formatIconName, searchLucideIcons } from '../iconLibrary';
+import { LucideIconGlyph } from './LucideIconGlyph';
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
   return (
@@ -63,6 +65,14 @@ function ColorCardPresetPreview() {
   );
 }
 
+function IconPresetPreview({ iconName }: { iconName: string }) {
+  return (
+    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <LucideIconGlyph name={iconName} className="h-7 w-7 text-[#0f172a]" color="#0f172a" strokeWidth={2.25} />
+    </div>
+  );
+}
+
 function PresetButton({
   label,
   onClick,
@@ -90,10 +100,16 @@ export function LeftSidebar() {
   const sceneTemplates = templates.filter((template) => (template.kind || 'scene') === 'scene');
   const branchTemplates = templates.filter((template) => template.kind === 'branch');
   const [activeTab, setActiveTab] = useState<'library' | 'templates'>('library');
+  const [componentTab, setComponentTab] = useState<'presets' | 'icons'>('presets');
   const [templateTab, setTemplateTab] = useState<'scene' | 'branch'>('scene');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
+  const [iconQuery, setIconQuery] = useState('');
   const defaultRevealStep = selectedSequenceStep ?? 1;
+  const deferredIconQuery = useDeferredValue(iconQuery);
+  const filteredIcons = deferredIconQuery.trim()
+    ? searchLucideIcons(deferredIconQuery, 72)
+    : FEATURED_ICON_NAMES;
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -221,6 +237,23 @@ export function LeftSidebar() {
       y: 150,
       width: 300,
       height: 300,
+      revealStep: defaultRevealStep,
+    };
+    dispatch({ type: 'ADD_ELEMENT', payload: newElement });
+  };
+
+  const addIconElement = (iconName: string) => {
+    const newElement: ShapeElement = {
+      id: generateId(),
+      type: 'shape',
+      shapeType: 'icon',
+      iconName,
+      iconColor: '#0f172a',
+      iconStrokeWidth: 2.25,
+      x: 160,
+      y: 180,
+      width: 180,
+      height: 180,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
@@ -372,7 +405,7 @@ export function LeftSidebar() {
           className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${activeTab === 'library' ? 'text-[#1e293b] border-[#4f46e5] bg-white' : 'text-slate-400 border-transparent hover:bg-slate-50'}`}
           onClick={() => setActiveTab('library')}
         >
-          Images & Text
+          Components
         </button>
         <button
           className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${activeTab === 'templates' ? 'text-[#1e293b] border-[#4f46e5] bg-white' : 'text-slate-400 border-transparent hover:bg-slate-50'}`}
@@ -386,91 +419,182 @@ export function LeftSidebar() {
         {activeTab === 'library' ? (
           <div className="p-4 space-y-6">
             <div>
-              <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em] mb-4">Component Presets</h3>
-              <div className="grid grid-cols-2 gap-2">
-                <PresetButton label="Free Text" onClick={addFreeTextElement}>
-                  <TextPresetPreview />
-                </PresetButton>
-                <PresetButton label="Text Block" onClick={addTextBlockElement}>
-                  <TextPresetPreview block />
-                </PresetButton>
-                <PresetButton label="Yes Badge" onClick={addYesElement}>
-                  <BadgePresetPreview type="yes" />
-                </PresetButton>
-                <PresetButton label="No Badge" onClick={addNoElement}>
-                  <BadgePresetPreview type="no" />
-                </PresetButton>
-                <PresetButton label="Solid Color Card" onClick={addColorElement}>
-                  <ColorCardPresetPreview />
-                </PresetButton>
-                <PresetButton label="Blue Check" onClick={addCheckElement}>
-                  <MarkPresetPreview type="check" />
-                </PresetButton>
-                <PresetButton label="Red X" onClick={addCrossElement}>
-                  <MarkPresetPreview type="cross" />
-                </PresetButton>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Components</h3>
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">
+                    Presets now, searchable icons next, and room for more component libraries later.
+                  </p>
+                </div>
+                <div className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#4f46e5]">
+                  {LUCIDE_ICON_NAMES.length}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Assets Library</h3>
-                <label className="cursor-pointer text-slate-400 hover:text-[#4f46e5] transition-colors" title="Upload Images">
-                  <Upload className="w-4 h-4" />
-                  <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
-                </label>
+              <div className="mb-4 grid grid-cols-2 gap-2 rounded-sm bg-[#f8fafc] p-1">
+                <button
+                  type="button"
+                  onClick={() => setComponentTab('presets')}
+                  className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    componentTab === 'presets'
+                      ? 'bg-white text-[#1e293b] shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Presets
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentTab('icons')}
+                  className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    componentTab === 'icons'
+                      ? 'bg-white text-[#1e293b] shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Icons
+                </button>
               </div>
-              
-              {project.assets.length === 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
-                    <Upload className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-                  </label>
+
+              {componentTab === 'presets' ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="mb-4 text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Component Presets</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <PresetButton label="Free Text" onClick={addFreeTextElement}>
+                        <TextPresetPreview />
+                      </PresetButton>
+                      <PresetButton label="Text Block" onClick={addTextBlockElement}>
+                        <TextPresetPreview block />
+                      </PresetButton>
+                      <PresetButton label="Yes Badge" onClick={addYesElement}>
+                        <BadgePresetPreview type="yes" />
+                      </PresetButton>
+                      <PresetButton label="No Badge" onClick={addNoElement}>
+                        <BadgePresetPreview type="no" />
+                      </PresetButton>
+                      <PresetButton label="Solid Color Card" onClick={addColorElement}>
+                        <ColorCardPresetPreview />
+                      </PresetButton>
+                      <PresetButton label="Blue Check" onClick={addCheckElement}>
+                        <MarkPresetPreview type="check" />
+                      </PresetButton>
+                      <PresetButton label="Red X" onClick={addCrossElement}>
+                        <MarkPresetPreview type="cross" />
+                      </PresetButton>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="mb-4 flex items-center justify-between">
+                      <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Assets Library</h3>
+                      <label className="cursor-pointer text-slate-400 hover:text-[#4f46e5] transition-colors" title="Upload Images">
+                        <Upload className="w-4 h-4" />
+                        <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                      </label>
+                    </div>
+                    
+                    {project.assets.length === 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
+                          <Upload className="w-5 h-5 mb-1" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                        </label>
+                        {project.assets.map((asset) => {
+                          const usageCount = getAssetUsageCount(asset.id);
+
+                          return (
+                            <div key={asset.id} className="relative aspect-square group">
+                              <button
+                                onClick={() => addImageElement(asset.id)}
+                                className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
+                                title={asset.name}
+                              >
+                                <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-cover" />
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Plus className="w-6 h-6 text-white" />
+                                </div>
+                              </button>
+
+                              <button
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  deleteAsset(asset.id);
+                                }}
+                                className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
+                                title={usageCount > 0 ? `Delete Asset (${usageCount} uses)` : 'Delete Asset'}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+
+                              {usageCount > 0 && (
+                                <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                  {usageCount} use{usageCount === 1 ? '' : 's'}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="aspect-square border border-dashed border-[#cbd5e1] hover:bg-slate-50 flex flex-col items-center justify-center text-[#64748b] transition-all cursor-pointer">
-                    <Upload className="w-5 h-5 mb-1" />
-                    <span className="text-[9px] font-bold uppercase tracking-wider">Upload</span>
-                    <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} />
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Icon Library</h3>
+                    <p className="mt-1 text-[10px] font-medium text-slate-400">
+                      Search Lucide icons and add them as resizable components.
+                    </p>
+                  </div>
+
+                  <label className="flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
+                    <Search className="h-3.5 w-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={iconQuery}
+                      onChange={(event) => setIconQuery(event.target.value)}
+                      placeholder="Search icons..."
+                      className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+                    />
                   </label>
-                  {project.assets.map((asset) => {
-                    const usageCount = getAssetUsageCount(asset.id);
 
-                    return (
-                      <div key={asset.id} className="relative aspect-square group">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    <span>{deferredIconQuery.trim() ? 'Search Results' : 'Featured Icons'}</span>
+                    <span className="text-[#4f46e5]">{filteredIcons.length}</span>
+                  </div>
+
+                  {filteredIcons.length === 0 ? (
+                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      No icons match that search
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      {filteredIcons.map((iconName) => (
                         <button
-                          onClick={() => addImageElement(asset.id)}
-                          className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
-                          title={asset.name}
+                          key={iconName}
+                          type="button"
+                          onClick={() => addIconElement(iconName)}
+                          title={`Add ${formatIconName(iconName)}`}
+                          className="flex flex-col items-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-2 py-3 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
                         >
-                          <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                            <Plus className="w-6 h-6 text-white" />
-                          </div>
+                          <IconPresetPreview iconName={iconName} />
+                          <span className="mt-2 line-clamp-2 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+                            {formatIconName(iconName)}
+                          </span>
                         </button>
-
-                        <button
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            deleteAsset(asset.id);
-                          }}
-                          className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
-                          title={usageCount > 0 ? `Delete Asset (${usageCount} uses)` : 'Delete Asset'}
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-
-                        {usageCount > 0 && (
-                          <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                            {usageCount} use{usageCount === 1 ? '' : 's'}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

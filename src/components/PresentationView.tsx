@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
+import { LucideIconGlyph } from './LucideIconGlyph';
 
 function getSequenceConfig(scene: Scene, step: number) {
   return scene.sequences?.find((sequence) => sequence.step === step) || {
@@ -340,6 +341,19 @@ function PresentationColorCard({ element }: { element: ColorElement }) {
 }
 
 function PresentationShape({ element }: { element: ShapeElement }) {
+  if (element.shapeType === 'icon') {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
+        <LucideIconGlyph
+          name={element.iconName || 'circle'}
+          className="h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.18)]"
+          color={element.iconColor || '#0f172a'}
+          strokeWidth={element.iconStrokeWidth || 2.25}
+        />
+      </div>
+    );
+  }
+
   if (element.shapeType === 'yes') {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#3b82f6] rounded-[100px] shadow-2xl text-white pointer-events-none">

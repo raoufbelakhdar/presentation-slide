@@ -4,6 +4,7 @@ import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
+import { LucideIconGlyph } from './LucideIconGlyph';
 
 type CanvasBackgroundMode = 'light' | 'gray' | 'dark';
 
@@ -485,6 +486,19 @@ function ColorCardRenderer({ element }: { element: ColorElement }) {
 }
 
 function ShapeRenderer({ element }: { element: ShapeElement }) {
+  if (element.shapeType === 'icon') {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
+        <LucideIconGlyph
+          name={element.iconName || 'circle'}
+          className="h-full w-full drop-shadow-[0_12px_20px_rgba(15,23,42,0.16)]"
+          color={element.iconColor || '#0f172a'}
+          strokeWidth={element.iconStrokeWidth || 2.25}
+        />
+      </div>
+    );
+  }
+
   if (element.shapeType === 'yes') {
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#3b82f6] rounded-[100px] shadow-2xl text-white pointer-events-none">

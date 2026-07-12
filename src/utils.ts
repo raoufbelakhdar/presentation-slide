@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Asset, ColorElement, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
+import { formatIconName } from "./iconLibrary";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -137,6 +138,46 @@ function renderTextElement(element: TextElement) {
 }
 
 function renderShapeElement(element: Extract<SceneElement, { type: 'shape' }>) {
+  if (element.shapeType === 'icon') {
+    const iconColor = element.iconColor || '#0f172a';
+    const iconLabel = formatIconName(element.iconName || 'shape').slice(0, 24);
+    const centerX = element.x + element.width / 2;
+    const centerY = element.y + element.height / 2;
+    const radius = Math.max(36, Math.min(element.width, element.height) * 0.28);
+    const labelSize = Math.max(18, Math.round(Math.min(element.width, element.height) * 0.09));
+
+    return `
+      <circle
+        cx="${centerX}"
+        cy="${centerY - labelSize * 0.3}"
+        r="${radius}"
+        fill="none"
+        stroke="${escapeXml(iconColor)}"
+        stroke-width="${Math.max(8, radius * 0.12)}"
+        opacity="0.14"
+      />
+      <circle
+        cx="${centerX}"
+        cy="${centerY - labelSize * 0.3}"
+        r="${radius * 0.64}"
+        fill="none"
+        stroke="${escapeXml(iconColor)}"
+        stroke-width="${Math.max(4, radius * 0.06)}"
+        opacity="0.24"
+      />
+      <text
+        x="${centerX}"
+        y="${centerY + radius + labelSize * 0.7}"
+        fill="${escapeXml(iconColor)}"
+        font-size="${labelSize}"
+        font-weight="700"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="Arial, sans-serif"
+      >${escapeXml(iconLabel)}</text>
+    `;
+  }
+
   if (element.shapeType === 'check') {
     return `
       <polyline

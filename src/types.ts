@@ -61,7 +61,10 @@ export interface TextElement extends BaseElement {
 
 export interface ShapeElement extends BaseElement {
   type: 'shape';
-  shapeType: 'yes' | 'no' | 'check' | 'cross';
+  shapeType: 'yes' | 'no' | 'check' | 'cross' | 'icon';
+  iconName?: string;
+  iconColor?: string;
+  iconStrokeWidth?: number;
 }
 
 export type SceneElement = ImageElement | ColorElement | TextElement | ShapeElement;
