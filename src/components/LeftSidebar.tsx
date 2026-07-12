@@ -1,10 +1,26 @@
-import React, { useDeferredValue, useState } from 'react';
+import React, { useDeferredValue, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch, Search } from 'lucide-react';
+import { Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch, Search, Star } from 'lucide-react';
 import { buildSceneTemplate, generateId } from '../utils';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { FEATURED_ICON_NAMES, LUCIDE_ICON_NAMES, searchLucideIcons } from '../iconLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
+
+const FAVORITE_COMPONENTS_STORAGE_KEY = 'visual-learning-favorite-components';
+
+type PresetId =
+  | 'free-text'
+  | 'text-block'
+  | 'yes-badge'
+  | 'no-badge'
+  | 'color-card'
+  | 'blue-check'
+  | 'red-cross';
+
+type FavoriteComponent =
+  | { type: 'preset'; id: PresetId }
+  | { type: 'icon'; id: string }
+  | { type: 'asset'; id: string };
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
   return (
@@ -94,22 +110,67 @@ function PresetButton({
   );
 }
 
+function FavoriteToggleButton({
+  active,
+  onClick,
+  title,
+  className = '',
+}: {
+  active: boolean;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  title: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={`absolute z-10 rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${active ? 'border-amber-300 bg-amber-50 text-amber-500' : 'border-white/70 bg-white/90 text-slate-400 hover:text-amber-500'} ${className}`}
+    >
+      <Star className={`h-3.5 w-3.5 ${active ? 'fill-current' : ''}`} />
+    </button>
+  );
+}
+
 export function LeftSidebar() {
   const { state, dispatch } = useAppContext();
   const { project, activeSceneIndex, templates, selectedSequenceStep } = state;
   const sceneTemplates = templates.filter((template) => (template.kind || 'scene') === 'scene');
   const branchTemplates = templates.filter((template) => template.kind === 'branch');
   const [activeTab, setActiveTab] = useState<'library' | 'templates'>('library');
-  const [componentTab, setComponentTab] = useState<'presets' | 'icons' | 'assets'>('presets');
+  const [componentTab, setComponentTab] = useState<'favorites' | 'presets' | 'icons' | 'assets'>('favorites');
   const [templateTab, setTemplateTab] = useState<'scene' | 'branch'>('scene');
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
   const [editingTemplateName, setEditingTemplateName] = useState('');
   const [iconQuery, setIconQuery] = useState('');
+  const [favoriteComponents, setFavoriteComponents] = useState<FavoriteComponent[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+
+    const storedFavorites = window.localStorage.getItem(FAVORITE_COMPONENTS_STORAGE_KEY);
+    if (!storedFavorites) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(storedFavorites);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  });
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
     : FEATURED_ICON_NAMES;
+
+  useEffect(() => {
+    window.localStorage.setItem(FAVORITE_COMPONENTS_STORAGE_KEY, JSON.stringify(favoriteComponents));
+  }, [favoriteComponents]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -274,6 +335,48 @@ export function LeftSidebar() {
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
   };
 
+  const presetDefinitions: Array<{
+    id: PresetId;
+    label: string;
+    onClick: () => void;
+    preview: React.ReactNode;
+  }> = [
+    { id: 'free-text', label: 'Free Text', onClick: addFreeTextElement, preview: <TextPresetPreview /> },
+    { id: 'text-block', label: 'Text Block', onClick: addTextBlockElement, preview: <TextPresetPreview block /> },
+    { id: 'yes-badge', label: 'Yes Badge', onClick: addYesElement, preview: <BadgePresetPreview type="yes" /> },
+    { id: 'no-badge', label: 'No Badge', onClick: addNoElement, preview: <BadgePresetPreview type="no" /> },
+    { id: 'color-card', label: 'Solid Color Card', onClick: addColorElement, preview: <ColorCardPresetPreview /> },
+    { id: 'blue-check', label: 'Blue Check', onClick: addCheckElement, preview: <MarkPresetPreview type="check" /> },
+    { id: 'red-cross', label: 'Red X', onClick: addCrossElement, preview: <MarkPresetPreview type="cross" /> },
+  ];
+
+  const presetDefinitionsById = new Map(presetDefinitions.map((preset) => [preset.id, preset]));
+
+  const isFavorite = (favorite: FavoriteComponent) =>
+    favoriteComponents.some((entry) => entry.type === favorite.type && entry.id === favorite.id);
+
+  const toggleFavorite = (favorite: FavoriteComponent) => {
+    setFavoriteComponents((currentFavorites) => {
+      const exists = currentFavorites.some((entry) => entry.type === favorite.type && entry.id === favorite.id);
+      if (exists) {
+        return currentFavorites.filter((entry) => !(entry.type === favorite.type && entry.id === favorite.id));
+      }
+
+      return [...currentFavorites, favorite];
+    });
+  };
+
+  const favoritePresets = favoriteComponents.filter(
+    (favorite): favorite is Extract<FavoriteComponent, { type: 'preset' }> => favorite.type === 'preset',
+  );
+  const favoriteIcons = favoriteComponents.filter(
+    (favorite): favorite is Extract<FavoriteComponent, { type: 'icon' }> => favorite.type === 'icon',
+  );
+  const favoriteAssets = favoriteComponents
+    .filter((favorite): favorite is Extract<FavoriteComponent, { type: 'asset' }> => favorite.type === 'asset')
+    .map((favorite) => project.assets.find((asset) => asset.id === favorite.id))
+    .filter((asset): asset is typeof project.assets[number] => Boolean(asset));
+
   const getAssetUsageCount = (assetId: string) => {
     return project.scenes.reduce((count, scene) => {
       return count + scene.elements.filter((element) => element.type === 'image' && element.assetId === assetId).length;
@@ -431,7 +534,18 @@ export function LeftSidebar() {
                 </div>
               </div>
 
-              <div className="mb-4 grid grid-cols-3 gap-2 rounded-sm bg-[#f8fafc] p-1">
+              <div className="mb-4 grid grid-cols-4 gap-2 rounded-sm bg-[#f8fafc] p-1">
+                <button
+                  type="button"
+                  onClick={() => setComponentTab('favorites')}
+                  className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    componentTab === 'favorites'
+                      ? 'bg-white text-[#1e293b] shadow-sm'
+                      : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >
+                  Favs
+                </button>
                 <button
                   type="button"
                   onClick={() => setComponentTab('presets')}
@@ -467,32 +581,153 @@ export function LeftSidebar() {
                 </button>
               </div>
 
-              {componentTab === 'presets' ? (
+              {componentTab === 'favorites' ? (
+                <div className="space-y-6">
+                  <div>
+                    <h3 className="mb-4 text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Favorite Components</h3>
+                    <p className="mt-1 text-[10px] font-medium text-slate-400">
+                      Bookmark presets, icons, and assets for quick reuse.
+                    </p>
+                  </div>
+
+                  {favoriteComponents.length === 0 ? (
+                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      No favorites yet
+                    </div>
+                  ) : (
+                    <div className="space-y-5">
+                      {favoritePresets.length > 0 && (
+                        <div>
+                          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Presets</div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {favoritePresets.map((favorite) => {
+                              const preset = presetDefinitionsById.get(favorite.id);
+                              if (!preset) return null;
+
+                              return (
+                                <div key={favorite.id} className="relative">
+                                  <FavoriteToggleButton
+                                    active
+                                    title={`Remove ${preset.label} from favorites`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleFavorite({ type: 'preset', id: favorite.id });
+                                    }}
+                                    className="right-1.5 top-1.5"
+                                  />
+                                  <PresetButton label={preset.label} onClick={preset.onClick}>
+                                    {preset.preview}
+                                  </PresetButton>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {favoriteIcons.length > 0 && (
+                        <div>
+                          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Icons</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {favoriteIcons.map((favorite) => (
+                              <div key={favorite.id} className="relative">
+                                <FavoriteToggleButton
+                                  active
+                                  title="Remove icon from favorites"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite({ type: 'icon', id: favorite.id });
+                                  }}
+                                  className="right-1 top-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => addIconElement(favorite.id)}
+                                  className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
+                                >
+                                  <IconPresetPreview iconName={favorite.id} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {favoriteAssets.length > 0 && (
+                        <div>
+                          <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Assets</div>
+                          <div className="grid grid-cols-2 gap-3">
+                            {favoriteAssets.map((asset) => {
+                              const usageCount = getAssetUsageCount(asset.id);
+
+                              return (
+                                <div key={asset.id} className="relative aspect-square group">
+                                  <FavoriteToggleButton
+                                    active
+                                    title={`Remove ${asset.name} from favorites`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      toggleFavorite({ type: 'asset', id: asset.id });
+                                    }}
+                                    className="left-1.5 top-1.5"
+                                  />
+                                  <button
+                                    onClick={() => addImageElement(asset.id)}
+                                    className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
+                                    title={asset.name}
+                                  >
+                                    <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                      <Plus className="w-6 h-6 text-white" />
+                                    </div>
+                                  </button>
+
+                                  <button
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      deleteAsset(asset.id);
+                                    }}
+                                    className="absolute top-1.5 right-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
+                                    title={usageCount > 0 ? `Delete Asset (${usageCount} uses)` : 'Delete Asset'}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {usageCount > 0 && (
+                                    <div className="absolute left-1.5 bottom-1.5 rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                      {usageCount} use{usageCount === 1 ? '' : 's'}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : componentTab === 'presets' ? (
                 <div>
                   <div>
                     <h3 className="mb-4 text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Component Presets</h3>
                     <div className="grid grid-cols-2 gap-2">
-                      <PresetButton label="Free Text" onClick={addFreeTextElement}>
-                        <TextPresetPreview />
-                      </PresetButton>
-                      <PresetButton label="Text Block" onClick={addTextBlockElement}>
-                        <TextPresetPreview block />
-                      </PresetButton>
-                      <PresetButton label="Yes Badge" onClick={addYesElement}>
-                        <BadgePresetPreview type="yes" />
-                      </PresetButton>
-                      <PresetButton label="No Badge" onClick={addNoElement}>
-                        <BadgePresetPreview type="no" />
-                      </PresetButton>
-                      <PresetButton label="Solid Color Card" onClick={addColorElement}>
-                        <ColorCardPresetPreview />
-                      </PresetButton>
-                      <PresetButton label="Blue Check" onClick={addCheckElement}>
-                        <MarkPresetPreview type="check" />
-                      </PresetButton>
-                      <PresetButton label="Red X" onClick={addCrossElement}>
-                        <MarkPresetPreview type="cross" />
-                      </PresetButton>
+                      {presetDefinitions.map((preset) => (
+                        <div key={preset.id} className="relative">
+                          <FavoriteToggleButton
+                            active={isFavorite({ type: 'preset', id: preset.id })}
+                            title={`${isFavorite({ type: 'preset', id: preset.id }) ? 'Remove' : 'Add'} ${preset.label} ${isFavorite({ type: 'preset', id: preset.id }) ? 'from' : 'to'} favorites`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleFavorite({ type: 'preset', id: preset.id });
+                            }}
+                            className="right-1.5 top-1.5"
+                          />
+                          <PresetButton label={preset.label} onClick={preset.onClick}>
+                            {preset.preview}
+                          </PresetButton>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -528,14 +763,24 @@ export function LeftSidebar() {
                   ) : (
                     <div className="grid grid-cols-3 gap-2">
                       {filteredIcons.map((iconName) => (
-                        <button
-                          key={iconName}
-                          type="button"
-                          onClick={() => addIconElement(iconName)}
-                          className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
-                        >
-                          <IconPresetPreview iconName={iconName} />
-                        </button>
+                        <div key={iconName} className="relative">
+                          <FavoriteToggleButton
+                            active={isFavorite({ type: 'icon', id: iconName })}
+                            title={`${isFavorite({ type: 'icon', id: iconName }) ? 'Remove' : 'Add'} icon ${isFavorite({ type: 'icon', id: iconName }) ? 'from' : 'to'} favorites`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleFavorite({ type: 'icon', id: iconName });
+                            }}
+                            className="right-1 top-1"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => addIconElement(iconName)}
+                            className="flex items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-1.5 py-2 text-center transition-colors hover:border-[#4f46e5] hover:bg-white"
+                          >
+                            <IconPresetPreview iconName={iconName} />
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -573,6 +818,15 @@ export function LeftSidebar() {
 
                         return (
                           <div key={asset.id} className="relative aspect-square group">
+                            <FavoriteToggleButton
+                              active={isFavorite({ type: 'asset', id: asset.id })}
+                              title={`${isFavorite({ type: 'asset', id: asset.id }) ? 'Remove' : 'Add'} ${asset.name} ${isFavorite({ type: 'asset', id: asset.id }) ? 'from' : 'to'} favorites`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleFavorite({ type: 'asset', id: asset.id });
+                              }}
+                              className="left-1.5 top-1.5"
+                            />
                             <button
                               onClick={() => addImageElement(asset.id)}
                               className="h-full w-full bg-[#f1f5f9] border border-[#e2e8f0] hover:border-[#4f46e5] transition-colors cursor-pointer flex flex-col items-center justify-center overflow-hidden relative"
