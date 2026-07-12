@@ -1,8 +1,145 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Copy, Trash2, Layers } from 'lucide-react';
-import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement } from '../types';
-import { combineTextContent, splitTextContent } from '../utils';
+import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
+import { Asset, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
+import { combineTextContent, getEffectiveElementState, splitTextContent } from '../utils';
+
+function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
+  if (element.type === 'text') {
+    const title = splitTextContent(element.text).title.trim();
+    return title || 'Text';
+  }
+
+  if (element.type === 'image') {
+    return element.captionText?.trim() || assetsById.get(element.assetId)?.name || 'Image';
+  }
+
+  if (element.shapeType === 'yes') return 'Yes Badge';
+  if (element.shapeType === 'no') return 'No Badge';
+  if (element.shapeType === 'check') return 'Check Mark';
+  return 'Cross Mark';
+}
+
+function getElementTypeLabel(element: SceneElement) {
+  if (element.type === 'text') return 'Text';
+  if (element.type === 'image') return 'Image';
+  if (element.shapeType === 'yes') return 'Yes';
+  if (element.shapeType === 'no') return 'No';
+  if (element.shapeType === 'check') return 'Check';
+  return 'Cross';
+}
+
+function upsertHiddenKeyframe(element: SceneElement, step: number, hidden: boolean) {
+  const nextKeyframes = { ...(element.keyframes || {}) };
+  nextKeyframes[step] = { ...(nextKeyframes[step] || {}), hidden };
+  return nextKeyframes;
+}
+
+function SequenceLayersPanel({
+  step,
+  elements,
+  assets,
+  selectedElementId,
+  onSelectElement,
+  onToggleVisibility,
+}: {
+  step: number;
+  elements: SceneElement[];
+  assets: Asset[];
+  selectedElementId: string | null;
+  onSelectElement: (elementId: string) => void;
+  onToggleVisibility: (element: SceneElement, hidden: boolean) => void;
+}) {
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const managedElements = elements
+    .filter((element) => element.revealStep <= step)
+    .sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+  const visibleElements = managedElements.filter((element) => !getEffectiveElementState(element, step).hidden);
+  const hiddenElements = managedElements.filter((element) => getEffectiveElementState(element, step).hidden);
+
+  const renderElementRow = (element: SceneElement, hidden: boolean) => (
+    <div
+      key={element.id}
+      className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
+        selectedElementId === element.id
+          ? 'border-[#4f46e5] bg-indigo-50'
+          : 'border-[#e2e8f0] bg-white'
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onSelectElement(element.id)}
+        className="min-w-0 flex-1 text-left"
+      >
+        <div className="truncate text-[11px] font-semibold text-[#0f172a]">
+          {getElementName(element, assetsById)}
+        </div>
+        <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+          {getElementTypeLabel(element)}
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleVisibility(element, !hidden);
+        }}
+        className={`rounded-sm border p-1 transition-colors ${
+          hidden
+            ? 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+            : 'border-rose-200 text-rose-500 hover:bg-rose-50'
+        }`}
+        title={hidden ? 'Reveal in this sequence' : 'Hide in this sequence'}
+      >
+        {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="border-b border-[#f1f5f9] bg-[#fcfdff] p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748b]">
+          Sequence Layers
+        </div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+          S{step}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            <span>Visible</span>
+            <span>{visibleElements.length}</span>
+          </div>
+          <div className="space-y-2">
+            {visibleElements.length > 0 ? visibleElements.map((element) => renderElementRow(element, false)) : (
+              <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
+                No visible components
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            <span>Hidden</span>
+            <span>{hiddenElements.length}</span>
+          </div>
+          <div className="space-y-2">
+            {hiddenElements.length > 0 ? hiddenElements.map((element) => renderElementRow(element, true)) : (
+              <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
+                No hidden components
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
@@ -11,6 +148,24 @@ export function RightSidebar() {
   
   const selectedElement = activeScene?.elements.find(el => el.id === selectedElementId);
   const selectedSequenceStep = state.selectedSequenceStep;
+  const handleSelectElement = (elementId: string) => {
+    dispatch({ type: 'SELECT_ELEMENT', payload: elementId });
+  };
+  const handleSequenceVisibilityToggle = (element: SceneElement, hidden: boolean) => {
+    if (selectedSequenceStep === null) {
+      return;
+    }
+
+    dispatch({
+      type: 'UPDATE_ELEMENT',
+      payload: {
+        id: element.id,
+        updates: {
+          keyframes: upsertHiddenKeyframe(element, selectedSequenceStep, hidden),
+        },
+      },
+    });
+  };
 
   if (!selectedElement) {
     if (selectedSequenceStep) {
@@ -91,6 +246,15 @@ export function RightSidebar() {
               </div>
             </div>
           </div>
+
+          <SequenceLayersPanel
+            step={selectedSequenceStep}
+            elements={activeScene?.elements || []}
+            assets={project.assets}
+            selectedElementId={selectedElementId}
+            onSelectElement={handleSelectElement}
+            onToggleVisibility={handleSequenceVisibilityToggle}
+          />
         </div>
       );
     }
@@ -184,37 +348,6 @@ export function RightSidebar() {
             />
           </div>
         </div>
-
-        {selectedSequenceStep !== null && selectedSequenceStep > selectedElement.revealStep && (
-          <div className="bg-indigo-50 p-3 rounded-sm border border-indigo-100">
-            <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider mb-1">Sequence {selectedSequenceStep} Override</p>
-            <p className="text-xs text-indigo-700/80 leading-relaxed mb-2">
-              You are editing this element specifically for sequence step {selectedSequenceStep}. Position and size changes will be applied as a keyframe.
-            </p>
-            <div className="flex flex-col gap-2">
-              <button 
-                onClick={() => {
-                  const newKeyframes = { ...(selectedElement.keyframes || {}) };
-                  newKeyframes[selectedSequenceStep] = { ...(newKeyframes[selectedSequenceStep] || {}), hidden: true };
-                  handleUpdate({ keyframes: newKeyframes });
-                }}
-                className="text-xs font-bold bg-white text-rose-600 hover:bg-rose-50 border border-rose-200 py-1.5 px-3 rounded-sm w-full text-center transition-colors"
-              >
-                Hide in this Sequence
-              </button>
-              <button 
-                onClick={() => {
-                  const newKeyframes = { ...(selectedElement.keyframes || {}) };
-                  delete newKeyframes[selectedSequenceStep];
-                  handleUpdate({ keyframes: newKeyframes });
-                }}
-                className="text-xs font-bold bg-white text-indigo-600 hover:bg-indigo-50 border border-indigo-200 py-1.5 px-3 rounded-sm w-full text-center transition-colors"
-              >
-                Clear Override
-              </button>
-            </div>
-          </div>
-        )}
 
         {selectedElement.type === 'image' && imageElement && (
           <>
@@ -394,6 +527,17 @@ export function RightSidebar() {
           </button>
         </div>
       </div>
+
+      {selectedSequenceStep !== null && (
+        <SequenceLayersPanel
+          step={selectedSequenceStep}
+          elements={activeScene.elements}
+          assets={project.assets}
+          selectedElementId={selectedElementId}
+          onSelectElement={handleSelectElement}
+          onToggleVisibility={handleSequenceVisibilityToggle}
+        />
+      )}
     </div>
   );
 }

@@ -149,6 +149,26 @@ function getNextElementZIndex(elements: SceneElement[]) {
   return elements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1) + 1;
 }
 
+function shiftKeyframesAfterDeletedStep(
+  keyframes: SceneElement['keyframes'],
+  deletedStep: number,
+): SceneElement['keyframes'] {
+  if (!keyframes) {
+    return keyframes;
+  }
+
+  const nextEntries = Object.entries(keyframes).flatMap(([stepValue, keyframe]) => {
+    const step = Number(stepValue);
+    if (step === deletedStep) {
+      return [];
+    }
+
+    return [[step > deletedStep ? step - 1 : step, { ...keyframe }] as const];
+  });
+
+  return nextEntries.length > 0 ? Object.fromEntries(nextEntries) : undefined;
+}
+
 function createDefaultScene(name = 'Scene 1'): Scene {
   return normalizeScene({ name, elements: [] });
 }
@@ -770,13 +790,31 @@ function appReducer(state: AppState, action: Action): AppState {
 
       const nextSequenceCount = Math.max(1, (scene.sequenceCount || 1) - 1);
       const nextElements = scene.elements.map((element) => {
+        const nextHideStep =
+          element.hideStep == null
+            ? element.hideStep
+            : element.hideStep > sequenceStep
+              ? element.hideStep - 1
+              : element.hideStep;
+
         if (element.revealStep === sequenceStep) {
-          return cloneElement(element, { revealStep: Math.max(1, sequenceStep - 1) });
+          return cloneElement(element, {
+            revealStep: Math.max(1, sequenceStep - 1),
+            hideStep: nextHideStep,
+            keyframes: shiftKeyframesAfterDeletedStep(element.keyframes, sequenceStep),
+          });
         }
         if (element.revealStep > sequenceStep) {
-          return cloneElement(element, { revealStep: element.revealStep - 1 });
+          return cloneElement(element, {
+            revealStep: element.revealStep - 1,
+            hideStep: nextHideStep,
+            keyframes: shiftKeyframesAfterDeletedStep(element.keyframes, sequenceStep),
+          });
         }
-        return element;
+        return cloneElement(element, {
+          hideStep: nextHideStep,
+          keyframes: shiftKeyframesAfterDeletedStep(element.keyframes, sequenceStep),
+        });
       });
 
       const nextSequences = (scene.sequences || [])

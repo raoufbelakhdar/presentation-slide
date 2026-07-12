@@ -318,7 +318,13 @@ export function readTextFile(file: File): Promise<string> {
 }
 
 export function getEffectiveElementState(element: any, currentStep: number) {
-  const effectiveElement = { ...element };
+  const effectiveElement = {
+    ...element,
+    hidden:
+      element.hideStep !== undefined &&
+      element.hideStep !== null &&
+      currentStep >= element.hideStep,
+  };
   
   if (element.keyframes) {
     // Apply keyframes in order up to the current step
@@ -330,10 +336,7 @@ export function getEffectiveElementState(element: any, currentStep: number) {
     }
   }
 
-  // If there's a hideStep and we reached or passed it, mark as hidden
-  if (element.hideStep !== undefined && element.hideStep !== null && currentStep >= element.hideStep) {
-    effectiveElement.hidden = true;
-  } else if (effectiveElement.hidden === undefined) {
+  if (effectiveElement.hidden === undefined) {
     effectiveElement.hidden = false;
   }
 
