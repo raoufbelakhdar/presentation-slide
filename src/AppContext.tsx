@@ -6,6 +6,7 @@ import {
   DEFAULT_SEQUENCE_ANIMATION_TYPE,
   DEFAULT_SEQUENCE_DELAY,
   DEFAULT_SEQUENCE_DURATION,
+  ElementKeyframe,
   Project,
   Scene,
   SceneElement,
@@ -76,6 +77,9 @@ interface HistoryState {
 }
 
 const HISTORY_LIMIT = 100;
+type SequenceFrameKey = 'x' | 'y' | 'width' | 'height';
+
+const SEQUENCE_FRAME_KEYFIELDS: SequenceFrameKey[] = ['x', 'y', 'width', 'height'];
 
 const TRACKED_ACTIONS = new Set<Action['type']>([
   'USE_TEMPLATE',
@@ -176,6 +180,54 @@ function shiftKeyframesAfterDeletedStep(
   });
 
   return nextEntries.length > 0 ? Object.fromEntries(nextEntries) : undefined;
+}
+
+function applyElementUpdates(
+  element: SceneElement,
+  updates: Partial<SceneElement>,
+  selectedSequenceStep: number | null,
+): SceneElement {
+  if (selectedSequenceStep === null || selectedSequenceStep <= element.revealStep) {
+    return cloneElement(element, updates);
+  }
+
+  const includesFrameUpdate = SEQUENCE_FRAME_KEYFIELDS.some((field) =>
+    Object.prototype.hasOwnProperty.call(updates, field),
+  );
+
+  if (!includesFrameUpdate) {
+    return cloneElement(element, updates);
+  }
+
+  const baseUpdates = { ...updates } as Partial<SceneElement>;
+  const keyframesSource = Object.prototype.hasOwnProperty.call(updates, 'keyframes')
+    ? updates.keyframes
+    : element.keyframes;
+  const nextKeyframes = { ...(keyframesSource || {}) };
+  const nextKeyframe: ElementKeyframe = {
+    ...(nextKeyframes[selectedSequenceStep] || {}),
+  };
+  const mutableFrameValues = nextKeyframe as Record<SequenceFrameKey, number | undefined>;
+
+  for (const field of SEQUENCE_FRAME_KEYFIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(updates, field)) {
+      continue;
+    }
+
+    const value = updates[field];
+    if (typeof value === 'number') {
+      mutableFrameValues[field] = value;
+    }
+
+    delete (baseUpdates as Partial<Record<keyof SceneElement, unknown>>)[field];
+  }
+
+  nextKeyframes[selectedSequenceStep] = nextKeyframe;
+
+  return cloneElement(element, {
+    ...baseUpdates,
+    keyframes: nextKeyframes,
+  });
 }
 
 function createDefaultScene(name = 'Scene 1'): Scene {
@@ -755,7 +807,7 @@ function appReducer(state: AppState, action: Action): AppState {
       const nextElements = activeScene.elements.map((element) => {
         if (element.id !== action.payload.id) return element;
 
-        return cloneElement(element, action.payload.updates);
+        return applyElementUpdates(element, action.payload.updates, state.selectedSequenceStep);
       });
 
       const nextScenes = [...state.project.scenes];

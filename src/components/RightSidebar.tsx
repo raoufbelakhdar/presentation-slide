@@ -311,6 +311,10 @@ export function RightSidebar() {
   const colorElement = selectedElement.type === 'color' ? (selectedElement as ColorElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const shapeElement = selectedElement.type === 'shape' ? (selectedElement as ShapeElement) : null;
+  const displayedElement =
+    selectedSequenceStep !== null && selectedElement.revealStep <= selectedSequenceStep
+      ? getEffectiveElementState(selectedElement, selectedSequenceStep)
+      : selectedElement;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
   const textAlign = textElement ? getTextAlign(textElement) : null;
@@ -654,7 +658,7 @@ export function RightSidebar() {
         <div className="pt-4 border-t border-[#f1f5f9]">
           <div className="flex items-center justify-between mb-2">
              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Position</span>
-             <span className="text-[10px] font-mono text-[#4f46e5]">X: {Math.round(selectedElement.x)} | Y: {Math.round(selectedElement.y)}</span>
+             <span className="text-[10px] font-mono text-[#4f46e5]">X: {Math.round(displayedElement.x)} | Y: {Math.round(displayedElement.y)}</span>
           </div>
           <div className="mb-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
             <div className="mb-2 flex items-center justify-between">
