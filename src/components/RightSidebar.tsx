@@ -93,12 +93,12 @@ function SequenceLayersPanel({
         }}
         className={`rounded-sm border p-1 transition-colors ${
           hidden
-            ? 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-            : 'border-rose-200 text-rose-500 hover:bg-rose-50'
+            ? 'border-rose-200 text-rose-500 hover:bg-rose-50'
+            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
         }`}
         title={hidden ? 'Reveal in this sequence' : 'Hide in this sequence'}
       >
-        {hidden ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+        {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>
     </div>
     );
@@ -292,6 +292,10 @@ export function RightSidebar() {
   const otherElements = activeScene.elements.filter((element) => element.id !== selectedElement.id);
   const maxOtherZIndex = otherElements.reduce((maxZIndex, element) => Math.max(maxZIndex, element.zIndex ?? 0), -1);
   const minOtherZIndex = otherElements.reduce((minZIndex, element) => Math.min(minZIndex, element.zIndex ?? 0), 0);
+  const selectedElementHiddenInSequence =
+    selectedSequenceStep !== null &&
+    selectedElement.revealStep <= selectedSequenceStep &&
+    Boolean(getEffectiveElementState(selectedElement, selectedSequenceStep).hidden);
 
   return (
     <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
@@ -334,7 +338,7 @@ export function RightSidebar() {
           </div>
         </div>
 
-        {selectedElement.type === 'image' && imageElement && (
+        {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
           <>
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
