@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Asset, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
+import { Asset, ColorElement, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -253,6 +253,46 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
   `;
 }
 
+function renderColorElement(element: ColorElement) {
+  const captionText = element.captionText?.trim() || '';
+  const framePadding = 12;
+  const captionHeight = 76;
+  const swatchWidth = Math.max(0, element.width - framePadding * 2);
+  const swatchHeight = Math.max(0, element.height - framePadding * 2 - captionHeight);
+
+  return `
+    <rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+    <rect
+      x="${element.x + framePadding}"
+      y="${element.y + framePadding}"
+      width="${swatchWidth}"
+      height="${swatchHeight}"
+      rx="6"
+      fill="${escapeXml(element.fillColor)}"
+    />
+    <line
+      x1="${element.x + framePadding}"
+      y1="${element.y + element.height - captionHeight + 10}"
+      x2="${element.x + element.width - framePadding}"
+      y2="${element.y + element.height - captionHeight + 10}"
+      stroke="#cbd5e1"
+      stroke-width="2"
+      opacity="0.75"
+    />
+    <text
+      x="${element.x + element.width / 2}"
+      y="${element.y + element.height - captionHeight / 2 + 8}"
+      fill="#475569"
+      font-size="${Math.max(24, Math.round(Math.min(element.width, element.height) * 0.09))}"
+      font-weight="800"
+      letter-spacing="2"
+      text-anchor="middle"
+      dominant-baseline="middle"
+      font-family="Arial, sans-serif"
+    >${escapeXml(captionText)}</text>
+  `;
+}
+
 export function createSceneThumbnail(scene: Scene, assets: Asset[]): string {
   const svgContent = scene.elements.map((element) => {
     if (element.type === 'text') {
@@ -260,6 +300,9 @@ export function createSceneThumbnail(scene: Scene, assets: Asset[]): string {
     }
     if (element.type === 'image') {
       return renderImageElement(element, assets);
+    }
+    if (element.type === 'color') {
+      return renderColorElement(element);
     }
     return renderShapeElement(element);
   }).join('');

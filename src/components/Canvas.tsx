@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
-import { TextElement, ImageElement, ShapeElement } from '../types';
+import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 
@@ -332,6 +332,10 @@ function CanvasElement({
           </>
         )}
 
+        {element.type === 'color' && (
+          <ColorCardRenderer element={element as ColorElement} />
+        )}
+
         {element.type === 'shape' && (
           <ShapeRenderer element={element as ShapeElement} />
         )}
@@ -359,6 +363,25 @@ function ImageRenderer({ element }: { element: ImageElement }) {
         alt={asset.name} 
         className="w-full h-full object-cover border border-slate-100" 
         draggable={false}
+      />
+      <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
+        {captionText}
+      </div>
+    </div>
+  );
+}
+
+function ColorCardRenderer({ element }: { element: ColorElement }) {
+  const captionText = element.captionText?.trim() || '';
+
+  return (
+    <div
+      className="w-full h-full bg-white p-3 shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
+      style={{ paddingBottom: '4.5rem' }}
+    >
+      <div
+        className="w-full h-full rounded-sm border border-slate-100"
+        style={{ backgroundColor: element.fillColor }}
       />
       <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
         {captionText}

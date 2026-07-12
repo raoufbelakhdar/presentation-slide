@@ -1,4 +1,4 @@
-export type ElementType = 'image' | 'text' | 'shape';
+export type ElementType = 'image' | 'text' | 'shape' | 'color';
 
 export type AnimationType = 'fade' | 'slide-up' | 'slide-left' | 'scale' | 'none';
 
@@ -40,6 +40,12 @@ export interface ImageElement extends BaseElement {
   captionText?: string;
 }
 
+export interface ColorElement extends BaseElement {
+  type: 'color';
+  fillColor: string;
+  captionText?: string;
+}
+
 export interface TextElement extends BaseElement {
   type: 'text';
   variant?: 'block' | 'free';
@@ -56,7 +62,7 @@ export interface ShapeElement extends BaseElement {
   shapeType: 'yes' | 'no' | 'check' | 'cross';
 }
 
-export type SceneElement = ImageElement | TextElement | ShapeElement;
+export type SceneElement = ImageElement | ColorElement | TextElement | ShapeElement;
 
 export interface Scene {
   id: string;

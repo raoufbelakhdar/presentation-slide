@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useState, useRef } from 'react';
 import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene } from '../types';
+import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getEffectiveElementState, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 
 function getSequenceConfig(scene: Scene, step: number) {
@@ -255,6 +255,10 @@ export function PresentationView() {
                     <PresentationImage element={effectiveElement as ImageElement} />
                   )}
 
+                  {effectiveElement.type === 'color' && (
+                    <PresentationColorCard element={effectiveElement as ColorElement} />
+                  )}
+
                   {effectiveElement.type === 'shape' && (
                     <PresentationShape element={effectiveElement as ShapeElement} />
                   )}
@@ -309,6 +313,25 @@ function PresentationImage({ element }: { element: ImageElement }) {
         alt={asset.name} 
         className="w-full h-full object-cover border border-slate-100" 
         draggable={false}
+      />
+      <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
+        {captionText}
+      </div>
+    </div>
+  );
+}
+
+function PresentationColorCard({ element }: { element: ColorElement }) {
+  const captionText = element.captionText?.trim() || '';
+
+  return (
+    <div
+      className="w-full h-full bg-white p-3 shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
+      style={{ paddingBottom: '4.5rem' }}
+    >
+      <div
+        className="w-full h-full rounded-sm border border-slate-100"
+        style={{ backgroundColor: element.fillColor }}
       />
       <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
         {captionText}

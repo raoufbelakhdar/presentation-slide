@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff } from 'lucide-react';
-import { Asset, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, TextElement } from '../types';
 import { combineTextContent, getEffectiveElementState, getTextVariant, splitTextContent } from '../utils';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
@@ -17,6 +17,10 @@ function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
     return element.captionText?.trim() || assetsById.get(element.assetId)?.name || 'Image';
   }
 
+  if (element.type === 'color') {
+    return element.captionText?.trim() || 'Color Card';
+  }
+
   if (element.shapeType === 'yes') return 'Yes Badge';
   if (element.shapeType === 'no') return 'No Badge';
   if (element.shapeType === 'check') return 'Check Mark';
@@ -26,6 +30,7 @@ function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
 function getElementTypeLabel(element: SceneElement) {
   if (element.type === 'text') return getTextVariant(element) === 'free' ? 'Text' : 'Text Block';
   if (element.type === 'image') return 'Image';
+  if (element.type === 'color') return 'Color';
   if (element.shapeType === 'yes') return 'Yes';
   if (element.shapeType === 'no') return 'No';
   if (element.shapeType === 'check') return 'Check';
@@ -290,6 +295,7 @@ export function RightSidebar() {
   };
 
   const imageElement = selectedElement.type === 'image' ? (selectedElement as import('../types').ImageElement) : null;
+  const colorElement = selectedElement.type === 'color' ? (selectedElement as ColorElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
@@ -392,6 +398,39 @@ export function RightSidebar() {
                   }}
                 />
               </label>
+            </div>
+          </>
+        )}
+
+        {selectedElement.type === 'color' && colorElement && !selectedElementHiddenInSequence && (
+          <>
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
+              <input
+                type="text"
+                value={colorElement.captionText || ''}
+                placeholder="Optional label under the color card"
+                onChange={(e) => handleUpdate({ captionText: e.target.value })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Fill Color</label>
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={colorElement.fillColor}
+                  onChange={(e) => handleUpdate({ fillColor: e.target.value })}
+                  className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+                />
+                <input
+                  type="text"
+                  value={colorElement.fillColor}
+                  onChange={(e) => handleUpdate({ fillColor: e.target.value })}
+                  className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
             </div>
           </>
         )}

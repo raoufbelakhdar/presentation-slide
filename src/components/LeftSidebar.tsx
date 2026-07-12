@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Upload, Save, Copy, Plus, Trash2, Edit2, Check, X, GitBranch } from 'lucide-react';
 import { buildSceneTemplate, generateId } from '../utils';
-import { TextElement, ImageElement, ShapeElement } from '../types';
+import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
   return (
@@ -49,6 +49,16 @@ function MarkPresetPreview({ type }: { type: 'check' | 'cross' }) {
       ) : (
         <X className="h-8 w-8 text-rose-500" strokeWidth={3.5} />
       )}
+    </div>
+  );
+}
+
+function ColorCardPresetPreview() {
+  return (
+    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <div className="relative h-10 w-10 rounded-[3px] bg-[#f59e0b] shadow-sm">
+        <div className="absolute inset-x-1.5 bottom-1.5 h-1 rounded-full bg-white/80" />
+      </div>
     </div>
   );
 }
@@ -195,6 +205,21 @@ export function LeftSidebar() {
       y: 320,
       width: 180,
       height: 180,
+      revealStep: 1,
+    };
+    dispatch({ type: 'ADD_ELEMENT', payload: newElement });
+  };
+
+  const addColorElement = () => {
+    const newElement: ColorElement = {
+      id: generateId(),
+      type: 'color',
+      fillColor: '#f59e0b',
+      captionText: '',
+      x: 180,
+      y: 150,
+      width: 300,
+      height: 300,
       revealStep: 1,
     };
     dispatch({ type: 'ADD_ELEMENT', payload: newElement });
@@ -373,6 +398,9 @@ export function LeftSidebar() {
                 </PresetButton>
                 <PresetButton label="No Badge" onClick={addNoElement}>
                   <BadgePresetPreview type="no" />
+                </PresetButton>
+                <PresetButton label="Solid Color Card" onClick={addColorElement}>
+                  <ColorCardPresetPreview />
                 </PresetButton>
                 <PresetButton label="Blue Check" onClick={addCheckElement}>
                   <MarkPresetPreview type="check" />
