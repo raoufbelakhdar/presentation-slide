@@ -6,19 +6,20 @@ import { TextElement, ImageElement, ShapeElement } from '../types';
 
 function TextPresetPreview({ block = false }: { block?: boolean }) {
   return (
-    <div className={`flex h-10 w-14 shrink-0 overflow-hidden rounded-md border border-[#dbe4f0] ${
-      block ? 'items-center justify-center bg-[#eff6ff]' : 'items-start justify-start bg-white p-2'
+    <div className={`flex h-12 w-16 shrink-0 overflow-hidden rounded-md border border-[#dbe4f0] ${
+      block ? 'items-center justify-center bg-[#eff6ff]' : 'items-start justify-start bg-white p-2.5'
     }`}>
       {block ? (
-        <div className="flex h-6 w-10 flex-col items-center justify-center rounded-full bg-[#3b82f6] px-2 text-[5px] font-bold uppercase tracking-[0.18em] text-white">
-          <span>Title</span>
-          <span className="mt-0.5 text-[4px] font-medium normal-case tracking-normal opacity-90">subtitle</span>
+        <div className="flex h-7 w-11 flex-col items-center justify-center rounded-full bg-[#3b82f6] px-2">
+          <span className="h-1.5 w-6 rounded-full bg-white" />
+          <span className="mt-1 h-1 w-4 rounded-full bg-white/85" />
         </div>
       ) : (
         <div className="w-full space-y-1">
           <div className="h-1.5 w-10 rounded-full bg-slate-700" />
-          <div className="h-1.5 w-8 rounded-full bg-slate-400" />
+          <div className="h-1.5 w-7 rounded-full bg-slate-400" />
           <div className="h-1.5 w-11 rounded-full bg-slate-300" />
+          <div className="h-1.5 w-6 rounded-full bg-slate-200" />
         </div>
       )}
     </div>
@@ -29,24 +30,47 @@ function BadgePresetPreview({ type }: { type: 'yes' | 'no' }) {
   const isYes = type === 'yes';
 
   return (
-    <div className={`flex h-10 w-14 shrink-0 flex-col items-center justify-center rounded-full text-white shadow-sm ${
-      isYes ? 'bg-[#3b82f6]' : 'bg-[#ef4444]'
-    }`}>
-      <span className="text-[6px] font-semibold uppercase tracking-[0.16em]">{isYes ? 'NAAM' : 'LA'}</span>
-      <span className="mt-0.5 text-[8px] font-black uppercase">{isYes ? 'YES' : 'NO'}</span>
+    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <div className={`flex h-10 w-10 flex-col items-center justify-center rounded-full text-white shadow-sm ${
+        isYes ? 'bg-[#3b82f6]' : 'bg-[#ef4444]'
+      }`}>
+        <span className="text-[4px] font-semibold uppercase tracking-[0.16em]">{isYes ? 'NAAM' : 'LA'}</span>
+        <span className="mt-0.5 text-[6px] font-black uppercase">{isYes ? 'YES' : 'NO'}</span>
+      </div>
     </div>
   );
 }
 
 function MarkPresetPreview({ type }: { type: 'check' | 'cross' }) {
   return (
-    <div className="flex h-10 w-14 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
       {type === 'check' ? (
-        <Check className="h-6 w-6 text-sky-500" strokeWidth={3.5} />
+        <Check className="h-8 w-8 text-sky-500" strokeWidth={3.5} />
       ) : (
-        <X className="h-6 w-6 text-rose-500" strokeWidth={3.5} />
+        <X className="h-8 w-8 text-rose-500" strokeWidth={3.5} />
       )}
     </div>
+  );
+}
+
+function PresetButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      className="flex aspect-[1.25/1] items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3 transition-colors hover:border-[#4f46e5]"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -337,59 +361,25 @@ export function LeftSidebar() {
           <div className="p-4 space-y-6">
             <div>
               <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em] mb-4">Component Presets</h3>
-              <div className="space-y-2">
-                <button
-                  onClick={addFreeTextElement}
-                  className="w-full p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-3 text-left"
-                >
+              <div className="grid grid-cols-2 gap-2">
+                <PresetButton label="Free Text" onClick={addFreeTextElement}>
                   <TextPresetPreview />
-                  <div className="min-w-0">
-                    <div className="font-semibold text-[#1e293b]">Free Text</div>
-                    <div className="text-[10px] font-medium text-slate-400">Plain text you can place anywhere</div>
-                  </div>
-                </button>
-                <button
-                  onClick={addTextBlockElement}
-                  className="w-full p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-3 text-left"
-                >
+                </PresetButton>
+                <PresetButton label="Text Block" onClick={addTextBlockElement}>
                   <TextPresetPreview block />
-                  <div className="min-w-0">
-                    <div className="font-semibold text-[#1e293b]">Text Block</div>
-                    <div className="text-[10px] font-medium text-slate-400">Title and subtitle inside a pill card</div>
-                  </div>
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={addYesElement}
-                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-2 text-left"
-                  >
-                    <BadgePresetPreview type="yes" />
-                    <span>Yes Badge</span>
-                  </button>
-                  <button
-                    onClick={addNoElement}
-                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-2 text-left"
-                  >
-                    <BadgePresetPreview type="no" />
-                    <span>No Badge</span>
-                  </button>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={addCheckElement}
-                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-2 text-left"
-                  >
-                    <MarkPresetPreview type="check" />
-                    <span>Blue Check</span>
-                  </button>
-                  <button
-                    onClick={addCrossElement}
-                    className="flex-1 p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center gap-2 text-left"
-                  >
-                    <MarkPresetPreview type="cross" />
-                    <span>Red X</span>
-                  </button>
-                </div>
+                </PresetButton>
+                <PresetButton label="Yes Badge" onClick={addYesElement}>
+                  <BadgePresetPreview type="yes" />
+                </PresetButton>
+                <PresetButton label="No Badge" onClick={addNoElement}>
+                  <BadgePresetPreview type="no" />
+                </PresetButton>
+                <PresetButton label="Blue Check" onClick={addCheckElement}>
+                  <MarkPresetPreview type="check" />
+                </PresetButton>
+                <PresetButton label="Red X" onClick={addCrossElement}>
+                  <MarkPresetPreview type="cross" />
+                </PresetButton>
               </div>
             </div>
 
