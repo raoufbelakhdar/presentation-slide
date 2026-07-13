@@ -3,6 +3,7 @@ import { useAppContext } from '../AppContext';
 import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
+import { getDefaultImageFrameStyle } from '../assetUtils';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
@@ -303,6 +304,7 @@ function PresentationImage({ element }: { element: ImageElement }) {
   const asset = state.project.assets.find(a => a.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
+  const frameStyle = element.frameStyle || getDefaultImageFrameStyle(asset);
   const baseSize = Math.min(element.width, element.height);
   const shellPadding = 5;
   const frameGap = Math.max(3, Math.min(8, Math.round(baseSize * 0.03)));
@@ -310,6 +312,19 @@ function PresentationImage({ element }: { element: ImageElement }) {
   const captionTextSize = Math.max(9, Math.min(14, Math.round(baseSize * 0.075)));
 
   if (!asset) return null;
+
+  if (frameStyle === 'plain') {
+    return (
+      <div className="flex h-full w-full items-center justify-center pointer-events-none">
+        <img
+          src={asset.dataUrl}
+          alt={asset.name}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+      </div>
+    );
+  }
 
   return (
     <div

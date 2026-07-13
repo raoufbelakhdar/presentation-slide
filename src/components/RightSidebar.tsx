@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
+import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
@@ -367,6 +368,8 @@ export function RightSidebar() {
   const colorElement = selectedElement.type === 'color' ? (selectedElement as ColorElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const shapeElement = selectedElement.type === 'shape' ? (selectedElement as ShapeElement) : null;
+  const imageAsset = imageElement ? project.assets.find((asset) => asset.id === imageElement.assetId) || null : null;
+  const imageFrameStyle = imageElement ? (imageElement.frameStyle || getDefaultImageFrameStyle(imageAsset)) : null;
   const displayedElement =
     selectedSequenceStep !== null && selectedElement.revealStep <= selectedSequenceStep
       ? getEffectiveElementState(selectedElement, selectedSequenceStep)
@@ -444,26 +447,49 @@ export function RightSidebar() {
         {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
           <>
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
-              <input
-                type="text"
-                value={imageElement.captionText || ''}
-                placeholder="Optional label under the image"
-                onChange={(e) => handleUpdate({ captionText: e.target.value })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
-              />
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Render Style</label>
+              <select
+                value={imageFrameStyle || 'polaroid'}
+                onChange={(e) => handleUpdate({ frameStyle: e.target.value as import('../types').ImageFrameStyle })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+              >
+                <option value="polaroid">Polaroid Frame</option>
+                <option value="plain">Frameless Graphic</option>
+              </select>
+              {imageAsset && (
+                <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  Asset Type: {getAssetKind(imageAsset)}
+                </div>
+              )}
             </div>
 
+            {imageFrameStyle === 'polaroid' ? (
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
+                <input
+                  type="text"
+                  value={imageElement.captionText || ''}
+                  placeholder="Optional label under the image"
+                  onChange={(e) => handleUpdate({ captionText: e.target.value })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+            ) : (
+              <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Frameless graphics render directly on the canvas without the white image card.
+              </div>
+            )}
+
             <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Replace Image</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Replace Asset</label>
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {project.assets.map(asset => (
                   <div 
                     key={asset.id} 
-                    onClick={() => handleUpdate({ assetId: asset.id })}
+                    onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
                     className={`aspect-square bg-slate-100 rounded-sm overflow-hidden cursor-pointer border-2 transition-all ${imageElement.assetId === asset.id ? 'border-[#4f46e5]' : 'border-transparent hover:border-slate-300'}`}
                   >
-                    <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-cover" />
+                    <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-contain" />
                   </div>
                 ))}
               </div>
@@ -471,22 +497,22 @@ export function RightSidebar() {
                 Upload New
                 <input 
                   type="file" 
-                  accept="image/*" 
+                  accept="image/*,.svg" 
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onload = (e) => {
-                        const dataUrl = e.target?.result as string;
-                        const newAssetId = Math.random().toString(36).substring(2, 9);
+                      void (async () => {
+                        const asset = await createAssetFromFile(file);
                         dispatch({
                           type: 'ADD_ASSET',
-                          payload: { id: newAssetId, name: file.name, dataUrl }
+                          payload: asset,
                         });
-                        handleUpdate({ assetId: newAssetId });
-                      };
-                      reader.readAsDataURL(file);
+                        handleUpdate({
+                          assetId: asset.id,
+                          frameStyle: getDefaultImageFrameStyle(asset),
+                        });
+                      })();
                     }
                   }}
                 />

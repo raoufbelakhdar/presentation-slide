@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
+import { createAssetFromFile, getDefaultImageFrameStyle } from '../assetUtils';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 import { LucideIconGlyph } from './LucideIconGlyph';
@@ -414,26 +415,29 @@ function CanvasElement({
             <ImageRenderer element={element} />
             <input 
               type="file" 
-              accept="image/*" 
+              accept="image/*,.svg" 
               className="hidden" 
               ref={fileInputRef}
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) {
-                  const reader = new FileReader();
-                  reader.onload = (ev) => {
-                    const dataUrl = ev.target?.result as string;
-                    const newAssetId = Math.random().toString(36).substring(2, 9);
+                  void (async () => {
+                    const asset = await createAssetFromFile(file);
                     dispatch({
                       type: 'ADD_ASSET',
-                      payload: { id: newAssetId, name: file.name, dataUrl }
+                      payload: asset,
                     });
                     dispatch({
                       type: 'UPDATE_ELEMENT',
-                      payload: { id: element.id, updates: { assetId: newAssetId } }
+                      payload: {
+                        id: element.id,
+                        updates: {
+                          assetId: asset.id,
+                          frameStyle: getDefaultImageFrameStyle(asset),
+                        },
+                      },
                     });
-                  };
-                  reader.readAsDataURL(file);
+                  })();
                 }
               }}
             />
@@ -457,6 +461,7 @@ function ImageRenderer({ element }: { element: ImageElement }) {
   const asset = state.project.assets.find(a => a.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
+  const frameStyle = element.frameStyle || getDefaultImageFrameStyle(asset);
   const baseSize = Math.min(element.width, element.height);
   const shellPadding = 5;
   const frameGap = Math.max(3, Math.min(8, Math.round(baseSize * 0.03)));
@@ -465,6 +470,19 @@ function ImageRenderer({ element }: { element: ImageElement }) {
 
   if (!asset) {
     return <div className="w-full h-full bg-[#f1f5f9] border border-[#cbd5e1] flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Image not found</div>;
+  }
+
+  if (frameStyle === 'plain') {
+    return (
+      <div className="flex h-full w-full items-center justify-center pointer-events-none">
+        <img
+          src={asset.dataUrl}
+          alt={asset.name}
+          className="h-full w-full object-contain"
+          draggable={false}
+        />
+      </div>
+    );
   }
 
   return (

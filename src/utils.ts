@@ -1,6 +1,7 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Asset, ColorElement, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
+import { getDefaultImageFrameStyle } from "./assetUtils";
 import { formatIconName } from "./iconLibrary";
 import { getEmojiById } from "./emojiLibrary";
 
@@ -276,6 +277,7 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
   const asset = assets.find((entry) => entry.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
+  const frameStyle = element.frameStyle || getDefaultImageFrameStyle(asset);
   const framePadding = 5;
   const captionHeight = hasCaption ? 76 : 0;
   const imageWidth = Math.max(0, element.width - framePadding * 2);
@@ -293,6 +295,19 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
         dominant-baseline="middle"
         font-family="Arial, sans-serif"
       >IMAGE</text>
+    `;
+  }
+
+  if (frameStyle === 'plain') {
+    return `
+      <image
+        href="${asset.dataUrl}"
+        x="${element.x}"
+        y="${element.y}"
+        width="${element.width}"
+        height="${element.height}"
+        preserveAspectRatio="xMidYMid meet"
+      />
     `;
   }
 

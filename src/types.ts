@@ -1,5 +1,7 @@
 export type ElementType = 'image' | 'text' | 'shape' | 'color';
 export type TextAlign = 'left' | 'center' | 'right';
+export type AssetKind = 'photo' | 'graphic';
+export type ImageFrameStyle = 'polaroid' | 'plain';
 
 export type AnimationType = 'fade' | 'slide-up' | 'slide-left' | 'scale' | 'none';
 
@@ -39,6 +41,7 @@ export interface ImageElement extends BaseElement {
   type: 'image';
   assetId: string;
   captionText?: string;
+  frameStyle?: ImageFrameStyle;
 }
 
 export interface ColorElement extends BaseElement {
@@ -83,6 +86,7 @@ export interface Asset {
   id: string;
   name: string;
   dataUrl: string;
+  kind?: AssetKind;
 }
 
 export interface SceneTemplate {

@@ -13,6 +13,7 @@ import {
   SceneTemplate,
 } from './types';
 import { loadPersistedLibrary, PersistedLibraryRecord, savePersistedLibrary } from './persistence';
+import { getAssetKind, getDefaultImageFrameStyle } from './assetUtils';
 import { buildSceneTemplate, generateId, getSceneSequenceCount } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
@@ -165,16 +166,42 @@ function cloneScene(scene: Scene, overrides: Partial<Scene> = {}): Scene {
   };
 }
 
-function normalizeScene(scene: Partial<Scene> | null | undefined, index = 0): Scene {
+function normalizeAsset(asset: Partial<Asset> | null | undefined): Asset {
+  return {
+    id: asset?.id || generateId(),
+    name: asset?.name || 'Asset',
+    dataUrl: asset?.dataUrl || '',
+    kind: getAssetKind({
+      kind: asset?.kind,
+      name: asset?.name || 'Asset',
+      dataUrl: asset?.dataUrl || '',
+    }),
+  };
+}
+
+function normalizeScene(
+  scene: Partial<Scene> | null | undefined,
+  index = 0,
+  assetsById?: Map<string, Asset>,
+): Scene {
   return {
     id: scene?.id || generateId(),
     name: scene?.name || `Scene ${index + 1}`,
     elements: Array.isArray(scene?.elements)
-      ? scene.elements.map((element, elementIndex) =>
-          cloneElement(element as SceneElement, {
-            zIndex: (element as SceneElement).zIndex ?? elementIndex,
-          }),
-        )
+      ? scene.elements.map((element, elementIndex) => {
+          const sceneElement = element as SceneElement;
+
+          if (sceneElement.type === 'image') {
+            return cloneElement(sceneElement, {
+              zIndex: sceneElement.zIndex ?? elementIndex,
+              frameStyle: sceneElement.frameStyle || getDefaultImageFrameStyle(assetsById?.get(sceneElement.assetId)),
+            });
+          }
+
+          return cloneElement(sceneElement, {
+            zIndex: sceneElement.zIndex ?? elementIndex,
+          });
+        })
       : [],
     sequenceCount: scene?.sequenceCount,
     sequences: Array.isArray(scene?.sequences) ? scene.sequences.map((sequence) => ({ ...sequence })) : undefined,
@@ -285,15 +312,17 @@ function parseStoredJson<T>(value: string | null): T | null {
 
 function normalizeProject(project: Partial<Project> | null | undefined): Project {
   const fallback = createEmptyProject();
+  const assets = Array.isArray(project?.assets) ? project.assets.map((asset) => normalizeAsset(asset)) : [];
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const scenes = Array.isArray(project?.scenes) && project.scenes.length > 0
-    ? project.scenes.map((scene, index) => normalizeScene(scene, index))
+    ? project.scenes.map((scene, index) => normalizeScene(scene, index, assetsById))
     : [createDefaultScene()];
 
   return {
     id: project?.id || fallback.id,
     name: project?.name || fallback.name,
     scenes,
-    assets: Array.isArray(project?.assets) ? project.assets.map((asset) => ({ ...asset })) : [],
+    assets,
     templates: [],
     createdAt: project?.createdAt || project?.updatedAt || fallback.createdAt,
     updatedAt: project?.updatedAt || project?.createdAt || fallback.updatedAt,
@@ -301,10 +330,11 @@ function normalizeProject(project: Partial<Project> | null | undefined): Project
 }
 
 function normalizeTemplate(template: Partial<SceneTemplate> | null | undefined, fallbackAssets: Asset[] = []): SceneTemplate {
-  const normalizedScene = normalizeScene(template?.scene || (template as unknown as Scene));
   const assets = Array.isArray(template?.assets)
-    ? template.assets.map((asset) => ({ ...asset }))
-    : fallbackAssets.map((asset) => ({ ...asset }));
+    ? template.assets.map((asset) => normalizeAsset(asset))
+    : fallbackAssets.map((asset) => normalizeAsset(asset));
+  const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const normalizedScene = normalizeScene(template?.scene || (template as unknown as Scene), 0, assetsById);
   const name = template?.name || normalizedScene.name || 'Template';
 
   return buildSceneTemplate(normalizedScene, assets, name, {
@@ -373,11 +403,12 @@ function collectLegacyTemplates(rawProjects: Partial<Project>[]): SceneTemplate[
   const templates: SceneTemplate[] = [];
 
   for (const rawProject of rawProjects) {
-    const assets = Array.isArray(rawProject.assets) ? rawProject.assets.map((asset) => ({ ...asset })) : [];
+    const assets = Array.isArray(rawProject.assets) ? rawProject.assets.map((asset) => normalizeAsset(asset)) : [];
+    const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
     const rawTemplates = Array.isArray(rawProject.templates) ? rawProject.templates : [];
 
     for (const rawTemplate of rawTemplates) {
-      const normalizedScene = normalizeScene(rawTemplate);
+      const normalizedScene = normalizeScene(rawTemplate, 0, assetsById);
       templates.push(
         buildSceneTemplate(normalizedScene, assets, normalizedScene.name || 'Template', {
           createdAt: rawProject.updatedAt || rawProject.createdAt,
