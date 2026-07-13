@@ -38,7 +38,7 @@ export function getTextAlign(element: Pick<TextElement, 'align' | 'variant'>) {
 }
 
 export function getTextPadding(element: Pick<TextElement, 'padding'>) {
-  return Math.max(8, Math.round(element.padding || 18));
+  return Math.max(6, Math.round(element.padding || 12));
 }
 
 export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 'subtitleFontSize'>) {
@@ -275,8 +275,9 @@ function renderShapeElement(element: Extract<SceneElement, { type: 'shape' }>) {
 function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, assets: Asset[]) {
   const asset = assets.find((entry) => entry.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
+  const hasCaption = captionText.length > 0;
   const framePadding = 12;
-  const captionHeight = 76;
+  const captionHeight = hasCaption ? 76 : 0;
   const imageWidth = Math.max(0, element.width - framePadding * 2);
   const imageHeight = Math.max(0, element.height - framePadding * 2 - captionHeight);
   if (!asset) {
@@ -305,6 +306,7 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
       height="${imageHeight}"
       preserveAspectRatio="xMidYMid slice"
     />
+    ${hasCaption ? `
     <line
       x1="${element.x + framePadding}"
       y1="${element.y + element.height - captionHeight + 10}"
@@ -324,14 +326,15 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
       text-anchor="middle"
       dominant-baseline="middle"
       font-family="Arial, sans-serif"
-    >${escapeXml(captionText)}</text>
+    >${escapeXml(captionText)}</text>` : ''}
   `;
 }
 
 function renderColorElement(element: ColorElement) {
   const captionText = element.captionText?.trim() || '';
+  const hasCaption = captionText.length > 0;
   const framePadding = 12;
-  const captionHeight = 76;
+  const captionHeight = hasCaption ? 76 : 0;
   const swatchWidth = Math.max(0, element.width - framePadding * 2);
   const swatchHeight = Math.max(0, element.height - framePadding * 2 - captionHeight);
 
@@ -345,6 +348,7 @@ function renderColorElement(element: ColorElement) {
       rx="6"
       fill="${escapeXml(element.fillColor)}"
     />
+    ${hasCaption ? `
     <line
       x1="${element.x + framePadding}"
       y1="${element.y + element.height - captionHeight + 10}"
@@ -364,7 +368,7 @@ function renderColorElement(element: ColorElement) {
       text-anchor="middle"
       dominant-baseline="middle"
       font-family="Arial, sans-serif"
-    >${escapeXml(captionText)}</text>
+    >${escapeXml(captionText)}</text>` : ''}
   `;
 }
 

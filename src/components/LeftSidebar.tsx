@@ -720,9 +720,9 @@ export function LeftSidebar() {
       width: 400,
       height: 120,
       revealStep: defaultRevealStep,
-      fontSize: 48,
-      subtitleFontSize: 24,
-      padding: 18,
+      fontSize: 40,
+      subtitleFontSize: 20,
+      padding: 12,
       fontWeight: "bold",
       color: "#ffffff",
     };
@@ -782,8 +782,8 @@ export function LeftSidebar() {
       shapeType: "check",
       x: 120,
       y: 320,
-      width: 180,
-      height: 180,
+      width: 140,
+      height: 140,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
@@ -796,8 +796,8 @@ export function LeftSidebar() {
       shapeType: "cross",
       x: 340,
       y: 320,
-      width: 180,
-      height: 180,
+      width: 140,
+      height: 140,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
