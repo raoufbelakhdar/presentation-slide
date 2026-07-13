@@ -198,6 +198,7 @@ export function PresentationView() {
                       const subtitleLines = subtitle.split('\n').filter(Boolean);
                       const subtitleFontSize = getTextSubtitleFontSize(textElement);
                       const textPadding = textVariant === 'block' ? getTextPadding(textElement) : 0;
+                      const blockTextPaddingX = Math.max(8, Math.round(textPadding * 0.72));
 
                       return (
                         <div 
@@ -209,7 +210,7 @@ export function PresentationView() {
                           style={{
                             backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
                             color: textElement.color,
-                            padding: textVariant === 'block' ? `${textPadding}px` : '0px',
+                            padding: textVariant === 'block' ? `${textPadding}px ${blockTextPaddingX}px` : '0px',
                           }}
                         >
                           {textVariant === 'block' ? (
@@ -345,11 +346,13 @@ function PresentationShape({ element }: { element: ShapeElement }) {
   if (element.shapeType === 'emoji') {
     return (
       <div className="w-full h-full flex items-center justify-center pointer-events-none">
-        <EmojiGlyph
-          id={element.emojiHexcode || 'grinning-face'}
-          fallback={element.emojiChar || '😀'}
-          className="h-full w-full object-contain drop-shadow-[0_18px_32px_rgba(15,23,42,0.16)]"
-        />
+        <div className="h-[84%] w-[84%]">
+          <EmojiGlyph
+            id={element.emojiHexcode || 'grinning-face'}
+            fallback={element.emojiChar || '😀'}
+            className="h-full w-full object-contain drop-shadow-[0_18px_32px_rgba(15,23,42,0.16)]"
+          />
+        </div>
       </div>
     );
   }
@@ -357,12 +360,14 @@ function PresentationShape({ element }: { element: ShapeElement }) {
   if (element.shapeType === 'icon') {
     return (
       <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
-        <LucideIconGlyph
-          name={element.iconName || 'circle'}
-          className="h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.18)]"
-          color={element.iconColor || '#0f172a'}
-          strokeWidth={element.iconStrokeWidth || 2.25}
-        />
+        <div className="h-[84%] w-[84%]">
+          <LucideIconGlyph
+            name={element.iconName || 'circle'}
+            className="h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.18)]"
+            color={element.iconColor || '#0f172a'}
+            strokeWidth={element.iconStrokeWidth || 2.25}
+          />
+        </div>
       </div>
     );
   }
