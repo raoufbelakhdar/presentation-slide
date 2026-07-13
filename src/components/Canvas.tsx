@@ -50,7 +50,7 @@ const CANVAS_BACKGROUND_MODES: Record<
 
 export function Canvas() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, selectedElementId, selectedSequenceStep } = state;
+  const { project, activeSceneIndex, selectedElementId, selectedElementIds, selectedSequenceStep } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(1);
@@ -155,7 +155,7 @@ export function Canvas() {
             if (element.revealStep > selectedSequenceStep) return null;
             
             const effectiveElement = getEffectiveElementState(element, selectedSequenceStep);
-            const isSelected = element.id === selectedElementId;
+            const isSelected = selectedElementIds.includes(element.id);
             if (effectiveElement.hidden && !isSelected) return null;
 
             return (
@@ -163,6 +163,7 @@ export function Canvas() {
                 key={`${element.id}-${currentStep}`}
                 element={effectiveElement}
                 isSelected={isSelected}
+                isPrimarySelected={element.id === selectedElementId}
                 isHiddenPreview={Boolean(effectiveElement.hidden && isSelected)}
                 scale={scale}
               />
@@ -172,7 +173,8 @@ export function Canvas() {
               <CanvasElement
                 key={`${element.id}-${currentStep}`}
                 element={element}
-                isSelected={element.id === selectedElementId}
+                isSelected={selectedElementIds.includes(element.id)}
+                isPrimarySelected={element.id === selectedElementId}
                 isHiddenPreview={false}
                 scale={scale}
               />
@@ -187,11 +189,13 @@ export function Canvas() {
 function CanvasElement({
   element,
   isSelected,
+  isPrimarySelected,
   isHiddenPreview,
   scale,
 }: {
   element: any,
   isSelected: boolean,
+  isPrimarySelected: boolean,
   isHiddenPreview: boolean,
   scale: number,
   key?: React.Key
@@ -218,6 +222,7 @@ function CanvasElement({
   const subtitleLines = textParts?.subtitle ? textParts.subtitle.split('\n').filter(Boolean) : [];
   const subtitleFontSize = element.type === 'text' ? getTextSubtitleFontSize(element) : 0;
   const textPadding = element.type === 'text' && textVariant === 'block' ? getTextPadding(element) : 0;
+  const blockTextPaddingX = Math.max(8, Math.round(textPadding * 0.72));
 
   const syncFrame = (nextFrame: Frame | ((current: Frame) => Frame)) => {
     const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(frameRef.current) : nextFrame;
@@ -270,15 +275,22 @@ function CanvasElement({
     });
   };
 
-  const selectElement = () => {
-    if (!isSelected) {
+  const selectElement = (event?: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'> | Pick<React.MouseEvent, 'ctrlKey' | 'metaKey' | 'shiftKey'>) => {
+    const isMultiSelect = Boolean(event?.ctrlKey || event?.metaKey || event?.shiftKey);
+
+    if (isMultiSelect) {
+      dispatch({ type: 'TOGGLE_ELEMENT_SELECTION', payload: element.id });
+      return;
+    }
+
+    if (!isSelected || !isPrimarySelected) {
       dispatch({ type: 'SELECT_ELEMENT', payload: element.id });
     }
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    selectElement();
+    dispatch({ type: 'SELECT_ELEMENT', payload: element.id });
     if (element.type === 'text') {
       setIsEditingText(true);
     } else if (element.type === 'image') {
@@ -294,8 +306,8 @@ function CanvasElement({
       onDragStop={handleDragStop}
       onResize={handleResize}
       onResizeStop={handleResizeStop}
-      onDragStart={selectElement}
-      onResizeStart={selectElement}
+      onDragStart={(event) => selectElement(event as MouseEvent)}
+      onResizeStart={(event) => selectElement(event as MouseEvent)}
       disableDragging={isEditingText}
       bounds="parent"
       scale={scale}
@@ -310,10 +322,10 @@ function CanvasElement({
         onDoubleClick={handleDoubleClick}
         onClick={(e) => {
           e.stopPropagation();
-          selectElement();
+          selectElement(e);
         }}
       >
-        {isSelected && (
+        {isPrimarySelected && (
           <div className={`absolute -top-4 right-0 text-white text-[10px] px-1.5 py-0.5 font-bold uppercase tracking-wider ${
             isHiddenPreview ? 'bg-rose-500' : 'bg-[#4f46e5]'
           }`}>
@@ -329,7 +341,7 @@ function CanvasElement({
                 textVariant === 'block' ? 'text-center shadow-2xl rounded-[100px]' : 'bg-transparent text-left'
               }`}
               style={{ 
-                padding: textVariant === 'block' ? `${textPadding}px` : '0px',
+                padding: textVariant === 'block' ? `${textPadding}px ${blockTextPaddingX}px` : '0px',
                 fontSize: `${element.fontSize}px`, 
                 fontWeight: element.fontWeight, 
                 color: element.color,
@@ -354,7 +366,7 @@ function CanvasElement({
               style={{
                 backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
                 color: element.color,
-                padding: textVariant === 'block' ? `${textPadding}px` : '0px',
+                padding: textVariant === 'block' ? `${textPadding}px ${blockTextPaddingX}px` : '0px',
               }}
             >
               {textVariant === 'block' && textParts && (
@@ -444,6 +456,10 @@ function ImageRenderer({ element }: { element: ImageElement }) {
   const { state } = useAppContext();
   const asset = state.project.assets.find(a => a.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
+  const baseSize = Math.min(element.width, element.height);
+  const shellPadding = Math.max(8, Math.min(20, Math.round(baseSize * 0.08)));
+  const captionHeight = Math.max(24, Math.min(44, Math.round(element.height * 0.22)));
+  const captionTextSize = Math.max(9, Math.min(14, Math.round(baseSize * 0.075)));
 
   if (!asset) {
     return <div className="w-full h-full bg-[#f1f5f9] border border-[#cbd5e1] flex items-center justify-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">Image not found</div>;
@@ -451,8 +467,8 @@ function ImageRenderer({ element }: { element: ImageElement }) {
 
   return (
     <div
-      className="w-full h-full bg-white p-3 shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
-      style={{ paddingBottom: '4.5rem' }}
+      className="w-full h-full bg-white shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
+      style={{ padding: `${shellPadding}px`, paddingBottom: `${shellPadding + captionHeight + 8}px` }}
     >
       <img 
         src={asset.dataUrl} 
@@ -460,7 +476,17 @@ function ImageRenderer({ element }: { element: ImageElement }) {
         className="w-full h-full object-cover border border-slate-100" 
         draggable={false}
       />
-      <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
+      <div
+        className="absolute flex items-center justify-center border-t border-slate-200/80 text-center font-extrabold uppercase text-slate-700"
+        style={{
+          left: shellPadding,
+          right: shellPadding,
+          bottom: shellPadding,
+          height: captionHeight,
+          fontSize: `${captionTextSize}px`,
+          letterSpacing: `${Math.max(1, Math.round(captionTextSize * 0.18))}px`,
+        }}
+      >
         {captionText}
       </div>
     </div>
@@ -469,17 +495,31 @@ function ImageRenderer({ element }: { element: ImageElement }) {
 
 function ColorCardRenderer({ element }: { element: ColorElement }) {
   const captionText = element.captionText?.trim() || '';
+  const baseSize = Math.min(element.width, element.height);
+  const shellPadding = Math.max(8, Math.min(20, Math.round(baseSize * 0.08)));
+  const captionHeight = Math.max(24, Math.min(44, Math.round(element.height * 0.22)));
+  const captionTextSize = Math.max(9, Math.min(14, Math.round(baseSize * 0.075)));
 
   return (
     <div
-      className="w-full h-full bg-white p-3 shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
-      style={{ paddingBottom: '4.5rem' }}
+      className="w-full h-full bg-white shadow-xl flex flex-col border border-slate-200 pointer-events-none relative"
+      style={{ padding: `${shellPadding}px`, paddingBottom: `${shellPadding + captionHeight + 8}px` }}
     >
       <div
         className="w-full h-full rounded-sm border border-slate-100"
         style={{ backgroundColor: element.fillColor }}
       />
-      <div className="absolute inset-x-3 bottom-3 flex h-11 items-center justify-center border-t border-slate-200/80 text-center text-[14px] font-extrabold uppercase tracking-[0.2em] text-slate-700">
+      <div
+        className="absolute flex items-center justify-center border-t border-slate-200/80 text-center font-extrabold uppercase text-slate-700"
+        style={{
+          left: shellPadding,
+          right: shellPadding,
+          bottom: shellPadding,
+          height: captionHeight,
+          fontSize: `${captionTextSize}px`,
+          letterSpacing: `${Math.max(1, Math.round(captionTextSize * 0.18))}px`,
+        }}
+      >
         {captionText}
       </div>
     </div>
@@ -490,11 +530,13 @@ function ShapeRenderer({ element }: { element: ShapeElement }) {
   if (element.shapeType === 'emoji') {
     return (
       <div className="w-full h-full flex items-center justify-center pointer-events-none">
-        <EmojiGlyph
-          id={element.emojiHexcode || 'grinning-face'}
-          fallback={element.emojiChar || '😀'}
-          className="h-full w-full object-contain drop-shadow-[0_12px_20px_rgba(15,23,42,0.14)]"
-        />
+        <div className="h-[84%] w-[84%]">
+          <EmojiGlyph
+            id={element.emojiHexcode || 'grinning-face'}
+            fallback={element.emojiChar || '😀'}
+            className="h-full w-full object-contain drop-shadow-[0_12px_20px_rgba(15,23,42,0.14)]"
+          />
+        </div>
       </div>
     );
   }
@@ -502,32 +544,44 @@ function ShapeRenderer({ element }: { element: ShapeElement }) {
   if (element.shapeType === 'icon') {
     return (
       <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
-        <LucideIconGlyph
-          name={element.iconName || 'circle'}
-          className="h-full w-full drop-shadow-[0_12px_20px_rgba(15,23,42,0.16)]"
-          color={element.iconColor || '#0f172a'}
-          strokeWidth={element.iconStrokeWidth || 2.25}
-        />
+        <div className="h-[84%] w-[84%]">
+          <LucideIconGlyph
+            name={element.iconName || 'circle'}
+            className="h-full w-full drop-shadow-[0_12px_20px_rgba(15,23,42,0.16)]"
+            color={element.iconColor || '#0f172a'}
+            strokeWidth={element.iconStrokeWidth || 2.25}
+          />
+        </div>
       </div>
     );
   }
 
   if (element.shapeType === 'yes') {
+    const baseSize = Math.min(element.width, element.height);
+    const transliterationSize = Math.max(10, Math.min(18, Math.round(baseSize * 0.16)));
+    const labelSize = Math.max(16, Math.min(30, Math.round(baseSize * 0.28)));
+    const iconStrokeWidth = Math.max(2, Math.min(3, baseSize / 36));
+
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#3b82f6] rounded-[100px] shadow-2xl text-white pointer-events-none">
-        <Check className="w-1/3 h-1/3" strokeWidth={3} />
-        <span className="text-lg font-semibold tracking-[0.18em] mt-2">NAAM</span>
-        <span className="text-3xl font-bold mt-1">YES</span>
+        <Check className="w-1/3 h-1/3" strokeWidth={iconStrokeWidth} />
+        <span style={{ fontSize: `${transliterationSize}px`, letterSpacing: `${Math.max(1, Math.round(transliterationSize * 0.12))}px`, marginTop: Math.max(4, Math.round(baseSize * 0.06)) }} className="font-semibold">NAAM</span>
+        <span style={{ fontSize: `${labelSize}px`, marginTop: Math.max(2, Math.round(baseSize * 0.03)) }} className="font-bold">YES</span>
       </div>
     );
   }
 
   if (element.shapeType === 'no') {
+    const baseSize = Math.min(element.width, element.height);
+    const transliterationSize = Math.max(10, Math.min(18, Math.round(baseSize * 0.16)));
+    const labelSize = Math.max(16, Math.min(30, Math.round(baseSize * 0.28)));
+    const iconStrokeWidth = Math.max(2, Math.min(3, baseSize / 36));
+
     return (
       <div className="w-full h-full flex flex-col items-center justify-center bg-[#ef4444] rounded-[100px] shadow-2xl text-white pointer-events-none">
-        <X className="w-1/3 h-1/3" strokeWidth={3} />
-        <span className="text-lg font-semibold tracking-[0.18em] mt-2">LA</span>
-        <span className="text-3xl font-bold mt-1">NO</span>
+        <X className="w-1/3 h-1/3" strokeWidth={iconStrokeWidth} />
+        <span style={{ fontSize: `${transliterationSize}px`, letterSpacing: `${Math.max(1, Math.round(transliterationSize * 0.12))}px`, marginTop: Math.max(4, Math.round(baseSize * 0.06)) }} className="font-semibold">LA</span>
+        <span style={{ fontSize: `${labelSize}px`, marginTop: Math.max(2, Math.round(baseSize * 0.03)) }} className="font-bold">NO</span>
       </div>
     );
   }

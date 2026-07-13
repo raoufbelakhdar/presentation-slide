@@ -28,6 +28,7 @@ interface AppState {
   currentScreen: AppScreen;
   activeSceneIndex: number;
   selectedElementId: string | null;
+  selectedElementIds: string[];
   selectedSequenceStep: number | null;
   mode: AppMode;
   presentationSceneIndex: number;
@@ -55,10 +56,14 @@ type Action =
   | { type: 'UPDATE_PROJECT_NAME'; payload: string }
   | { type: 'ADD_TEMPLATE'; payload: SceneTemplate }
   | { type: 'SELECT_ELEMENT'; payload: string | null }
+  | { type: 'SELECT_ELEMENTS'; payload: string[] }
+  | { type: 'TOGGLE_ELEMENT_SELECTION'; payload: string }
   | { type: 'ADD_ELEMENT'; payload: SceneElement }
   | { type: 'UPDATE_ELEMENT'; payload: { id: string; updates: Partial<SceneElement> } }
   | { type: 'DELETE_ELEMENT'; payload: string }
+  | { type: 'DELETE_ELEMENTS'; payload: string[] }
   | { type: 'DUPLICATE_ELEMENT'; payload: string }
+  | { type: 'DUPLICATE_ELEMENTS'; payload: string[] }
   | { type: 'SET_PRESENTATION_SCENE'; payload: number }
   | { type: 'SET_PRESENTATION_STEP'; payload: number }
   | { type: 'ADD_SEQUENCE'; payload: { sceneIndex: number; position?: 'start' | 'end' } }
@@ -97,7 +102,9 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
   'ADD_ELEMENT',
   'UPDATE_ELEMENT',
   'DELETE_ELEMENT',
+  'DELETE_ELEMENTS',
   'DUPLICATE_ELEMENT',
+  'DUPLICATE_ELEMENTS',
   'ADD_SEQUENCE',
   'DELETE_SEQUENCE',
   'UPDATE_SEQUENCE_CONFIG',
@@ -105,6 +112,22 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
 
 function getTimestamp() {
   return new Date().toISOString();
+}
+
+function getSelectionState(selectedElementId: string | null) {
+  return {
+    selectedElementId,
+    selectedElementIds: selectedElementId ? [selectedElementId] : [],
+  };
+}
+
+function getMultiSelectionState(selectedElementIds: string[]) {
+  const nextSelectedElementIds = Array.from(new Set(selectedElementIds));
+
+  return {
+    selectedElementId: nextSelectedElementIds[0] || null,
+    selectedElementIds: nextSelectedElementIds,
+  };
 }
 
 function cloneElement(element: SceneElement, overrides: Partial<SceneElement> = {}): SceneElement {
@@ -551,6 +574,7 @@ const initialState: AppState = {
   currentScreen: 'projects',
   activeSceneIndex: 0,
   selectedElementId: null,
+  selectedElementIds: [],
   selectedSequenceStep: null,
   mode: 'editor',
   presentationSceneIndex: 0,
@@ -580,7 +604,7 @@ function appReducer(state: AppState, action: Action): AppState {
         currentScreen: 'editor',
         mode: 'editor',
         activeSceneIndex: 0,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
         presentationSceneIndex: 0,
         presentationRevealStep: 1,
@@ -598,7 +622,7 @@ function appReducer(state: AppState, action: Action): AppState {
         currentScreen: 'editor',
         mode: 'editor',
         activeSceneIndex: 0,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
         presentationSceneIndex: 0,
         presentationRevealStep: 1,
@@ -618,7 +642,7 @@ function appReducer(state: AppState, action: Action): AppState {
         currentScreen: 'editor',
         mode: 'editor',
         activeSceneIndex: 0,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
         presentationSceneIndex: 0,
         presentationRevealStep: 1,
@@ -638,7 +662,7 @@ function appReducer(state: AppState, action: Action): AppState {
         currentScreen: isDeletingActiveProject ? 'projects' : state.currentScreen,
         mode: 'editor',
         activeSceneIndex: isDeletingActiveProject ? 0 : state.activeSceneIndex,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
         presentationSceneIndex: 0,
         presentationRevealStep: 1,
@@ -653,7 +677,7 @@ function appReducer(state: AppState, action: Action): AppState {
         : buildSceneFromTemplate(state.project, template);
       return applyProjectUpdate(state, nextProject, {
         activeSceneIndex: template.kind === 'branch' ? state.activeSceneIndex : nextProject.scenes.length - 1,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep:
           template.kind === 'branch'
             ? getSceneSequenceCount(state.project.scenes[state.activeSceneIndex]) + 1
@@ -665,7 +689,7 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         currentScreen: action.payload,
         mode: action.payload === 'projects' ? 'editor' : state.mode,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
       };
     case 'SET_MODE':
@@ -674,11 +698,11 @@ function appReducer(state: AppState, action: Action): AppState {
         mode: action.payload,
         presentationSceneIndex: action.payload === 'presentation' ? state.activeSceneIndex : state.presentationSceneIndex,
         presentationRevealStep: 1,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
       };
     case 'SET_ACTIVE_SCENE':
-      return { ...state, activeSceneIndex: action.payload, selectedElementId: null, selectedSequenceStep: null };
+      return { ...state, activeSceneIndex: action.payload, ...getSelectionState(null), selectedSequenceStep: null };
     case 'ADD_SCENE': {
       const nextProject = {
         ...state.project,
@@ -687,7 +711,7 @@ function appReducer(state: AppState, action: Action): AppState {
 
       return applyProjectUpdate(state, nextProject, {
         activeSceneIndex: state.project.scenes.length,
-        selectedElementId: null,
+        ...getSelectionState(null),
         selectedSequenceStep: null,
       });
     }
@@ -739,7 +763,7 @@ function appReducer(state: AppState, action: Action): AppState {
 
       return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
         activeSceneIndex: Math.min(state.activeSceneIndex, nextScenes.length - 1),
-        selectedElementId: null,
+        ...getSelectionState(null),
       });
     }
     case 'UPDATE_SCENE': {
@@ -785,7 +809,17 @@ function appReducer(state: AppState, action: Action): AppState {
         ),
       };
     case 'SELECT_ELEMENT':
-      return { ...state, selectedElementId: action.payload };
+      return { ...state, ...getSelectionState(action.payload) };
+    case 'SELECT_ELEMENTS':
+      return { ...state, ...getMultiSelectionState(action.payload) };
+    case 'TOGGLE_ELEMENT_SELECTION': {
+      const isSelected = state.selectedElementIds.includes(action.payload);
+      const nextSelectedElementIds = isSelected
+        ? state.selectedElementIds.filter((elementId) => elementId !== action.payload)
+        : [...state.selectedElementIds, action.payload];
+
+      return { ...state, ...getMultiSelectionState(nextSelectedElementIds) };
+    }
     case 'SELECT_SEQUENCE':
       return { ...state, selectedSequenceStep: action.payload };
     case 'ADD_ELEMENT': {
@@ -798,7 +832,7 @@ function appReducer(state: AppState, action: Action): AppState {
       nextScenes[state.activeSceneIndex] = nextScene;
 
       return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
-        selectedElementId: action.payload.id,
+        ...getSelectionState(action.payload.id),
       });
     }
     case 'UPDATE_ELEMENT': {
@@ -822,7 +856,22 @@ function appReducer(state: AppState, action: Action): AppState {
       nextScenes[state.activeSceneIndex] = { ...activeScene, elements: nextElements };
 
       return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
-        selectedElementId: state.selectedElementId === action.payload ? null : state.selectedElementId,
+        ...getMultiSelectionState(
+          state.selectedElementIds.filter((elementId) => elementId !== action.payload),
+        ),
+      });
+    }
+    case 'DELETE_ELEMENTS': {
+      const idsToDelete = new Set(action.payload);
+      if (idsToDelete.size === 0) return state;
+
+      const activeScene = state.project.scenes[state.activeSceneIndex];
+      const nextElements = activeScene.elements.filter((element) => !idsToDelete.has(element.id));
+      const nextScenes = [...state.project.scenes];
+      nextScenes[state.activeSceneIndex] = { ...activeScene, elements: nextElements };
+
+      return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
+        ...getSelectionState(null),
       });
     }
     case 'DUPLICATE_ELEMENT': {
@@ -843,7 +892,33 @@ function appReducer(state: AppState, action: Action): AppState {
       };
 
       return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
-        selectedElementId: newElement.id,
+        ...getSelectionState(newElement.id),
+      });
+    }
+    case 'DUPLICATE_ELEMENTS': {
+      const activeScene = state.project.scenes[state.activeSceneIndex];
+      const sourceElements = activeScene.elements.filter((element) => action.payload.includes(element.id));
+      if (sourceElements.length === 0) return state;
+
+      let nextZIndex = getNextElementZIndex(activeScene.elements);
+      const duplicatedElements = sourceElements.map((element) => {
+        const newElement = cloneElement(element, {
+          id: generateId(),
+          x: element.x + 20,
+          y: element.y + 20,
+          zIndex: nextZIndex,
+        });
+        nextZIndex += 1;
+        return newElement;
+      });
+      const nextScenes = [...state.project.scenes];
+      nextScenes[state.activeSceneIndex] = {
+        ...activeScene,
+        elements: [...activeScene.elements, ...duplicatedElements],
+      };
+
+      return applyProjectUpdate(state, { ...state.project, scenes: nextScenes }, {
+        ...getMultiSelectionState(duplicatedElements.map((element) => element.id)),
       });
     }
     case 'SET_PRESENTATION_SCENE':

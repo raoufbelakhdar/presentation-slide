@@ -492,12 +492,14 @@ export function LeftSidebar() {
     activeSceneIndex,
     templates,
     selectedElementId,
+    selectedElementIds,
     selectedSequenceStep,
   } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const selectedElement =
-    activeScene?.elements.find((element) => element.id === selectedElementId) ||
-    null;
+    selectedElementIds.length === 1
+      ? activeScene?.elements.find((element) => element.id === selectedElementId) || null
+      : null;
   const projectAssetsById = new Map<string, Asset>(
     project.assets.map((asset) => [asset.id, asset]),
   );
@@ -720,7 +722,7 @@ export function LeftSidebar() {
       revealStep: defaultRevealStep,
       fontSize: 48,
       subtitleFontSize: 24,
-      padding: 24,
+      padding: 18,
       fontWeight: "bold",
       color: "#ffffff",
     };
@@ -826,8 +828,8 @@ export function LeftSidebar() {
       iconStrokeWidth: 2.25,
       x: 160,
       y: 180,
-      width: 180,
-      height: 180,
+      width: 150,
+      height: 150,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
@@ -842,7 +844,7 @@ export function LeftSidebar() {
       x: 150,
       y: 150,
       width: 300,
-      height: 300, // proportional scaling handled via resizer if needed, defaults are fine
+      height: 300,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
@@ -862,8 +864,8 @@ export function LeftSidebar() {
       emojiChar: emojiEntry.emoji,
       x: 160,
       y: 180,
-      width: 180,
-      height: 180,
+      width: 150,
+      height: 150,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });

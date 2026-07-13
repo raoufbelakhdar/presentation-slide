@@ -4,7 +4,7 @@ export type TextAlign = 'left' | 'center' | 'right';
 export type AnimationType = 'fade' | 'slide-up' | 'slide-left' | 'scale' | 'none';
 
 export const DEFAULT_SEQUENCE_ANIMATION_TYPE: AnimationType = 'slide-up';
-export const DEFAULT_SEQUENCE_DURATION = 0.85;
+export const DEFAULT_SEQUENCE_DURATION = 1.5;
 export const DEFAULT_SEQUENCE_DELAY = 0.08;
 
 export interface SequenceConfig {

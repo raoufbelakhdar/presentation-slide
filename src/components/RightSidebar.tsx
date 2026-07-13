@@ -60,15 +60,15 @@ function SequenceLayersPanel({
   step,
   elements,
   assets,
-  selectedElementId,
+  selectedElementIds,
   onSelectElement,
   onToggleVisibility,
 }: {
   step: number;
   elements: SceneElement[];
   assets: Asset[];
-  selectedElementId: string | null;
-  onSelectElement: (elementId: string) => void;
+  selectedElementIds: string[];
+  onSelectElement: (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => void;
   onToggleVisibility: (element: SceneElement, hidden: boolean) => void;
 }) {
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
@@ -83,14 +83,14 @@ function SequenceLayersPanel({
     <div
       key={element.id}
       className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 ${
-        selectedElementId === element.id
+        selectedElementIds.includes(element.id)
           ? 'border-[#4f46e5] bg-indigo-50'
           : 'border-[#e2e8f0] bg-white'
       }`}
     >
       <button
         type="button"
-        onClick={() => onSelectElement(element.id)}
+        onClick={(event) => onSelectElement(event, element.id)}
         className="min-w-0 flex-1 text-left"
       >
         <div className="truncate text-[11px] font-semibold text-[#0f172a]">
@@ -149,12 +149,18 @@ function SequenceLayersPanel({
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, selectedElementId } = state;
+  const { project, activeSceneIndex, selectedElementId, selectedElementIds } = state;
   const activeScene = project.scenes[activeSceneIndex];
   
   const selectedElement = activeScene?.elements.find(el => el.id === selectedElementId);
   const selectedSequenceStep = state.selectedSequenceStep;
-  const handleSelectElement = (elementId: string) => {
+  const isMultiSelecting = selectedElementIds.length > 1;
+  const handleSelectElement = (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey) {
+      dispatch({ type: 'TOGGLE_ELEMENT_SELECTION', payload: elementId });
+      return;
+    }
+
     dispatch({ type: 'SELECT_ELEMENT', payload: elementId });
   };
   const handleSequenceVisibilityToggle = (element: SceneElement, hidden: boolean) => {
@@ -257,7 +263,7 @@ export function RightSidebar() {
             step={selectedSequenceStep}
             elements={activeScene?.elements || []}
             assets={project.assets}
-            selectedElementId={selectedElementId}
+            selectedElementIds={selectedElementIds}
             onSelectElement={handleSelectElement}
             onToggleVisibility={handleSequenceVisibilityToggle}
           />
@@ -295,6 +301,56 @@ export function RightSidebar() {
               </p>
             </div>
           </div>
+        )}
+      </div>
+    );
+  }
+
+  if (isMultiSelecting) {
+    return (
+      <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
+        <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
+          <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Multiple Selected</h3>
+          <button
+            onClick={() => dispatch({ type: 'DELETE_ELEMENTS', payload: selectedElementIds })}
+            className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+            title="Delete Selected Elements"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              Selection
+            </div>
+            <div className="mt-2 text-sm font-semibold text-[#0f172a]">
+              {selectedElementIds.length} components selected
+            </div>
+            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+              Ctrl, Cmd, or Shift click components on the canvas or in sequence layers to add or remove them from this selection.
+            </p>
+          </div>
+
+          <button
+            onClick={() => dispatch({ type: 'DUPLICATE_ELEMENTS', payload: selectedElementIds })}
+            className="w-full py-1.5 text-[10px] font-bold border border-[#e2e8f0] bg-slate-50 uppercase text-slate-600 hover:bg-slate-100 hover:border-[#cbd5e1] transition-colors rounded-sm mt-2 flex items-center justify-center gap-2"
+          >
+            <Copy className="w-3 h-3" />
+            Duplicate Selected
+          </button>
+        </div>
+
+        {selectedSequenceStep !== null && (
+          <SequenceLayersPanel
+            step={selectedSequenceStep}
+            elements={activeScene?.elements || []}
+            assets={project.assets}
+            selectedElementIds={selectedElementIds}
+            onSelectElement={handleSelectElement}
+            onToggleVisibility={handleSequenceVisibilityToggle}
+          />
         )}
       </div>
     );
@@ -576,8 +632,8 @@ export function RightSidebar() {
                   <input 
                     type="number" 
                     min={8}
-                    value={textElement.padding || 24}
-                    onChange={(e) => handleUpdate({ padding: Math.max(8, parseInt(e.target.value) || 24) })}
+                    value={textElement.padding || 18}
+                    onChange={(e) => handleUpdate({ padding: Math.max(8, parseInt(e.target.value) || 18) })}
                     className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
                   />
                 </div>
@@ -721,7 +777,7 @@ export function RightSidebar() {
           step={selectedSequenceStep}
           elements={activeScene.elements}
           assets={project.assets}
-          selectedElementId={selectedElementId}
+          selectedElementIds={selectedElementIds}
           onSelectElement={handleSelectElement}
           onToggleVisibility={handleSequenceVisibilityToggle}
         />

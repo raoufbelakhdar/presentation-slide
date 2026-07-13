@@ -43,9 +43,14 @@ function AppContent() {
           return;
         }
 
-        if (state.selectedElementId) {
+        if (state.selectedElementIds.length > 0) {
           event.preventDefault();
-          dispatch({ type: 'DELETE_ELEMENT', payload: state.selectedElementId });
+          if (state.selectedElementIds.length === 1 && state.selectedElementId) {
+            dispatch({ type: 'DELETE_ELEMENT', payload: state.selectedElementId });
+            return;
+          }
+
+          dispatch({ type: 'DELETE_ELEMENTS', payload: state.selectedElementIds });
           return;
         }
 
@@ -109,6 +114,7 @@ function AppContent() {
     state.currentScreen,
     state.mode,
     state.selectedElementId,
+    state.selectedElementIds,
     state.selectedSequenceStep,
   ]);
 
