@@ -198,7 +198,7 @@ export function PresentationView() {
                       const subtitleLines = subtitle.split('\n').filter(Boolean);
                       const subtitleFontSize = getTextSubtitleFontSize(textElement);
                       const textPadding = textVariant === 'block' ? getTextPadding(textElement) : 0;
-                      const blockTextPaddingX = Math.max(4, Math.round(textPadding * 0.45));
+                      const blockTextPaddingX = textPadding;
 
                       return (
                         <div 
@@ -304,7 +304,7 @@ function PresentationImage({ element }: { element: ImageElement }) {
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
   const baseSize = Math.min(element.width, element.height);
-  const shellPadding = Math.max(6, Math.min(20, Math.round(baseSize * 0.08)));
+  const shellPadding = 5;
   const frameGap = Math.max(3, Math.min(8, Math.round(baseSize * 0.03)));
   const captionHeight = Math.max(16, Math.min(44, Math.round(element.height * 0.18)));
   const captionTextSize = Math.max(9, Math.min(14, Math.round(baseSize * 0.075)));

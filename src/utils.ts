@@ -38,7 +38,7 @@ export function getTextAlign(element: Pick<TextElement, 'align' | 'variant'>) {
 }
 
 export function getTextPadding(element: Pick<TextElement, 'padding'>) {
-  return Math.max(6, Math.round(element.padding || 12));
+  return Math.max(6, Math.round(element.padding || 20));
 }
 
 export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 'subtitleFontSize'>) {
@@ -276,7 +276,7 @@ function renderImageElement(element: Extract<SceneElement, { type: 'image' }>, a
   const asset = assets.find((entry) => entry.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
-  const framePadding = 12;
+  const framePadding = 5;
   const captionHeight = hasCaption ? 76 : 0;
   const imageWidth = Math.max(0, element.width - framePadding * 2);
   const imageHeight = Math.max(0, element.height - framePadding * 2 - captionHeight);

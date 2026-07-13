@@ -722,7 +722,7 @@ export function LeftSidebar() {
       revealStep: defaultRevealStep,
       fontSize: 40,
       subtitleFontSize: 20,
-      padding: 12,
+      padding: 20,
       fontWeight: "bold",
       color: "#ffffff",
     };
@@ -811,8 +811,8 @@ export function LeftSidebar() {
       captionText: "",
       x: 180,
       y: 150,
-      width: 300,
-      height: 300,
+      width: 250,
+      height: 250,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
@@ -843,8 +843,8 @@ export function LeftSidebar() {
       captionText: "",
       x: 150,
       y: 150,
-      width: 300,
-      height: 300,
+      width: 250,
+      height: 250,
       revealStep: defaultRevealStep,
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });

@@ -632,8 +632,8 @@ export function RightSidebar() {
                   <input 
                     type="number" 
                     min={8}
-                    value={textElement.padding || 12}
-                    onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 12) })}
+                    value={textElement.padding || 20}
+                    onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 20) })}
                     className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
                   />
                 </div>
