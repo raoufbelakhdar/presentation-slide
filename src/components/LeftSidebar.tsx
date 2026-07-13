@@ -28,6 +28,11 @@ import {
   ColorElement,
 } from "../types";
 import {
+  createAssetFromFile,
+  getAssetKind,
+  getDefaultImageFrameStyle,
+} from "../assetUtils";
+import {
   buildSceneTemplate,
   generateId,
   getTextAlign,
@@ -692,20 +697,13 @@ export function LeftSidebar() {
     if (!files) return;
 
     Array.from(files).forEach((file: File) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (typeof event.target?.result === "string") {
-          dispatch({
-            type: "ADD_ASSET",
-            payload: {
-              id: generateId(),
-              name: file.name,
-              dataUrl: event.target.result,
-            },
-          });
-        }
-      };
-      reader.readAsDataURL(file);
+      void (async () => {
+        const asset = await createAssetFromFile(file);
+        dispatch({
+          type: "ADD_ASSET",
+          payload: asset,
+        });
+      })();
     });
   };
 
@@ -836,11 +834,13 @@ export function LeftSidebar() {
   };
 
   const addImageElement = (assetId: string) => {
+    const asset = projectAssetsById.get(assetId);
     const newElement: ImageElement = {
       id: generateId(),
       type: "image",
       assetId,
       captionText: "",
+      frameStyle: getDefaultImageFrameStyle(asset),
       x: 150,
       y: 150,
       width: 250,
@@ -1026,6 +1026,7 @@ export function LeftSidebar() {
           id: generateId(),
           name: getPexelsPhotoLabel(photo),
           dataUrl,
+          kind: "photo",
         },
       });
     } catch (error) {
@@ -1908,12 +1909,12 @@ export function LeftSidebar() {
                         <div className="mb-4 flex items-center justify-end">
                           <label
                             className="cursor-pointer text-slate-400 transition-colors hover:text-[#4f46e5]"
-                            title="Upload Images"
+                            title="Upload Images or SVG Graphics"
                           >
                             <Upload className="h-4 w-4" />
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.svg"
                               multiple
                               className="hidden"
                               onChange={handleImageUpload}
@@ -1929,7 +1930,7 @@ export function LeftSidebar() {
                             </span>
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/*,.svg"
                               multiple
                               className="hidden"
                               onChange={handleImageUpload}
@@ -1967,8 +1968,11 @@ export function LeftSidebar() {
                                   <img
                                     src={asset.dataUrl}
                                     alt={asset.name}
-                                    className="h-full w-full object-cover"
+                                    className="h-full w-full object-contain"
                                   />
+                                  <div className="absolute bottom-1.5 right-1.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500 shadow-sm">
+                                    {getAssetKind(asset)}
+                                  </div>
                                   <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                                     <Plus className="h-6 w-6 text-white" />
                                   </div>
@@ -2002,7 +2006,7 @@ export function LeftSidebar() {
 
                         {project.assets.length === 0 && (
                           <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                            Upload images to start your local asset library
+                            Upload photos, transparent PNGs, or SVG graphics to start your local asset library
                           </div>
                         )}
                       </div>
