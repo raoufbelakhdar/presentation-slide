@@ -121,58 +121,6 @@ function cloneFavoriteElement(element: SceneElement): SceneElement {
   } as SceneElement;
 }
 
-function getSavedFavoriteId(
-  projectId: string,
-  sceneId: string,
-  elementId: string,
-) {
-  return `saved:${projectId}:${sceneId}:${elementId}`;
-}
-
-function getSavedFavoriteName(
-  element: SceneElement,
-  assetsById: Map<string, Asset>,
-) {
-  if (element.type === "text") {
-    const textVariant = getTextVariant(element);
-    const title =
-      textVariant === "free"
-        ? element.text
-            .split("\n")
-            .find((line) => line.trim())
-            ?.trim()
-        : splitTextContent(element.text).title.trim();
-
-    return title || (textVariant === "free" ? "Free Text" : "Text Block");
-  }
-
-  if (element.type === "image") {
-    return (
-      element.captionText?.trim() ||
-      assetsById.get(element.assetId)?.name ||
-      "Image"
-    );
-  }
-
-  if (element.type === "color") {
-    return element.captionText?.trim() || "Color Card";
-  }
-
-  if (element.shapeType === "emoji") {
-    const emojiEntry = getEmojiById(element.emojiHexcode || "");
-    return emojiEntry ? getEmojiLabel(emojiEntry) : element.emojiChar || "Emoji";
-  }
-
-  if (element.shapeType === "icon") {
-    return formatIconName(element.iconName || "Icon");
-  }
-
-  if (element.shapeType === "yes") return "Yes Badge";
-  if (element.shapeType === "no") return "No Badge";
-  if (element.shapeType === "check") return "Check Mark";
-  return "Cross Mark";
-}
-
 function getSavedFavoriteTypeLabel(element: SceneElement) {
   if (element.type === "text") {
     return getTextVariant(element) === "free" ? "Text" : "Text Block";
@@ -481,15 +429,9 @@ export function LeftSidebar() {
     sharedAssets,
     favoriteComponents,
     templates,
-    selectedElementId,
-    selectedElementIds,
     selectedSequenceStep,
   } = state;
   const activeScene = project.scenes[activeSceneIndex];
-  const selectedElement =
-    selectedElementIds.length === 1
-      ? activeScene?.elements.find((element) => element.id === selectedElementId) || null
-      : null;
   const localAssets = project.assets;
   const availableAssets = mergeAssetLibraries(project.assets, sharedAssets);
   const projectAssetsById = new Map<string, Asset>(
@@ -944,19 +886,6 @@ export function LeftSidebar() {
     ): favorite is Extract<FavoriteComponent, { type: "saved-element" }> =>
       favorite.type === "saved-element",
   );
-  const selectedSavedFavoriteId =
-    selectedElement && activeScene
-      ? getSavedFavoriteId(project.id, activeScene.id, selectedElement.id)
-      : null;
-  const isSelectedElementSaved = Boolean(
-    selectedSavedFavoriteId &&
-      favoriteSavedElements.some(
-        (favorite) => favorite.id === selectedSavedFavoriteId,
-      ),
-  );
-  const selectedElementFavoriteName = selectedElement
-    ? getSavedFavoriteName(selectedElement, projectAssetsById)
-    : "";
   const visibleSharedAssets = showSharedAssets
     ? sharedAssets.filter((asset) => !localAssetIds.has(asset.id))
     : [];
@@ -1049,25 +978,6 @@ export function LeftSidebar() {
     dispatch({ type: "USE_TEMPLATE", payload: templateId });
   };
 
-  const saveSelectedElementToFavorites = () => {
-    if (!activeScene || !selectedElement) {
-      return;
-    }
-
-    const favorite: Extract<FavoriteComponent, { type: "saved-element" }> = {
-      type: "saved-element",
-      id: getSavedFavoriteId(project.id, activeScene.id, selectedElement.id),
-      name: getSavedFavoriteName(selectedElement, projectAssetsById),
-      element: cloneFavoriteElement(selectedElement),
-      asset:
-        selectedElement.type === "image"
-          ? projectAssetsById.get(selectedElement.assetId)
-          : undefined,
-    };
-
-    dispatch({ type: "UPSERT_FAVORITE_COMPONENT", payload: favorite });
-  };
-
   const addSavedFavoriteElement = (
     favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
   ) => {
@@ -1131,59 +1041,6 @@ export function LeftSidebar() {
         revealStep: defaultRevealStep,
         hideStep: null,
         keyframes: undefined,
-      },
-    });
-  };
-
-  const replaceSelectedElementWithFavorite = (
-    favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
-  ) => {
-    if (!selectedElement) {
-      return;
-    }
-
-    const nextElement = cloneFavoriteElement(favorite.element);
-
-    if (nextElement.type === "image") {
-      let assetId = nextElement.assetId;
-      const existingAsset = projectAssetsById.get(assetId);
-
-      if (!existingAsset) {
-        if (!favorite.asset) {
-          window.alert(
-            "This saved component is missing its image asset, so it can't replace the selected component right now.",
-          );
-          return;
-        }
-
-        assetId = generateId();
-        dispatch({
-          type: "ADD_ASSET",
-          payload: {
-            ...favorite.asset,
-            id: assetId,
-          },
-        });
-      }
-
-      dispatch({
-        type: "REPLACE_ELEMENT",
-        payload: {
-          id: selectedElement.id,
-          element: {
-            ...nextElement,
-            assetId,
-          },
-        },
-      });
-      return;
-    }
-
-    dispatch({
-      type: "REPLACE_ELEMENT",
-      payload: {
-        id: selectedElement.id,
-        element: nextElement,
       },
     });
   };
@@ -1408,40 +1265,6 @@ export function LeftSidebar() {
 
               {componentTab === "favorites" ? (
                 <div className="space-y-6">
-                  {selectedElement ? (
-                    <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        Selected On Canvas
-                      </div>
-                      <div className="mt-3 flex items-center gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-xs font-semibold text-[#0f172a]">
-                            {selectedElementFavoriteName}
-                          </div>
-                          <div className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                            {getSavedFavoriteTypeLabel(selectedElement)}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={saveSelectedElementToFavorites}
-                          className="rounded-sm border border-[#dbe4f0] bg-white px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                        >
-                          {isSelectedElementSaved ? "Update" : "Save"}
-                        </button>
-                      </div>
-                      {favoriteSavedElements.length > 0 && (
-                        <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-2.5 py-2 text-[10px] font-medium text-slate-500">
-                          Pick a card below and use <span className="font-bold text-[#4f46e5]">Replace selected</span> to swap this canvas component with a saved one while keeping its placement.
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      Select a canvas component to save it here
-                    </div>
-                  )}
-
                   {favoriteComponents.length === 0 ? (
                     <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                       No favorites yet
@@ -1487,20 +1310,6 @@ export function LeftSidebar() {
                                     {getSavedFavoriteTypeLabel(favorite.element)}
                                   </div>
                                 </button>
-                                {selectedElement && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      replaceSelectedElementWithFavorite(
-                                        favorite,
-                                      )
-                                    }
-                                    className="mt-1.5 w-full rounded-sm border border-[#c7d2fe] bg-indigo-50 px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                                    title={`Replace selected component with ${favorite.name}`}
-                                  >
-                                    Replace Selected
-                                  </button>
-                                )}
                               </div>
                             ))}
                           </div>

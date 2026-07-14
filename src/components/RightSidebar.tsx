@@ -1,11 +1,13 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Copy, Trash2, Layers, Eye, EyeOff, RotateCcw } from 'lucide-react';
-import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
+import { Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, RotateCcw, Save, Trash2, Type, Upload, X } from 'lucide-react';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
-import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
+import { LucideIconGlyph } from './LucideIconGlyph';
+import { EmojiGlyph } from './EmojiGlyph';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -51,10 +53,300 @@ function getElementTypeLabel(element: SceneElement) {
   return 'Cross';
 }
 
+function cloneFavoriteElement(element: SceneElement): SceneElement {
+  return {
+    ...element,
+    keyframes: element.keyframes
+      ? Object.fromEntries(
+          Object.entries(element.keyframes).map(([step, keyframe]) => [
+            Number(step),
+            { ...keyframe },
+          ]),
+        )
+      : undefined,
+  } as SceneElement;
+}
+
+function getSavedFavoriteId(projectId: string, sceneId: string, elementId: string) {
+  return `saved:${projectId}:${sceneId}:${elementId}`;
+}
+
 function upsertHiddenKeyframe(element: SceneElement, step: number, hidden: boolean) {
   const nextKeyframes = { ...(element.keyframes || {}) };
   nextKeyframes[step] = { ...(nextKeyframes[step] || {}), hidden };
   return nextKeyframes;
+}
+
+type SavedElementLibraryGroupId =
+  | 'text-block'
+  | 'text-free'
+  | 'image-photo'
+  | 'image-graphic'
+  | 'color-card'
+  | 'shape-icon'
+  | 'shape-emoji'
+  | 'shape-badge'
+  | 'shape-mark';
+
+function getSavedElementAssetKind(asset?: Asset | null) {
+  return asset ? getAssetKind(asset) : 'photo';
+}
+
+function getSavedElementLibraryGroupId(element: SceneElement, asset?: Asset | null): SavedElementLibraryGroupId {
+  if (element.type === 'text') {
+    return getTextVariant(element) === 'free' ? 'text-free' : 'text-block';
+  }
+
+  if (element.type === 'image') {
+    return getSavedElementAssetKind(asset) === 'graphic' ? 'image-graphic' : 'image-photo';
+  }
+
+  if (element.type === 'color') {
+    return 'color-card';
+  }
+
+  if (element.shapeType === 'icon') return 'shape-icon';
+  if (element.shapeType === 'emoji') return 'shape-emoji';
+  if (element.shapeType === 'yes' || element.shapeType === 'no') return 'shape-badge';
+  return 'shape-mark';
+}
+
+function getSavedElementLibraryGroupLabel(groupId: SavedElementLibraryGroupId) {
+  switch (groupId) {
+    case 'text-block':
+      return 'Text Blocks';
+    case 'text-free':
+      return 'Free Text';
+    case 'image-photo':
+      return 'Photos';
+    case 'image-graphic':
+      return 'Graphics';
+    case 'color-card':
+      return 'Color Cards';
+    case 'shape-icon':
+      return 'Icons';
+    case 'shape-emoji':
+      return 'Emojis';
+    case 'shape-badge':
+      return 'Badges';
+    default:
+      return 'Marks';
+  }
+}
+
+function getVisibleSavedElementLibraryGroups(element: SceneElement, asset?: Asset | null): SavedElementLibraryGroupId[] {
+  if (element.type === 'text') {
+    return getTextVariant(element) === 'free'
+      ? ['text-free', 'text-block']
+      : ['text-block', 'text-free'];
+  }
+
+  if (element.type === 'image') {
+    return getSavedElementAssetKind(asset) === 'graphic'
+      ? ['image-graphic', 'image-photo']
+      : ['image-photo', 'image-graphic'];
+  }
+
+  if (element.type === 'color') {
+    return ['color-card'];
+  }
+
+  if (element.shapeType === 'icon') {
+    return ['shape-icon', 'shape-emoji', 'shape-badge', 'shape-mark'];
+  }
+
+  if (element.shapeType === 'emoji') {
+    return ['shape-emoji', 'shape-icon', 'shape-badge', 'shape-mark'];
+  }
+
+  if (element.shapeType === 'yes' || element.shapeType === 'no') {
+    return ['shape-badge', 'shape-mark', 'shape-icon', 'shape-emoji'];
+  }
+
+  return ['shape-mark', 'shape-badge', 'shape-icon', 'shape-emoji'];
+}
+
+function renderSavedElementLibraryGroupIcon(groupId: SavedElementLibraryGroupId) {
+  if (groupId === 'text-block' || groupId === 'text-free') {
+    return <Type className="h-3.5 w-3.5" />;
+  }
+
+  if (groupId === 'image-photo' || groupId === 'image-graphic') {
+    return <ImageIcon className="h-3.5 w-3.5" />;
+  }
+
+  if (groupId === 'color-card') {
+    return <div className="h-3.5 w-3.5 rounded-[4px] border border-white/50 bg-gradient-to-br from-amber-300 via-orange-400 to-rose-500" />;
+  }
+
+  if (groupId === 'shape-icon') {
+    return (
+      <LucideIconGlyph
+        name="star"
+        className="h-3.5 w-3.5"
+        color="currentColor"
+        strokeWidth={2.25}
+      />
+    );
+  }
+
+  if (groupId === 'shape-emoji') {
+    return (
+      <EmojiGlyph
+        id="grinning-face"
+        fallback="😀"
+        className="h-3.5 w-3.5 text-sm"
+      />
+    );
+  }
+
+  if (groupId === 'shape-badge') {
+    return (
+      <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-current text-[6px] font-black text-white">
+        Y
+      </div>
+    );
+  }
+
+  return <Check className="h-3.5 w-3.5" strokeWidth={3} />;
+}
+
+function SavedElementLibraryPreview({
+  element,
+  asset,
+  name,
+}: {
+  element: SceneElement;
+  asset?: Asset | null;
+  name: string;
+}) {
+  if (element.type === 'text') {
+    const textVariant = getTextVariant(element);
+    const textAlign = getTextAlign(element);
+    const textParts = splitTextContent(element.text);
+    const title = textVariant === 'free'
+      ? element.text.split('\n').find((line) => line.trim())?.trim() || 'Text'
+      : textParts.title.trim() || 'Title';
+    const subtitleLines = textVariant === 'block'
+      ? textParts.subtitle.split('\n').filter(Boolean).slice(0, 2)
+      : [];
+
+    if (textVariant === 'block') {
+      return (
+        <div className="flex h-full w-full items-center justify-center rounded-[18px] bg-[#2563eb] px-3 text-white">
+          <div className="w-full" style={{ textAlign }}>
+            <div
+              className="truncate font-bold leading-tight"
+              style={{ fontSize: `${Math.min(12, Math.max(8, element.fontSize / 6))}px` }}
+            >
+              {title}
+            </div>
+            {subtitleLines.map((line, index) => (
+              <div
+                key={`${name}-${index}`}
+                className="truncate opacity-90"
+                style={{
+                  fontSize: `${Math.min(
+                    9,
+                    Math.max(7, (element.subtitleFontSize || Math.max(16, Math.round(element.fontSize * 0.6))) / 5),
+                  )}px`,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        className="flex h-full w-full items-center justify-center whitespace-pre-wrap break-words px-2.5 text-center font-bold leading-tight text-slate-800"
+        style={{
+          textAlign,
+          color: element.color,
+          fontWeight: element.fontWeight,
+          fontSize: `${Math.min(13, Math.max(8, element.fontSize / 5.5))}px`,
+        }}
+      >
+        {title}
+      </div>
+    );
+  }
+
+  if (element.type === 'image') {
+    return asset ? (
+      <img src={asset.dataUrl} alt={name} className="h-full w-full object-cover" />
+    ) : (
+      <div className="flex h-full w-full items-center justify-center px-2 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+        Missing Asset
+      </div>
+    );
+  }
+
+  if (element.type === 'color') {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-2.5">
+        <div
+          className="h-full w-full rounded-[10px] border border-slate-100 shadow-sm"
+          style={{ backgroundColor: element.fillColor }}
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === 'emoji') {
+    const emojiEntry = getEmojiById(element.emojiHexcode || '');
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <EmojiGlyph
+          id={element.emojiHexcode || 'grinning-face'}
+          fallback={emojiEntry?.emoji || element.emojiChar || '😀'}
+          className="h-12 w-12 text-5xl"
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === 'icon') {
+    return (
+      <div className="flex h-full w-full items-center justify-center p-3.5">
+        <LucideIconGlyph
+          name={element.iconName || 'circle'}
+          className="h-full w-full"
+          color={element.iconColor || '#0f172a'}
+          strokeWidth={element.iconStrokeWidth || 2.25}
+        />
+      </div>
+    );
+  }
+
+  if (element.shapeType === 'yes' || element.shapeType === 'no') {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div
+          className={`flex h-14 w-14 flex-col items-center justify-center rounded-full text-white shadow-sm ${
+            element.shapeType === 'yes' ? 'bg-[#2563eb]' : 'bg-[#ef4444]'
+          }`}
+        >
+          <span className="text-[6px] font-semibold uppercase tracking-[0.16em]">
+            {element.shapeType === 'yes' ? 'YES' : 'NO'}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      {element.shapeType === 'check' ? (
+        <Check className="h-12 w-12 text-sky-500" strokeWidth={3.25} />
+      ) : (
+        <X className="h-12 w-12 text-rose-500" strokeWidth={3.25} />
+      )}
+    </div>
+  );
 }
 
 function SequenceLayersPanel({
@@ -150,9 +442,10 @@ function SequenceLayersPanel({
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, selectedElementId, selectedElementIds } = state;
+  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
+  const projectAssetsById = new Map<string, Asset>(availableAssets.map((asset) => [asset.id, asset]));
   
   const selectedElement = activeScene?.elements.find(el => el.id === selectedElementId);
   const selectedSequenceStep = state.selectedSequenceStep;
@@ -375,6 +668,36 @@ export function RightSidebar() {
     selectedSequenceStep !== null && selectedElement.revealStep <= selectedSequenceStep
       ? getEffectiveElementState(selectedElement, selectedSequenceStep)
       : selectedElement;
+  const favoriteSavedElements = favoriteComponents.filter(
+    (
+      favorite,
+    ): favorite is Extract<FavoriteComponent, { type: 'saved-element' }> => favorite.type === 'saved-element',
+  );
+  const selectedElementFavoriteId = getSavedFavoriteId(project.id, activeScene.id, selectedElement.id);
+  const isSelectedElementSaved = favoriteSavedElements.some(
+    (favorite) => favorite.id === selectedElementFavoriteId,
+  );
+  const selectedElementFavoriteName = getElementName(selectedElement, projectAssetsById);
+  const selectedLibraryGroups = getVisibleSavedElementLibraryGroups(selectedElement, imageAsset);
+  const matchingFavoriteSavedElements = favoriteSavedElements.filter(
+    (favorite) => favorite.element.type === selectedElement.type,
+  );
+  const favoriteSavedElementsByGroup = new Map<SavedElementLibraryGroupId, Extract<FavoriteComponent, { type: 'saved-element' }>[]>([]);
+
+  for (const favorite of matchingFavoriteSavedElements) {
+    const favoriteGroupId = getSavedElementLibraryGroupId(favorite.element, favorite.asset);
+    const groupFavorites = favoriteSavedElementsByGroup.get(favoriteGroupId) || [];
+    groupFavorites.push(favorite);
+    favoriteSavedElementsByGroup.set(favoriteGroupId, groupFavorites);
+  }
+
+  const visibleFavoriteSavedGroups = selectedLibraryGroups
+    .map((groupId) => ({
+      groupId,
+      label: getSavedElementLibraryGroupLabel(groupId),
+      favorites: favoriteSavedElementsByGroup.get(groupId) || [],
+    }))
+    .filter((group) => group.favorites.length > 0);
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
   const textAlign = textElement ? getTextAlign(textElement) : null;
@@ -403,6 +726,68 @@ export function RightSidebar() {
       : selectedElement.type === 'shape' && selectedElement.shapeType === 'icon'
         ? 'Icon Properties'
         : `${selectedElement.type} Properties`;
+  const saveSelectedElementToFavorites = () => {
+    const favorite: Extract<FavoriteComponent, { type: 'saved-element' }> = {
+      type: 'saved-element',
+      id: selectedElementFavoriteId,
+      name: selectedElementFavoriteName,
+      element: cloneFavoriteElement(selectedElement),
+      asset:
+        selectedElement.type === 'image'
+          ? projectAssetsById.get(selectedElement.assetId)
+          : undefined,
+    };
+
+    dispatch({ type: 'UPSERT_FAVORITE_COMPONENT', payload: favorite });
+  };
+  const replaceSelectedElementWithFavorite = (
+    favorite: Extract<FavoriteComponent, { type: 'saved-element' }>,
+  ) => {
+    const nextElement = cloneFavoriteElement(favorite.element);
+
+    if (nextElement.type === 'image') {
+      let assetId = nextElement.assetId;
+      const existingAsset = projectAssetsById.get(assetId);
+
+      if (!existingAsset) {
+        if (!favorite.asset) {
+          window.alert(
+            "This saved component is missing its image asset, so it can't replace the selected component right now.",
+          );
+          return;
+        }
+
+        assetId = generateId();
+        dispatch({
+          type: 'ADD_ASSET',
+          payload: {
+            ...favorite.asset,
+            id: assetId,
+          },
+        });
+      }
+
+      dispatch({
+        type: 'REPLACE_ELEMENT',
+        payload: {
+          id: selectedElement.id,
+          element: {
+            ...nextElement,
+            assetId,
+          },
+        },
+      });
+      return;
+    }
+
+    dispatch({
+      type: 'REPLACE_ELEMENT',
+      payload: {
+        id: selectedElement.id,
+        element: nextElement,
+      },
+    });
+  };
 
   return (
     <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
@@ -418,6 +803,60 @@ export function RightSidebar() {
       </div>
 
       <div className="p-4 space-y-5">
+        <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+          <div className="flex items-start gap-3">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
+              <SavedElementLibraryPreview
+                element={selectedElement}
+                asset={imageAsset}
+                name={selectedElementFavoriteName}
+              />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
+                    {renderSavedElementLibraryGroupIcon(
+                      getSavedElementLibraryGroupId(selectedElement, imageAsset),
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-semibold text-[#0f172a]">
+                      {selectedElementFavoriteName}
+                    </div>
+                    <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      {getElementTypeLabel(selectedElement)}
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={saveSelectedElementToFavorites}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                  title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
+                >
+                  <Save className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                  isSelectedElementSaved
+                    ? 'bg-emerald-50 text-emerald-600'
+                    : 'bg-white text-slate-500'
+                }`}>
+                  {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
+                </div>
+                <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                  {matchingFavoriteSavedElements.length} In Library
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div className="flex gap-4">
           <div className="flex-1">
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
@@ -480,45 +919,6 @@ export function RightSidebar() {
                 Frameless graphics render directly on the canvas without the white image card.
               </div>
             )}
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Replace Asset</label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
-                {availableAssets.map(asset => (
-                  <div 
-                    key={asset.id} 
-                    onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
-                    className={`aspect-square bg-slate-100 rounded-sm overflow-hidden cursor-pointer border-2 transition-all ${imageElement.assetId === asset.id ? 'border-[#4f46e5]' : 'border-transparent hover:border-slate-300'}`}
-                  >
-                    <img src={asset.dataUrl} alt={asset.name} className="w-full h-full object-contain" />
-                  </div>
-                ))}
-              </div>
-              <label className="w-full py-1.5 mt-2 text-[10px] font-bold border border-[#e2e8f0] bg-slate-50 uppercase text-slate-600 hover:bg-slate-100 hover:border-[#cbd5e1] transition-colors rounded-sm flex items-center justify-center cursor-pointer">
-                Upload New
-                <input 
-                  type="file" 
-                  accept="image/*,.svg" 
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) {
-                      void (async () => {
-                        const asset = await createAssetFromFile(file);
-                        dispatch({
-                          type: 'ADD_ASSET',
-                          payload: asset,
-                        });
-                        handleUpdate({
-                          assetId: asset.id,
-                          frameStyle: getDefaultImageFrameStyle(asset),
-                        });
-                      })();
-                    }
-                  }}
-                />
-              </label>
-            </div>
           </>
         )}
 
@@ -745,6 +1145,150 @@ export function RightSidebar() {
               />
             </div>
           </>
+        )}
+
+        <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              Component Library
+            </div>
+            <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {matchingFavoriteSavedElements.length}
+            </div>
+          </div>
+
+          {visibleFavoriteSavedGroups.length === 0 ? (
+            <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-[#dbe4f0] bg-white/70 px-4">
+              <div className="flex flex-col items-center gap-2 text-center text-slate-400">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                  {renderSavedElementLibraryGroupIcon(
+                    getSavedElementLibraryGroupId(selectedElement, imageAsset),
+                  )}
+                </div>
+                <div className="text-[10px] font-bold uppercase tracking-[0.16em]">
+                  No saved {selectedElement.type}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {visibleFavoriteSavedGroups.map((group) => (
+                <div key={group.groupId}>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm">
+                        {renderSavedElementLibraryGroupIcon(group.groupId)}
+                      </div>
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                        {group.label}
+                      </div>
+                    </div>
+                    <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      {group.favorites.length}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {group.favorites.map((favorite) => {
+                      const isCurrentFavorite = favorite.id === selectedElementFavoriteId;
+
+                      return (
+                        <button
+                          key={favorite.id}
+                          type="button"
+                          onClick={() => replaceSelectedElementWithFavorite(favorite)}
+                          title={favorite.name}
+                          className={`group rounded-xl border p-1.5 text-left transition-all ${
+                            isCurrentFavorite
+                              ? 'border-[#a5b4fc] bg-indigo-50 shadow-[0_6px_18px_rgba(79,70,229,0.08)]'
+                              : 'border-[#dbe4f0] bg-white hover:border-[#4f46e5] hover:shadow-[0_6px_18px_rgba(15,23,42,0.06)]'
+                          }`}
+                        >
+                          <div className="relative overflow-hidden rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc]">
+                            <div className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-sm">
+                              {renderSavedElementLibraryGroupIcon(group.groupId)}
+                            </div>
+                            <div className="aspect-[1.08/1]">
+                              <SavedElementLibraryPreview
+                                element={favorite.element}
+                                asset={favorite.asset}
+                                name={favorite.name}
+                              />
+                            </div>
+                          </div>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <div className="truncate text-[10px] font-semibold text-[#0f172a]">
+                              {favorite.name}
+                            </div>
+                            {isCurrentFavorite && (
+                              <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                                Current
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Asset Source</label>
+              {imageAsset && (
+                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  {getAssetKind(imageAsset)}
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {availableAssets.map((asset) => (
+                <button
+                  key={asset.id}
+                  type="button"
+                  onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
+                  className={`aspect-square overflow-hidden rounded-lg border transition-all ${
+                    imageElement.assetId === asset.id
+                      ? 'border-[#4f46e5] bg-indigo-50'
+                      : 'border-[#dbe4f0] bg-white hover:border-slate-300'
+                  }`}
+                  title={asset.name}
+                >
+                  <img src={asset.dataUrl} alt={asset.name} className="h-full w-full object-contain" />
+                </button>
+              ))}
+            </div>
+            <label className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] bg-slate-50 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-100">
+              <Upload className="h-3.5 w-3.5" />
+              Upload
+              <input
+                type="file"
+                accept="image/*,.svg"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    void (async () => {
+                      const asset = await createAssetFromFile(file);
+                      dispatch({
+                        type: 'ADD_ASSET',
+                        payload: asset,
+                      });
+                      handleUpdate({
+                        assetId: asset.id,
+                        frameStyle: getDefaultImageFrameStyle(asset),
+                      });
+                    })();
+                  }
+                }}
+              />
+            </label>
+          </div>
         )}
 
         <div className="pt-4 border-t border-[#f1f5f9]">
