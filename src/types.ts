@@ -111,6 +111,8 @@ export type FavoriteComponent =
       asset?: Asset;
     };
 
+export type SavedComponent = Extract<FavoriteComponent, { type: 'saved-element' }>;
+
 export interface SceneTemplate {
   id: string;
   name: string;

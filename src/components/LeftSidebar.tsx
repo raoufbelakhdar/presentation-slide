@@ -24,6 +24,7 @@ import {
   FavoriteComponent,
   FavoritePresetId,
   SceneElement,
+  SavedComponent,
   TextElement,
   ImageElement,
   ShapeElement,
@@ -427,6 +428,7 @@ export function LeftSidebar() {
     project,
     activeSceneIndex,
     sharedAssets,
+    sharedSavedComponents,
     favoriteComponents,
     templates,
     selectedSequenceStep,
@@ -883,9 +885,20 @@ export function LeftSidebar() {
   const favoriteSavedElements = favoriteComponents.filter(
     (
       favorite,
-    ): favorite is Extract<FavoriteComponent, { type: "saved-element" }> =>
+    ): favorite is SavedComponent =>
       favorite.type === "saved-element",
   );
+  const sharedSavedComponentIds = new Set(
+    sharedSavedComponents.map((component) => component.id),
+  );
+  const combinedSavedComponentMap = new Map<string, SavedComponent>();
+  favoriteSavedElements.forEach((component) =>
+    combinedSavedComponentMap.set(component.id, component),
+  );
+  sharedSavedComponents.forEach((component) =>
+    combinedSavedComponentMap.set(component.id, component),
+  );
+  const combinedSavedComponents = Array.from(combinedSavedComponentMap.values());
   const visibleSharedAssets = showSharedAssets
     ? sharedAssets.filter((asset) => !localAssetIds.has(asset.id))
     : [];
@@ -930,6 +943,24 @@ export function LeftSidebar() {
     }
 
     dispatch({ type: "ADD_SHARED_ASSET", payload: asset });
+  };
+
+  const toggleSharedSavedComponent = (component: SavedComponent) => {
+    if (sharedSavedComponentIds.has(component.id)) {
+      dispatch({ type: "DELETE_SHARED_SAVED_COMPONENT", payload: component.id });
+      return;
+    }
+
+    dispatch({ type: "UPSERT_SHARED_SAVED_COMPONENT", payload: component });
+  };
+
+  const deleteSavedComponent = (component: SavedComponent) => {
+    const message = sharedSavedComponentIds.has(component.id)
+      ? `Delete "${component.name}" from saved components and the shared library?`
+      : `Delete "${component.name}" from saved components?`;
+
+    if (!confirm(message)) return;
+    dispatch({ type: "DELETE_SAVED_COMPONENT", payload: component.id });
   };
 
   const importPexelsPhoto = async (photo: PexelsPhoto) => {
@@ -1271,17 +1302,29 @@ export function LeftSidebar() {
                     </div>
                   ) : (
                     <div className="space-y-5">
-                      {favoriteSavedElements.length > 0 && (
+                      {combinedSavedComponents.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Saved Components
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {favoriteSavedElements.map((favorite) => (
+                            {combinedSavedComponents.map((favorite) => {
+                              const isSavedFavorite = isFavorite({
+                                type: "saved-element",
+                                id: favorite.id,
+                                name: favorite.name,
+                                element: favorite.element,
+                                asset: favorite.asset,
+                              });
+                              const isSharedSavedComponent = sharedSavedComponentIds.has(
+                                favorite.id,
+                              );
+
+                              return (
                               <div key={favorite.id} className="relative">
                                 <FavoriteToggleButton
-                                  active
-                                  title={`Remove ${favorite.name} from favorites`}
+                                  active={isSavedFavorite}
+                                  title={`${isSavedFavorite ? "Remove" : "Add"} ${favorite.name} ${isSavedFavorite ? "from" : "to"} favorites`}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     toggleFavorite({
@@ -1296,6 +1339,36 @@ export function LeftSidebar() {
                                 />
                                 <button
                                   type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleSharedSavedComponent(favorite);
+                                  }}
+                                  className={`absolute left-1.5 top-1.5 z-10 rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
+                                    isSharedSavedComponent
+                                      ? "border-[#6366f1] bg-[#4f46e5] text-white hover:bg-[#4338ca]"
+                                      : "border-white/70 bg-white/90 text-slate-400 hover:text-[#4f46e5]"
+                                  }`}
+                                  title={
+                                    isSharedSavedComponent
+                                      ? "Remove from shared library"
+                                      : "Add to shared library"
+                                  }
+                                >
+                                  <Layers className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteSavedComponent(favorite);
+                                  }}
+                                  className="absolute bottom-1.5 right-1.5 z-10 rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm backdrop-blur transition-colors hover:text-rose-500"
+                                  title="Delete saved component"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => addSavedFavoriteElement(favorite)}
                                   title={favorite.name}
                                   className="flex w-full flex-col rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
@@ -1306,12 +1379,20 @@ export function LeftSidebar() {
                                   <div className="mt-2 truncate text-[11px] font-semibold text-[#0f172a]">
                                     {favorite.name}
                                   </div>
-                                  <div className="mt-1 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                                    {getSavedFavoriteTypeLabel(favorite.element)}
+                                  <div className="mt-1 flex items-center justify-between gap-2">
+                                    <div className="truncate text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                                      {getSavedFavoriteTypeLabel(favorite.element)}
+                                    </div>
+                                    {isSharedSavedComponent && (
+                                      <div className="rounded-full bg-[#4f46e5]/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                                        Shared
+                                      </div>
+                                    )}
                                   </div>
                                 </button>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -1495,6 +1576,132 @@ export function LeftSidebar() {
                       )}
                     </div>
                   )}
+
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        Shared Assets
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {showSharedAssets && (
+                          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                            {visibleSharedAssets.length}
+                          </div>
+                        )}
+                        <div className="inline-flex rounded-sm border border-[#dbe4f0] bg-white p-1">
+                          <button
+                            type="button"
+                            onClick={() => setShowSharedAssets(true)}
+                            className={`rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                              showSharedAssets
+                                ? "bg-[#4f46e5] text-white"
+                                : "text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            On
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowSharedAssets(false)}
+                            className={`rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                              !showSharedAssets
+                                ? "bg-slate-900 text-white"
+                                : "text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            Off
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {showSharedAssets ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          {visibleSharedAssets.map((asset) => {
+                            const usageCount = getAssetUsageCount(asset.id);
+
+                            return (
+                              <div
+                                key={asset.id}
+                                className="relative aspect-square group"
+                              >
+                                <FavoriteToggleButton
+                                  active={isFavorite({
+                                    type: "asset",
+                                    id: asset.id,
+                                  })}
+                                  title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    toggleFavorite({
+                                      type: "asset",
+                                      id: asset.id,
+                                    });
+                                  }}
+                                  className="left-1.5 top-1.5"
+                                />
+                                <button
+                                  onClick={() => addImageElement(asset.id)}
+                                  className="relative flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden border border-[#e2e8f0] bg-[#f1f5f9] transition-colors hover:border-[#4f46e5]"
+                                  title={asset.name}
+                                >
+                                  <img
+                                    src={asset.dataUrl}
+                                    alt={asset.name}
+                                    className="h-full w-full object-contain"
+                                  />
+                                  <div className="absolute bottom-1.5 right-1.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500 shadow-sm">
+                                    {getAssetKind(asset)}
+                                  </div>
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                                    <Plus className="h-6 w-6 text-white" />
+                                  </div>
+                                </button>
+
+                                <button
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    deleteSharedAsset(asset.id);
+                                  }}
+                                  className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
+                                  title={
+                                    usageCount > 0
+                                      ? `Delete Shared Asset (${usageCount} uses)`
+                                      : "Delete Shared Asset"
+                                  }
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+
+                                <div className="absolute bottom-1.5 left-1.5 flex flex-col gap-1">
+                                  <div className="rounded-full bg-[#4f46e5]/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                    Shared
+                                  </div>
+                                  {usageCount > 0 && (
+                                    <div className="rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
+                                      {usageCount} use
+                                      {usageCount === 1 ? "" : "s"}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {visibleSharedAssets.length === 0 && (
+                          <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            No separate shared assets yet. Promote a local asset when you want to reuse it across projects.
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        Shared assets are hidden. Favorite components stay visible.
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : componentTab === "presets" ? (
                 <div>
@@ -1875,132 +2082,6 @@ export function LeftSidebar() {
                           {localAssets.length === 0 && (
                             <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                               Upload photos, transparent PNGs, or SVG graphics to start this project&apos;s asset library
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <div className="mb-3 flex items-center justify-between">
-                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                              Shared Assets
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {showSharedAssets && (
-                                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                                  {visibleSharedAssets.length}
-                                </div>
-                              )}
-                              <div className="inline-flex rounded-sm border border-[#dbe4f0] bg-white p-1">
-                                <button
-                                  type="button"
-                                  onClick={() => setShowSharedAssets(true)}
-                                  className={`rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                                    showSharedAssets
-                                      ? "bg-[#4f46e5] text-white"
-                                      : "text-slate-500 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  On
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowSharedAssets(false)}
-                                  className={`rounded-sm px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
-                                    !showSharedAssets
-                                      ? "bg-slate-900 text-white"
-                                      : "text-slate-500 hover:bg-slate-50"
-                                  }`}
-                                >
-                                  Off
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-
-                          {showSharedAssets ? (
-                            <>
-                              <div className="grid grid-cols-2 gap-3">
-                                {visibleSharedAssets.map((asset) => {
-                                  const usageCount = getAssetUsageCount(asset.id);
-
-                                  return (
-                                    <div
-                                      key={asset.id}
-                                      className="relative aspect-square group"
-                                    >
-                                      <FavoriteToggleButton
-                                        active={isFavorite({
-                                          type: "asset",
-                                          id: asset.id,
-                                        })}
-                                        title={`${isFavorite({ type: "asset", id: asset.id }) ? "Remove" : "Add"} ${asset.name} ${isFavorite({ type: "asset", id: asset.id }) ? "from" : "to"} favorites`}
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          toggleFavorite({
-                                            type: "asset",
-                                            id: asset.id,
-                                          });
-                                        }}
-                                        className="left-1.5 top-1.5"
-                                      />
-                                      <button
-                                        onClick={() => addImageElement(asset.id)}
-                                        className="relative flex h-full w-full cursor-pointer flex-col items-center justify-center overflow-hidden border border-[#e2e8f0] bg-[#f1f5f9] transition-colors hover:border-[#4f46e5]"
-                                        title={asset.name}
-                                      >
-                                        <img
-                                          src={asset.dataUrl}
-                                          alt={asset.name}
-                                          className="h-full w-full object-contain"
-                                        />
-                                        <div className="absolute bottom-1.5 right-1.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.14em] text-slate-500 shadow-sm">
-                                          {getAssetKind(asset)}
-                                        </div>
-                                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                                          <Plus className="h-6 w-6 text-white" />
-                                        </div>
-                                      </button>
-
-                                      <button
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          deleteSharedAsset(asset.id);
-                                        }}
-                                        className="absolute right-1.5 top-1.5 rounded-full bg-white/90 p-1 text-slate-500 opacity-0 shadow-sm transition-all hover:bg-white hover:text-rose-500 group-hover:opacity-100"
-                                        title={
-                                          usageCount > 0
-                                            ? `Delete Shared Asset (${usageCount} uses)`
-                                            : "Delete Shared Asset"
-                                        }
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5" />
-                                      </button>
-
-                                      <div className="absolute bottom-1.5 left-1.5 flex flex-col gap-1">
-                                        <div className="rounded-full bg-[#4f46e5]/90 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                                          Shared
-                                        </div>
-                                        {usageCount > 0 && (
-                                          <div className="rounded-full bg-slate-900/70 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-white">
-                                            {usageCount} use
-                                            {usageCount === 1 ? "" : "s"}
-                                          </div>
-                                        )}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-
-                              {visibleSharedAssets.length === 0 && (
-                                <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                                  No separate shared assets yet. Promote a local asset when you want to reuse it across projects.
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                              Shared assets are hidden. Local assets stay visible.
                             </div>
                           )}
                         </div>

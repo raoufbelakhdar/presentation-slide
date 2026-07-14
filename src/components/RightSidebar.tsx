@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, RotateCcw, Save, Trash2, Type, Upload, X } from 'lucide-react';
-import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SceneElement, ShapeElement, TextElement } from '../types';
+import { Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, RotateCcw, Save, Star, Trash2, Type, Upload, X } from 'lucide-react';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
@@ -442,7 +442,7 @@ function SequenceLayersPanel({
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds } = state;
+  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds, sharedSavedComponents } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
   const projectAssetsById = new Map<string, Asset>(availableAssets.map((asset) => [asset.id, asset]));
@@ -671,20 +671,26 @@ export function RightSidebar() {
   const favoriteSavedElements = favoriteComponents.filter(
     (
       favorite,
-    ): favorite is Extract<FavoriteComponent, { type: 'saved-element' }> => favorite.type === 'saved-element',
+    ): favorite is SavedComponent => favorite.type === 'saved-element',
   );
+  const sharedSavedComponentIds = new Set(sharedSavedComponents.map((component) => component.id));
   const selectedElementFavoriteId = getSavedFavoriteId(project.id, activeScene.id, selectedElement.id);
   const isSelectedElementSaved = favoriteSavedElements.some(
     (favorite) => favorite.id === selectedElementFavoriteId,
   );
+  const isSelectedElementShared = sharedSavedComponentIds.has(selectedElementFavoriteId);
   const selectedElementFavoriteName = getElementName(selectedElement, projectAssetsById);
   const selectedLibraryGroups = getVisibleSavedElementLibraryGroups(selectedElement, imageAsset);
-  const matchingFavoriteSavedElements = favoriteSavedElements.filter(
-    (favorite) => favorite.element.type === selectedElement.type,
+  const combinedSavedComponentMap = new Map<string, SavedComponent>();
+  favoriteSavedElements.forEach((component) => combinedSavedComponentMap.set(component.id, component));
+  sharedSavedComponents.forEach((component) => combinedSavedComponentMap.set(component.id, component));
+  const combinedSavedComponents = Array.from(combinedSavedComponentMap.values());
+  const matchingSavedComponents = combinedSavedComponents.filter(
+    (component) => component.element.type === selectedElement.type,
   );
-  const favoriteSavedElementsByGroup = new Map<SavedElementLibraryGroupId, Extract<FavoriteComponent, { type: 'saved-element' }>[]>([]);
+  const favoriteSavedElementsByGroup = new Map<SavedElementLibraryGroupId, SavedComponent[]>([]);
 
-  for (const favorite of matchingFavoriteSavedElements) {
+  for (const favorite of matchingSavedComponents) {
     const favoriteGroupId = getSavedElementLibraryGroupId(favorite.element, favorite.asset);
     const groupFavorites = favoriteSavedElementsByGroup.get(favoriteGroupId) || [];
     groupFavorites.push(favorite);
@@ -726,8 +732,8 @@ export function RightSidebar() {
       : selectedElement.type === 'shape' && selectedElement.shapeType === 'icon'
         ? 'Icon Properties'
         : `${selectedElement.type} Properties`;
-  const saveSelectedElementToFavorites = () => {
-    const favorite: Extract<FavoriteComponent, { type: 'saved-element' }> = {
+  const buildSelectedSavedComponent = (): SavedComponent => {
+    return {
       type: 'saved-element',
       id: selectedElementFavoriteId,
       name: selectedElementFavoriteName,
@@ -737,11 +743,49 @@ export function RightSidebar() {
           ? projectAssetsById.get(selectedElement.assetId)
           : undefined,
     };
+  };
+  const saveSelectedElementToFavorites = () => {
+    const favorite = buildSelectedSavedComponent();
 
     dispatch({ type: 'UPSERT_FAVORITE_COMPONENT', payload: favorite });
+    if (isSelectedElementShared) {
+      dispatch({ type: 'UPSERT_SHARED_SAVED_COMPONENT', payload: favorite });
+    }
+  };
+  const toggleSelectedElementSharing = () => {
+    const favorite = buildSelectedSavedComponent();
+
+    if (isSelectedElementShared) {
+      dispatch({ type: 'DELETE_SHARED_SAVED_COMPONENT', payload: favorite.id });
+      return;
+    }
+
+    dispatch({ type: 'UPSERT_SHARED_SAVED_COMPONENT', payload: favorite });
+  };
+  const toggleSavedComponentFavorite = (favorite: SavedComponent) => {
+    dispatch({ type: 'TOGGLE_FAVORITE_COMPONENT', payload: favorite });
+  };
+  const toggleSharedSavedComponent = (favorite: SavedComponent) => {
+    if (sharedSavedComponentIds.has(favorite.id)) {
+      dispatch({ type: 'DELETE_SHARED_SAVED_COMPONENT', payload: favorite.id });
+      return;
+    }
+
+    dispatch({ type: 'UPSERT_SHARED_SAVED_COMPONENT', payload: favorite });
+  };
+  const deleteSavedComponent = (favorite: SavedComponent) => {
+    const message = sharedSavedComponentIds.has(favorite.id)
+      ? `Delete "${favorite.name}" from saved components and the shared library?`
+      : `Delete "${favorite.name}" from saved components?`;
+
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    dispatch({ type: 'DELETE_SAVED_COMPONENT', payload: favorite.id });
   };
   const replaceSelectedElementWithFavorite = (
-    favorite: Extract<FavoriteComponent, { type: 'saved-element' }>,
+    favorite: SavedComponent,
   ) => {
     const nextElement = cloneFavoriteElement(favorite.element);
 
@@ -831,14 +875,38 @@ export function RightSidebar() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={saveSelectedElementToFavorites}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                  title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
-                >
-                  <Save className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={saveSelectedElementToFavorites}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                    title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
+                  >
+                    <Save className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={toggleSelectedElementSharing}
+                    className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                      isSelectedElementShared
+                        ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                        : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
+                    }`}
+                    title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
+                  >
+                    <Layers className="h-4 w-4" />
+                  </button>
+                  {(isSelectedElementSaved || isSelectedElementShared) && (
+                    <button
+                      type="button"
+                      onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
+                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+                      title="Delete saved component"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 flex items-center gap-2">
@@ -850,8 +918,13 @@ export function RightSidebar() {
                   {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
                 </div>
                 <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {matchingFavoriteSavedElements.length} In Library
+                  {matchingSavedComponents.length} In Library
                 </div>
+                {isSelectedElementShared && (
+                  <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                    Shared
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1153,7 +1226,7 @@ export function RightSidebar() {
               Component Library
             </div>
             <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {matchingFavoriteSavedElements.length}
+              {matchingSavedComponents.length}
             </div>
           </div>
 
@@ -1191,13 +1264,12 @@ export function RightSidebar() {
                   <div className="grid grid-cols-2 gap-2">
                     {group.favorites.map((favorite) => {
                       const isCurrentFavorite = favorite.id === selectedElementFavoriteId;
+                      const isSharedSavedComponent = sharedSavedComponentIds.has(favorite.id);
+                      const isSavedFavorite = favoriteSavedElements.some((entry) => entry.id === favorite.id);
 
                       return (
-                        <button
+                        <div
                           key={favorite.id}
-                          type="button"
-                          onClick={() => replaceSelectedElementWithFavorite(favorite)}
-                          title={favorite.name}
                           className={`group rounded-xl border p-1.5 text-left transition-all ${
                             isCurrentFavorite
                               ? 'border-[#a5b4fc] bg-indigo-50 shadow-[0_6px_18px_rgba(79,70,229,0.08)]'
@@ -1205,28 +1277,83 @@ export function RightSidebar() {
                           }`}
                         >
                           <div className="relative overflow-hidden rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc]">
+                            <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleSavedComponentFavorite(favorite);
+                                }}
+                                className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
+                                  isSavedFavorite
+                                    ? 'border-amber-300 bg-amber-50 text-amber-500'
+                                    : 'border-white/70 bg-white/90 text-slate-400 hover:text-amber-500'
+                                }`}
+                                title={`${isSavedFavorite ? 'Remove from' : 'Add to'} favorites`}
+                              >
+                                <Star className={`h-3.5 w-3.5 ${isSavedFavorite ? 'fill-current' : ''}`} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  toggleSharedSavedComponent(favorite);
+                                }}
+                                className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
+                                  isSharedSavedComponent
+                                    ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                                    : 'border-white/70 bg-white/90 text-slate-400 hover:text-[#4f46e5]'
+                                }`}
+                                title={isSharedSavedComponent ? 'Remove from shared library' : 'Add to shared library'}
+                              >
+                                <Layers className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  deleteSavedComponent(favorite);
+                                }}
+                                className="rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm backdrop-blur transition-colors hover:text-rose-500"
+                                title="Delete saved component"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
                             <div className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-sm">
                               {renderSavedElementLibraryGroupIcon(group.groupId)}
                             </div>
-                            <div className="aspect-[1.08/1]">
+                            <button
+                              type="button"
+                              onClick={() => replaceSelectedElementWithFavorite(favorite)}
+                              title={favorite.name}
+                              className="block aspect-[1.08/1] w-full"
+                            >
                               <SavedElementLibraryPreview
                                 element={favorite.element}
                                 asset={favorite.asset}
                                 name={favorite.name}
                               />
-                            </div>
+                            </button>
                           </div>
                           <div className="mt-2 flex items-center justify-between gap-2">
                             <div className="truncate text-[10px] font-semibold text-[#0f172a]">
                               {favorite.name}
                             </div>
-                            {isCurrentFavorite && (
-                              <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                                Current
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {isSharedSavedComponent && (
+                                <div className="rounded-full bg-[#4f46e5]/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                                  Shared
+                                </div>
+                              )}
+                              {isCurrentFavorite && (
+                                <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                                  Current
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </button>
+                        </div>
                       );
                     })}
                   </div>

@@ -9,6 +9,7 @@ import {
   ElementKeyframe,
   FavoriteComponent,
   Project,
+  SavedComponent,
   Scene,
   SceneElement,
   SceneTemplate,
@@ -27,6 +28,7 @@ interface AppState {
   isHydrated: boolean;
   projects: Project[];
   sharedAssets: Asset[];
+  sharedSavedComponents: SavedComponent[];
   favoriteComponents: FavoriteComponent[];
   templates: SceneTemplate[];
   project: Project;
@@ -61,6 +63,9 @@ type Action =
   | { type: 'DELETE_ASSET'; payload: string }
   | { type: 'ADD_SHARED_ASSET'; payload: Asset }
   | { type: 'DELETE_SHARED_ASSET'; payload: string }
+  | { type: 'UPSERT_SHARED_SAVED_COMPONENT'; payload: SavedComponent }
+  | { type: 'DELETE_SHARED_SAVED_COMPONENT'; payload: string }
+  | { type: 'DELETE_SAVED_COMPONENT'; payload: string }
   | { type: 'UPDATE_PROJECT_NAME'; payload: string }
   | { type: 'ADD_TEMPLATE'; payload: SceneTemplate }
   | { type: 'TOGGLE_FAVORITE_COMPONENT'; payload: FavoriteComponent }
@@ -108,6 +113,8 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
   'DELETE_ASSET',
   'ADD_SHARED_ASSET',
   'DELETE_SHARED_ASSET',
+  'UPSERT_SHARED_SAVED_COMPONENT',
+  'DELETE_SHARED_SAVED_COMPONENT',
   'UPDATE_PROJECT_NAME',
   'ADD_TEMPLATE',
   'DELETE_TEMPLATE',
@@ -270,6 +277,14 @@ function normalizeFavoriteComponents(favorites: unknown): FavoriteComponent[] {
   }
 
   return normalizedFavorites;
+}
+
+function isSavedComponent(component: FavoriteComponent): component is SavedComponent {
+  return component.type === 'saved-element';
+}
+
+function normalizeSavedComponents(components: unknown): SavedComponent[] {
+  return normalizeFavoriteComponents(components).filter(isSavedComponent);
 }
 
 function getAssetFingerprint(asset: Pick<Asset, 'name' | 'dataUrl' | 'kind'>) {
@@ -693,6 +708,7 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
       : [],
     payload?.sharedAssetsVersion,
   );
+  const sharedSavedComponents = normalizeSavedComponents(payload?.sharedSavedComponents);
   const favoriteComponents = normalizeFavoriteComponents(payload?.favorites);
 
   let templates: SceneTemplate[] = [];
@@ -717,6 +733,7 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
     isHydrated: true,
     projects,
     sharedAssets,
+    sharedSavedComponents,
     favoriteComponents,
     templates,
     project: activeProject || baseState.project,
@@ -750,6 +767,7 @@ function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
     projects,
     sharedAssetsVersion: EXPLICIT_SHARED_ASSETS_VERSION,
     sharedAssets: [],
+    sharedSavedComponents: [],
     favorites: normalizeFavoriteComponents(storedFavorites),
     templates,
   };
@@ -766,6 +784,7 @@ const initialState: AppState = {
   isHydrated: false,
   projects: [],
   sharedAssets: [],
+  sharedSavedComponents: [],
   favoriteComponents: [],
   templates: [],
   project: createEmptyProject(),
@@ -992,6 +1011,43 @@ function appReducer(state: AppState, action: Action): AppState {
         sharedAssets: state.sharedAssets.filter((asset) => asset.id !== action.payload),
         favoriteComponents: state.favoriteComponents.filter(
           (favorite) => !(favorite.type === 'asset' && favorite.id === action.payload),
+        ),
+      };
+    case 'UPSERT_SHARED_SAVED_COMPONENT': {
+      const existingIndex = state.sharedSavedComponents.findIndex(
+        (component) => component.id === action.payload.id,
+      );
+
+      if (existingIndex === -1) {
+        return {
+          ...state,
+          sharedSavedComponents: [action.payload, ...state.sharedSavedComponents],
+        };
+      }
+
+      const nextSharedSavedComponents = [...state.sharedSavedComponents];
+      nextSharedSavedComponents[existingIndex] = action.payload;
+
+      return {
+        ...state,
+        sharedSavedComponents: nextSharedSavedComponents,
+      };
+    }
+    case 'DELETE_SHARED_SAVED_COMPONENT':
+      return {
+        ...state,
+        sharedSavedComponents: state.sharedSavedComponents.filter(
+          (component) => component.id !== action.payload,
+        ),
+      };
+    case 'DELETE_SAVED_COMPONENT':
+      return {
+        ...state,
+        sharedSavedComponents: state.sharedSavedComponents.filter(
+          (component) => component.id !== action.payload,
+        ),
+        favoriteComponents: state.favoriteComponents.filter(
+          (favorite) => !(favorite.type === 'saved-element' && favorite.id === action.payload),
         ),
       };
     case 'UPDATE_PROJECT_NAME':
@@ -1456,6 +1512,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       projects: present.projects,
       sharedAssetsVersion: EXPLICIT_SHARED_ASSETS_VERSION,
       sharedAssets: present.sharedAssets,
+      sharedSavedComponents: present.sharedSavedComponents,
       favorites: present.favoriteComponents,
       templates: present.templates,
     }).catch((error) => {
@@ -1467,6 +1524,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     present.isHydrated,
     present.projects,
     present.sharedAssets,
+    present.sharedSavedComponents,
     present.templates,
   ]);
 
