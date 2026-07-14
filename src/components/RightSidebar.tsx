@@ -506,7 +506,7 @@ export function RightSidebar() {
                       void (async () => {
                         const asset = await createAssetFromFile(file);
                         dispatch({
-                          type: 'ADD_SHARED_ASSET',
+                          type: 'ADD_ASSET',
                           payload: asset,
                         });
                         handleUpdate({

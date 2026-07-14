@@ -21,6 +21,7 @@ const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
 const TEMPLATE_LIBRARY_KEY = 'visual-learning-templates';
 const LEGACY_PROJECT_KEY = 'visual-learning-project';
 const FAVORITE_COMPONENTS_STORAGE_KEY = 'visual-learning-favorite-components';
+const EXPLICIT_SHARED_ASSETS_VERSION = 2;
 
 interface AppState {
   isHydrated: boolean;
@@ -104,6 +105,8 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
   'UPDATE_SCENE',
   'ADD_ASSET',
   'DELETE_ASSET',
+  'ADD_SHARED_ASSET',
+  'DELETE_SHARED_ASSET',
   'UPDATE_PROJECT_NAME',
   'ADD_TEMPLATE',
   'DELETE_TEMPLATE',
@@ -267,8 +270,43 @@ function normalizeFavoriteComponents(favorites: unknown): FavoriteComponent[] {
   return normalizedFavorites;
 }
 
-function collectSharedAssets(projects: Project[], sharedAssets: Asset[] = []) {
-  return mergeAssetLibraries(sharedAssets, ...projects.map((project) => project.assets));
+function getAssetFingerprint(asset: Pick<Asset, 'name' | 'dataUrl' | 'kind'>) {
+  return `${asset.name}::${asset.kind || ''}::${asset.dataUrl}`;
+}
+
+function migrateSharedAssets(
+  projects: Project[],
+  sharedAssets: Asset[],
+  sharedAssetsVersion?: number,
+) {
+  if (sharedAssetsVersion === EXPLICIT_SHARED_ASSETS_VERSION) {
+    return mergeAssetLibraries(sharedAssets);
+  }
+
+  const projectAssetCounts = new Map<string, number>();
+
+  for (const project of projects) {
+    const seenFingerprints = new Set<string>();
+    for (const asset of project.assets) {
+      const fingerprint = getAssetFingerprint(asset);
+      if (seenFingerprints.has(fingerprint)) {
+        continue;
+      }
+
+      seenFingerprints.add(fingerprint);
+      projectAssetCounts.set(
+        fingerprint,
+        (projectAssetCounts.get(fingerprint) || 0) + 1,
+      );
+    }
+  }
+
+  return mergeAssetLibraries(
+    sharedAssets.filter((asset) => {
+      const projectCount = projectAssetCounts.get(getAssetFingerprint(asset)) || 0;
+      return projectCount === 0 || projectCount > 1;
+    }),
+  );
 }
 
 function normalizeScene(
@@ -481,12 +519,7 @@ function upsertTemplate(templates: SceneTemplate[], template: SceneTemplate): Sc
 function applyProjectUpdate(state: AppState, project: Project, overrides: Partial<AppState> = {}): AppState {
   const savedProject = stampProject(project);
   const activeProjectId = overrides.activeProjectId ?? state.activeProjectId ?? savedProject.id;
-  const sharedAssets = overrides.sharedAssets ?? collectSharedAssets(
-    state.projects
-      .filter((entry) => entry.id !== savedProject.id)
-      .concat(savedProject),
-    state.sharedAssets,
-  );
+  const sharedAssets = overrides.sharedAssets ?? state.sharedAssets;
 
   return {
     ...state,
@@ -634,11 +667,12 @@ function buildSceneFromTemplate(project: Project, template: SceneTemplate): Proj
 function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord | null): AppState {
   const rawProjects = Array.isArray(payload?.projects) ? payload.projects : [];
   const projects = rawProjects.map((project) => normalizeProject(project));
-  const sharedAssets = collectSharedAssets(
+  const sharedAssets = migrateSharedAssets(
     projects,
     Array.isArray(payload?.sharedAssets)
       ? payload.sharedAssets.map((asset) => normalizeAsset(asset))
       : [],
+    payload?.sharedAssetsVersion,
   );
   const favoriteComponents = normalizeFavoriteComponents(payload?.favorites);
 
@@ -695,7 +729,8 @@ function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
   return {
     activeProjectId: projects[0]?.id || null,
     projects,
-    sharedAssets: collectSharedAssets(projects),
+    sharedAssetsVersion: EXPLICIT_SHARED_ASSETS_VERSION,
+    sharedAssets: [],
     favorites: normalizeFavoriteComponents(storedFavorites),
     templates,
   };
@@ -743,7 +778,6 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         projects: upsertProject(state.projects, importedProject),
-        sharedAssets: mergeAssetLibraries(state.sharedAssets, importedProject.assets),
         templates: importedTemplates.reduce((library, template) => upsertTemplate(library, template), state.templates),
         project: importedProject,
         activeProjectId: importedProject.id,
@@ -1383,6 +1417,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     savePersistedLibrary({
       activeProjectId: present.activeProjectId,
       projects: present.projects,
+      sharedAssetsVersion: EXPLICIT_SHARED_ASSETS_VERSION,
       sharedAssets: present.sharedAssets,
       favorites: present.favoriteComponents,
       templates: present.templates,
