@@ -70,6 +70,7 @@ type Action =
   | { type: 'TOGGLE_ELEMENT_SELECTION'; payload: string }
   | { type: 'ADD_ELEMENT'; payload: SceneElement }
   | { type: 'UPDATE_ELEMENT'; payload: { id: string; updates: Partial<SceneElement> } }
+  | { type: 'REPLACE_ELEMENT'; payload: { id: string; element: SceneElement } }
   | { type: 'DELETE_ELEMENT'; payload: string }
   | { type: 'DELETE_ELEMENTS'; payload: string[] }
   | { type: 'DUPLICATE_ELEMENT'; payload: string }
@@ -113,6 +114,7 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
   'UPDATE_TEMPLATE',
   'ADD_ELEMENT',
   'UPDATE_ELEMENT',
+  'REPLACE_ELEMENT',
   'DELETE_ELEMENT',
   'DELETE_ELEMENTS',
   'DUPLICATE_ELEMENT',
@@ -407,6 +409,23 @@ function applyElementUpdates(
   return cloneElement(element, {
     ...baseUpdates,
     keyframes: nextKeyframes,
+  });
+}
+
+function replaceElementContent(
+  currentElement: SceneElement,
+  replacementElement: SceneElement,
+): SceneElement {
+  return cloneElement(replacementElement, {
+    id: currentElement.id,
+    x: currentElement.x,
+    y: currentElement.y,
+    width: currentElement.width,
+    height: currentElement.height,
+    zIndex: currentElement.zIndex,
+    revealStep: currentElement.revealStep,
+    hideStep: currentElement.hideStep,
+    keyframes: currentElement.keyframes,
   });
 }
 
@@ -1069,6 +1088,24 @@ function appReducer(state: AppState, action: Action): AppState {
         if (element.id !== action.payload.id) return element;
 
         return applyElementUpdates(element, action.payload.updates, state.selectedSequenceStep);
+      });
+
+      const nextScenes = [...state.project.scenes];
+      nextScenes[state.activeSceneIndex] = { ...activeScene, elements: nextElements };
+
+      return applyProjectUpdate(state, { ...state.project, scenes: nextScenes });
+    }
+    case 'REPLACE_ELEMENT': {
+      const activeScene = state.project.scenes[state.activeSceneIndex];
+      const elementToReplace = activeScene.elements.find(
+        (element) => element.id === action.payload.id,
+      );
+      if (!elementToReplace) return state;
+
+      const nextElements = activeScene.elements.map((element) => {
+        if (element.id !== action.payload.id) return element;
+
+        return replaceElementContent(elementToReplace, action.payload.element);
       });
 
       const nextScenes = [...state.project.scenes];

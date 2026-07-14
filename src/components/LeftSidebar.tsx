@@ -1135,6 +1135,59 @@ export function LeftSidebar() {
     });
   };
 
+  const replaceSelectedElementWithFavorite = (
+    favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
+  ) => {
+    if (!selectedElement) {
+      return;
+    }
+
+    const nextElement = cloneFavoriteElement(favorite.element);
+
+    if (nextElement.type === "image") {
+      let assetId = nextElement.assetId;
+      const existingAsset = projectAssetsById.get(assetId);
+
+      if (!existingAsset) {
+        if (!favorite.asset) {
+          window.alert(
+            "This saved component is missing its image asset, so it can't replace the selected component right now.",
+          );
+          return;
+        }
+
+        assetId = generateId();
+        dispatch({
+          type: "ADD_ASSET",
+          payload: {
+            ...favorite.asset,
+            id: assetId,
+          },
+        });
+      }
+
+      dispatch({
+        type: "REPLACE_ELEMENT",
+        payload: {
+          id: selectedElement.id,
+          element: {
+            ...nextElement,
+            assetId,
+          },
+        },
+      });
+      return;
+    }
+
+    dispatch({
+      type: "REPLACE_ELEMENT",
+      payload: {
+        id: selectedElement.id,
+        element: nextElement,
+      },
+    });
+  };
+
   const activeTemplates =
     templateTab === "scene" ? sceneTemplates : branchTemplates;
 
@@ -1377,6 +1430,11 @@ export function LeftSidebar() {
                           {isSelectedElementSaved ? "Update" : "Save"}
                         </button>
                       </div>
+                      {favoriteSavedElements.length > 0 && (
+                        <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-2.5 py-2 text-[10px] font-medium text-slate-500">
+                          Pick a card below and use <span className="font-bold text-[#4f46e5]">Replace selected</span> to swap this canvas component with a saved one while keeping its placement.
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -1417,7 +1475,7 @@ export function LeftSidebar() {
                                   type="button"
                                   onClick={() => addSavedFavoriteElement(favorite)}
                                   title={favorite.name}
-                                  className="flex h-full w-full flex-col rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
+                                  className="flex w-full flex-col rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
                                 >
                                   <SavedElementFavoritePreview
                                     favorite={favorite}
@@ -1429,6 +1487,20 @@ export function LeftSidebar() {
                                     {getSavedFavoriteTypeLabel(favorite.element)}
                                   </div>
                                 </button>
+                                {selectedElement && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      replaceSelectedElementWithFavorite(
+                                        favorite,
+                                      )
+                                    }
+                                    className="mt-1.5 w-full rounded-sm border border-[#c7d2fe] bg-indigo-50 px-2 py-1.5 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                                    title={`Replace selected component with ${favorite.name}`}
+                                  >
+                                    Replace Selected
+                                  </button>
+                                )}
                               </div>
                             ))}
                           </div>
