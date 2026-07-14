@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { Asset, ColorElement, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
+import { Asset, ColorElement, Project, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
 import { getDefaultImageFrameStyle } from "./assetUtils";
 import { formatIconName } from "./iconLibrary";
 import { getEmojiById } from "./emojiLibrary";
@@ -48,6 +48,20 @@ export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 
 
 export function getSceneSequenceCount(scene: Scene) {
   return Math.max(scene.sequenceCount || 1, ...scene.elements.map((element) => element.revealStep), 1);
+}
+
+export function mergeAssetLibraries(...libraries: Asset[][]) {
+  const assetMap = new Map<string, Asset>();
+
+  for (const library of libraries) {
+    for (const asset of library) {
+      if (!assetMap.has(asset.id)) {
+        assetMap.set(asset.id, asset);
+      }
+    }
+  }
+
+  return Array.from(assetMap.values());
 }
 
 function escapeXml(value: string): string {
@@ -448,6 +462,20 @@ export function buildSceneTemplate(scene: Scene, assets: Asset[], name: string, 
     thumbnailDataUrl: createSceneThumbnail(sceneCopy, bundledAssets),
     createdAt: existingTemplate?.createdAt,
     updatedAt: existingTemplate?.updatedAt,
+  };
+}
+
+export function buildExportableProject(project: Project, assets: Asset[]): Project {
+  return {
+    ...project,
+    assets: getSceneTemplateAssets(
+      {
+        id: project.id,
+        name: project.name,
+        elements: project.scenes.flatMap((scene) => scene.elements),
+      },
+      assets,
+    ),
   };
 }
 

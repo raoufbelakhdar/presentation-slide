@@ -89,6 +89,28 @@ export interface Asset {
   kind?: AssetKind;
 }
 
+export type FavoritePresetId =
+  | 'free-text'
+  | 'text-block'
+  | 'yes-badge'
+  | 'no-badge'
+  | 'color-card'
+  | 'blue-check'
+  | 'red-cross';
+
+export type FavoriteComponent =
+  | { type: 'preset'; id: FavoritePresetId }
+  | { type: 'icon'; id: string }
+  | { type: 'emoji'; id: string }
+  | { type: 'asset'; id: string }
+  | {
+      type: 'saved-element';
+      id: string;
+      name: string;
+      element: SceneElement;
+      asset?: Asset;
+    };
+
 export interface SceneTemplate {
   id: string;
   name: string;

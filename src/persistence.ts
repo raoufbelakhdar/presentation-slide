@@ -1,4 +1,4 @@
-import { Project, SceneTemplate } from './types';
+import { Asset, FavoriteComponent, Project, SceneTemplate } from './types';
 
 const DB_NAME = 'visual-learning-scenes';
 const DB_VERSION = 1;
@@ -9,6 +9,8 @@ const FALLBACK_STORAGE_KEY = 'visual-learning-library-v2';
 export interface PersistedLibraryRecord {
   activeProjectId: string | null;
   projects: Project[];
+  sharedAssets: Asset[];
+  favorites: FavoriteComponent[];
   templates: Array<Omit<SceneTemplate, 'thumbnailDataUrl'> & { thumbnailDataUrl?: string }>;
 }
 
@@ -88,6 +90,8 @@ export async function savePersistedLibrary(record: PersistedLibraryRecord): Prom
   const payload: PersistedLibraryRecord = {
     activeProjectId: record.activeProjectId,
     projects: record.projects.map((project) => compactProject(project)),
+    sharedAssets: record.sharedAssets.map((asset) => ({ ...asset })),
+    favorites: record.favorites.map((favorite) => ({ ...favorite })),
     templates: record.templates.map((template) => compactTemplate(template)),
   };
 

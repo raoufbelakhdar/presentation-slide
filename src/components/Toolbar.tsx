@@ -1,11 +1,12 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
 import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2, Home } from 'lucide-react';
-import { generateId, exportProject, readTextFile } from '../utils';
+import { buildExportableProject, exportProject, generateId, mergeAssetLibraries, readTextFile } from '../utils';
 
 export function Toolbar() {
   const { state, dispatch, canUndo, canRedo } = useAppContext();
   const { project, activeSceneIndex, mode } = state;
+  const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
 
   const handleNewScene = () => {
     dispatch({
@@ -118,7 +119,7 @@ export function Toolbar() {
             <input type="file" accept=".json" className="hidden" onChange={handleImport} />
           </label>
           
-          <button onClick={() => exportProject(project)} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Export Project">
+          <button onClick={() => exportProject(buildExportableProject(project, availableAssets))} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Export Project">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export</span>
           </button>

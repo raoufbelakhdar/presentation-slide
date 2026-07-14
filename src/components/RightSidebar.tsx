@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { Copy, Trash2, Layers, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
-import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, splitTextContent } from '../utils';
+import { combineTextContent, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 
@@ -152,6 +152,7 @@ export function RightSidebar() {
   const { state, dispatch } = useAppContext();
   const { project, activeSceneIndex, selectedElementId, selectedElementIds } = state;
   const activeScene = project.scenes[activeSceneIndex];
+  const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
   
   const selectedElement = activeScene?.elements.find(el => el.id === selectedElementId);
   const selectedSequenceStep = state.selectedSequenceStep;
@@ -263,7 +264,7 @@ export function RightSidebar() {
           <SequenceLayersPanel
             step={selectedSequenceStep}
             elements={activeScene?.elements || []}
-            assets={project.assets}
+            assets={availableAssets}
             selectedElementIds={selectedElementIds}
             onSelectElement={handleSelectElement}
             onToggleVisibility={handleSequenceVisibilityToggle}
@@ -347,7 +348,7 @@ export function RightSidebar() {
           <SequenceLayersPanel
             step={selectedSequenceStep}
             elements={activeScene?.elements || []}
-            assets={project.assets}
+            assets={availableAssets}
             selectedElementIds={selectedElementIds}
             onSelectElement={handleSelectElement}
             onToggleVisibility={handleSequenceVisibilityToggle}
@@ -368,7 +369,7 @@ export function RightSidebar() {
   const colorElement = selectedElement.type === 'color' ? (selectedElement as ColorElement) : null;
   const textElement = selectedElement.type === 'text' ? (selectedElement as import('../types').TextElement) : null;
   const shapeElement = selectedElement.type === 'shape' ? (selectedElement as ShapeElement) : null;
-  const imageAsset = imageElement ? project.assets.find((asset) => asset.id === imageElement.assetId) || null : null;
+  const imageAsset = imageElement ? availableAssets.find((asset) => asset.id === imageElement.assetId) || null : null;
   const imageFrameStyle = imageElement ? (imageElement.frameStyle || getDefaultImageFrameStyle(imageAsset)) : null;
   const displayedElement =
     selectedSequenceStep !== null && selectedElement.revealStep <= selectedSequenceStep
@@ -483,7 +484,7 @@ export function RightSidebar() {
             <div>
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Replace Asset</label>
               <div className="grid grid-cols-2 gap-2 mt-2">
-                {project.assets.map(asset => (
+                {availableAssets.map(asset => (
                   <div 
                     key={asset.id} 
                     onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
@@ -505,7 +506,7 @@ export function RightSidebar() {
                       void (async () => {
                         const asset = await createAssetFromFile(file);
                         dispatch({
-                          type: 'ADD_ASSET',
+                          type: 'ADD_SHARED_ASSET',
                           payload: asset,
                         });
                         handleUpdate({
@@ -802,7 +803,7 @@ export function RightSidebar() {
         <SequenceLayersPanel
           step={selectedSequenceStep}
           elements={activeScene.elements}
-          assets={project.assets}
+          assets={availableAssets}
           selectedElementIds={selectedElementIds}
           onSelectElement={handleSelectElement}
           onToggleVisibility={handleSequenceVisibilityToggle}

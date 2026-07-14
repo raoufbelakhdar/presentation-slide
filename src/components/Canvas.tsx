@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { createAssetFromFile, getDefaultImageFrameStyle } from '../assetUtils';
-import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
@@ -424,7 +424,7 @@ function CanvasElement({
                   void (async () => {
                     const asset = await createAssetFromFile(file);
                     dispatch({
-                      type: 'ADD_ASSET',
+                      type: 'ADD_SHARED_ASSET',
                       payload: asset,
                     });
                     dispatch({
@@ -458,7 +458,7 @@ function CanvasElement({
 
 function ImageRenderer({ element }: { element: ImageElement }) {
   const { state } = useAppContext();
-  const asset = state.project.assets.find(a => a.id === element.assetId);
+  const asset = mergeAssetLibraries(state.project.assets, state.sharedAssets).find((entry) => entry.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
   const frameStyle = element.frameStyle || getDefaultImageFrameStyle(asset);

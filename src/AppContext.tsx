@@ -7,6 +7,7 @@ import {
   DEFAULT_SEQUENCE_DELAY,
   DEFAULT_SEQUENCE_DURATION,
   ElementKeyframe,
+  FavoriteComponent,
   Project,
   Scene,
   SceneElement,
@@ -14,15 +15,18 @@ import {
 } from './types';
 import { loadPersistedLibrary, PersistedLibraryRecord, savePersistedLibrary } from './persistence';
 import { getAssetKind, getDefaultImageFrameStyle } from './assetUtils';
-import { buildSceneTemplate, generateId, getSceneSequenceCount } from './utils';
+import { buildSceneTemplate, generateId, getSceneSequenceCount, mergeAssetLibraries } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
 const TEMPLATE_LIBRARY_KEY = 'visual-learning-templates';
 const LEGACY_PROJECT_KEY = 'visual-learning-project';
+const FAVORITE_COMPONENTS_STORAGE_KEY = 'visual-learning-favorite-components';
 
 interface AppState {
   isHydrated: boolean;
   projects: Project[];
+  sharedAssets: Asset[];
+  favoriteComponents: FavoriteComponent[];
   templates: SceneTemplate[];
   project: Project;
   activeProjectId: string | null;
@@ -54,8 +58,12 @@ type Action =
   | { type: 'UPDATE_SCENE'; payload: { index: number; scene: Scene } }
   | { type: 'ADD_ASSET'; payload: Asset }
   | { type: 'DELETE_ASSET'; payload: string }
+  | { type: 'ADD_SHARED_ASSET'; payload: Asset }
+  | { type: 'DELETE_SHARED_ASSET'; payload: string }
   | { type: 'UPDATE_PROJECT_NAME'; payload: string }
   | { type: 'ADD_TEMPLATE'; payload: SceneTemplate }
+  | { type: 'TOGGLE_FAVORITE_COMPONENT'; payload: FavoriteComponent }
+  | { type: 'UPSERT_FAVORITE_COMPONENT'; payload: FavoriteComponent }
   | { type: 'SELECT_ELEMENT'; payload: string | null }
   | { type: 'SELECT_ELEMENTS'; payload: string[] }
   | { type: 'TOGGLE_ELEMENT_SELECTION'; payload: string }
@@ -177,6 +185,90 @@ function normalizeAsset(asset: Partial<Asset> | null | undefined): Asset {
       dataUrl: asset?.dataUrl || '',
     }),
   };
+}
+
+function cloneFavoriteElement(element: SceneElement): SceneElement {
+  return {
+    ...element,
+    keyframes: element.keyframes
+      ? Object.fromEntries(
+          Object.entries(element.keyframes).map(([step, keyframe]) => [
+            Number(step),
+            { ...keyframe },
+          ]),
+        )
+      : undefined,
+  } as SceneElement;
+}
+
+function normalizeFavoriteComponent(
+  favorite: Partial<FavoriteComponent> | null | undefined,
+): FavoriteComponent | null {
+  if (!favorite || typeof favorite !== 'object' || typeof favorite.type !== 'string') {
+    return null;
+  }
+
+  if (favorite.type === 'preset' || favorite.type === 'icon' || favorite.type === 'emoji' || favorite.type === 'asset') {
+    if (typeof favorite.id !== 'string' || favorite.id.length === 0) {
+      return null;
+    }
+
+    return {
+      type: favorite.type,
+      id: favorite.id,
+    } as FavoriteComponent;
+  }
+
+  if (favorite.type === 'saved-element') {
+    if (
+      typeof favorite.id !== 'string' ||
+      favorite.id.length === 0 ||
+      typeof favorite.name !== 'string' ||
+      !favorite.element
+    ) {
+      return null;
+    }
+
+    return {
+      type: 'saved-element',
+      id: favorite.id,
+      name: favorite.name,
+      element: cloneFavoriteElement(favorite.element as SceneElement),
+      asset: favorite.asset ? normalizeAsset(favorite.asset) : undefined,
+    };
+  }
+
+  return null;
+}
+
+function normalizeFavoriteComponents(favorites: unknown): FavoriteComponent[] {
+  if (!Array.isArray(favorites)) {
+    return [];
+  }
+
+  const seenKeys = new Set<string>();
+  const normalizedFavorites: FavoriteComponent[] = [];
+
+  for (const favorite of favorites) {
+    const normalizedFavorite = normalizeFavoriteComponent(favorite as FavoriteComponent);
+    if (!normalizedFavorite) {
+      continue;
+    }
+
+    const key = `${normalizedFavorite.type}:${normalizedFavorite.id}`;
+    if (seenKeys.has(key)) {
+      continue;
+    }
+
+    seenKeys.add(key);
+    normalizedFavorites.push(normalizedFavorite);
+  }
+
+  return normalizedFavorites;
+}
+
+function collectSharedAssets(projects: Project[], sharedAssets: Asset[] = []) {
+  return mergeAssetLibraries(sharedAssets, ...projects.map((project) => project.assets));
 }
 
 function normalizeScene(
@@ -389,12 +481,19 @@ function upsertTemplate(templates: SceneTemplate[], template: SceneTemplate): Sc
 function applyProjectUpdate(state: AppState, project: Project, overrides: Partial<AppState> = {}): AppState {
   const savedProject = stampProject(project);
   const activeProjectId = overrides.activeProjectId ?? state.activeProjectId ?? savedProject.id;
+  const sharedAssets = overrides.sharedAssets ?? collectSharedAssets(
+    state.projects
+      .filter((entry) => entry.id !== savedProject.id)
+      .concat(savedProject),
+    state.sharedAssets,
+  );
 
   return {
     ...state,
     ...overrides,
     project: savedProject,
     activeProjectId,
+    sharedAssets,
     projects: upsertProject(state.projects, savedProject),
   };
 }
@@ -535,6 +634,13 @@ function buildSceneFromTemplate(project: Project, template: SceneTemplate): Proj
 function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord | null): AppState {
   const rawProjects = Array.isArray(payload?.projects) ? payload.projects : [];
   const projects = rawProjects.map((project) => normalizeProject(project));
+  const sharedAssets = collectSharedAssets(
+    projects,
+    Array.isArray(payload?.sharedAssets)
+      ? payload.sharedAssets.map((asset) => normalizeAsset(asset))
+      : [],
+  );
+  const favoriteComponents = normalizeFavoriteComponents(payload?.favorites);
 
   let templates: SceneTemplate[] = [];
   if (Array.isArray(payload?.templates)) {
@@ -557,6 +663,8 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
     ...baseState,
     isHydrated: true,
     projects,
+    sharedAssets,
+    favoriteComponents,
     templates,
     project: activeProject || baseState.project,
     activeProjectId,
@@ -566,6 +674,7 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
 function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
   const storedProjects = parseStoredJson<Partial<Project>[]>(localStorage.getItem(PROJECT_LIBRARY_KEY));
   const storedTemplates = parseStoredJson<SceneTemplate[]>(localStorage.getItem(TEMPLATE_LIBRARY_KEY));
+  const storedFavorites = parseStoredJson<FavoriteComponent[]>(localStorage.getItem(FAVORITE_COMPONENTS_STORAGE_KEY));
   const legacyProject = parseStoredJson<Partial<Project>>(localStorage.getItem(LEGACY_PROJECT_KEY));
 
   const rawProjects = Array.isArray(storedProjects)
@@ -574,7 +683,7 @@ function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
       ? [legacyProject]
       : [];
 
-  if (rawProjects.length === 0 && !Array.isArray(storedTemplates)) {
+  if (rawProjects.length === 0 && !Array.isArray(storedTemplates) && !Array.isArray(storedFavorites)) {
     return null;
   }
 
@@ -586,6 +695,8 @@ function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
   return {
     activeProjectId: projects[0]?.id || null,
     projects,
+    sharedAssets: collectSharedAssets(projects),
+    favorites: normalizeFavoriteComponents(storedFavorites),
     templates,
   };
 }
@@ -594,11 +705,14 @@ function clearLegacyLocalStorage() {
   localStorage.removeItem(PROJECT_LIBRARY_KEY);
   localStorage.removeItem(TEMPLATE_LIBRARY_KEY);
   localStorage.removeItem(LEGACY_PROJECT_KEY);
+  localStorage.removeItem(FAVORITE_COMPONENTS_STORAGE_KEY);
 }
 
 const initialState: AppState = {
   isHydrated: false,
   projects: [],
+  sharedAssets: [],
+  favoriteComponents: [],
   templates: [],
   project: createEmptyProject(),
   activeProjectId: null,
@@ -629,6 +743,7 @@ function appReducer(state: AppState, action: Action): AppState {
       return {
         ...state,
         projects: upsertProject(state.projects, importedProject),
+        sharedAssets: mergeAssetLibraries(state.sharedAssets, importedProject.assets),
         templates: importedTemplates.reduce((library, template) => upsertTemplate(library, template), state.templates),
         project: importedProject,
         activeProjectId: importedProject.id,
@@ -806,13 +921,26 @@ function appReducer(state: AppState, action: Action): AppState {
     case 'ADD_ASSET':
       return applyProjectUpdate(state, {
         ...state.project,
-        assets: [...state.project.assets, { ...action.payload }],
+        assets: mergeAssetLibraries(state.project.assets, [normalizeAsset(action.payload)]),
       });
     case 'DELETE_ASSET':
       return applyProjectUpdate(state, {
         ...state.project,
         assets: state.project.assets.filter((asset) => asset.id !== action.payload),
       });
+    case 'ADD_SHARED_ASSET':
+      return {
+        ...state,
+        sharedAssets: mergeAssetLibraries(state.sharedAssets, [normalizeAsset(action.payload)]),
+      };
+    case 'DELETE_SHARED_ASSET':
+      return {
+        ...state,
+        sharedAssets: state.sharedAssets.filter((asset) => asset.id !== action.payload),
+        favoriteComponents: state.favoriteComponents.filter(
+          (favorite) => !(favorite.type === 'asset' && favorite.id === action.payload),
+        ),
+      };
     case 'UPDATE_PROJECT_NAME':
       return applyProjectUpdate(state, { ...state.project, name: action.payload });
     case 'ADD_TEMPLATE':
@@ -820,6 +948,40 @@ function appReducer(state: AppState, action: Action): AppState {
         ...state,
         templates: upsertTemplate(state.templates, normalizeTemplate(action.payload, action.payload.assets)),
       };
+    case 'TOGGLE_FAVORITE_COMPONENT': {
+      const exists = state.favoriteComponents.some(
+        (favorite) => favorite.type === action.payload.type && favorite.id === action.payload.id,
+      );
+
+      return {
+        ...state,
+        favoriteComponents: exists
+          ? state.favoriteComponents.filter(
+              (favorite) => !(favorite.type === action.payload.type && favorite.id === action.payload.id),
+            )
+          : [...state.favoriteComponents, action.payload],
+      };
+    }
+    case 'UPSERT_FAVORITE_COMPONENT': {
+      const existingIndex = state.favoriteComponents.findIndex(
+        (favorite) => favorite.type === action.payload.type && favorite.id === action.payload.id,
+      );
+
+      if (existingIndex === -1) {
+        return {
+          ...state,
+          favoriteComponents: [action.payload, ...state.favoriteComponents],
+        };
+      }
+
+      const nextFavorites = [...state.favoriteComponents];
+      nextFavorites[existingIndex] = action.payload;
+
+      return {
+        ...state,
+        favoriteComponents: nextFavorites,
+      };
+    }
     case 'DELETE_TEMPLATE':
       return {
         ...state,
@@ -1221,11 +1383,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     savePersistedLibrary({
       activeProjectId: present.activeProjectId,
       projects: present.projects,
+      sharedAssets: present.sharedAssets,
+      favorites: present.favoriteComponents,
       templates: present.templates,
     }).catch((error) => {
       console.error('Failed to persist local project library', error);
     });
-  }, [present.activeProjectId, present.isHydrated, present.projects, present.templates]);
+  }, [
+    present.activeProjectId,
+    present.favoriteComponents,
+    present.isHydrated,
+    present.projects,
+    present.sharedAssets,
+    present.templates,
+  ]);
 
   return (
     <AppContext.Provider

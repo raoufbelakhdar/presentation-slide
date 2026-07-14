@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import {
   Asset,
+  FavoriteComponent,
+  FavoritePresetId,
   SceneElement,
   TextElement,
   ImageElement,
@@ -38,6 +40,7 @@ import {
   getTextAlign,
   getTextSubtitleFontSize,
   getTextVariant,
+  mergeAssetLibraries,
   splitTextContent,
 } from "../utils";
 import {
@@ -66,8 +69,6 @@ import {
   PexelsSize,
   searchPexelsPhotos,
 } from "../pexels";
-
-const FAVORITE_COMPONENTS_STORAGE_KEY = "visual-learning-favorite-components";
 
 const PEXELS_ORIENTATION_OPTIONS: Array<{
   value: PexelsOrientation;
@@ -102,27 +103,7 @@ const PEXELS_COLOR_OPTIONS: Array<{ value: PexelsColor; label: string }> = [
   { value: "turquoise", label: "Turquoise" },
 ];
 
-type PresetId =
-  | "free-text"
-  | "text-block"
-  | "yes-badge"
-  | "no-badge"
-  | "color-card"
-  | "blue-check"
-  | "red-cross";
-
-type FavoriteComponent =
-  | { type: "preset"; id: PresetId }
-  | { type: "icon"; id: string }
-  | { type: "emoji"; id: string }
-  | { type: "asset"; id: string }
-  | {
-      type: "saved-element";
-      id: string;
-      name: string;
-      element: SceneElement;
-      asset?: Asset;
-    };
+type PresetId = FavoritePresetId;
 
 function cloneFavoriteElement(element: SceneElement): SceneElement {
   return {
@@ -495,6 +476,8 @@ export function LeftSidebar() {
   const {
     project,
     activeSceneIndex,
+    sharedAssets,
+    favoriteComponents,
     templates,
     selectedElementId,
     selectedElementIds,
@@ -505,8 +488,9 @@ export function LeftSidebar() {
     selectedElementIds.length === 1
       ? activeScene?.elements.find((element) => element.id === selectedElementId) || null
       : null;
+  const availableAssets = mergeAssetLibraries(project.assets, sharedAssets);
   const projectAssetsById = new Map<string, Asset>(
-    project.assets.map((asset) => [asset.id, asset]),
+    availableAssets.map((asset) => [asset.id, asset]),
   );
   const sceneTemplates = templates.filter(
     (template) => (template.kind || "scene") === "scene",
@@ -549,27 +533,6 @@ export function LeftSidebar() {
   const [isOnline, setIsOnline] = useState(() =>
     typeof navigator === "undefined" ? true : navigator.onLine,
   );
-  const [favoriteComponents, setFavoriteComponents] = useState<
-    FavoriteComponent[]
-  >(() => {
-    if (typeof window === "undefined") {
-      return [];
-    }
-
-    const storedFavorites = window.localStorage.getItem(
-      FAVORITE_COMPONENTS_STORAGE_KEY,
-    );
-    if (!storedFavorites) {
-      return [];
-    }
-
-    try {
-      const parsed = JSON.parse(storedFavorites);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  });
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
@@ -583,13 +546,6 @@ export function LeftSidebar() {
         (entry): entry is NonNullable<ReturnType<typeof getEmojiById>> =>
           Boolean(entry),
       );
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      FAVORITE_COMPONENTS_STORAGE_KEY,
-      JSON.stringify(favoriteComponents),
-    );
-  }, [favoriteComponents]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -700,7 +656,7 @@ export function LeftSidebar() {
       void (async () => {
         const asset = await createAssetFromFile(file);
         dispatch({
-          type: "ADD_ASSET",
+          type: "ADD_SHARED_ASSET",
           payload: asset,
         });
       })();
@@ -931,19 +887,7 @@ export function LeftSidebar() {
     );
 
   const toggleFavorite = (favorite: FavoriteComponent) => {
-    setFavoriteComponents((currentFavorites) => {
-      const exists = currentFavorites.some(
-        (entry) => entry.type === favorite.type && entry.id === favorite.id,
-      );
-      if (exists) {
-        return currentFavorites.filter(
-          (entry) =>
-            !(entry.type === favorite.type && entry.id === favorite.id),
-        );
-      }
-
-      return [...currentFavorites, favorite];
-    });
+    dispatch({ type: "TOGGLE_FAVORITE_COMPONENT", payload: favorite });
   };
 
   const favoritePresets = favoriteComponents.filter(
@@ -968,8 +912,8 @@ export function LeftSidebar() {
       (favorite): favorite is Extract<FavoriteComponent, { type: "asset" }> =>
         favorite.type === "asset",
     )
-    .map((favorite) => project.assets.find((asset) => asset.id === favorite.id))
-    .filter((asset): asset is (typeof project.assets)[number] =>
+    .map((favorite) => availableAssets.find((asset) => asset.id === favorite.id))
+    .filter((asset): asset is (typeof availableAssets)[number] =>
       Boolean(asset),
     );
   const favoriteSavedElements = favoriteComponents.filter(
@@ -1011,7 +955,7 @@ export function LeftSidebar() {
         : "Remove this asset from the library?";
 
     if (!confirm(message)) return;
-    dispatch({ type: "DELETE_ASSET", payload: assetId });
+    dispatch({ type: "DELETE_SHARED_ASSET", payload: assetId });
   };
 
   const importPexelsPhoto = async (photo: PexelsPhoto) => {
@@ -1021,7 +965,7 @@ export function LeftSidebar() {
       const dataUrl = await convertRemoteImageToDataUrl(getPexelsAssetUrl(photo));
 
       dispatch({
-        type: "ADD_ASSET",
+        type: "ADD_SHARED_ASSET",
         payload: {
           id: generateId(),
           name: getPexelsPhotoLabel(photo),
@@ -1050,7 +994,7 @@ export function LeftSidebar() {
         : `${currentScene.name} Template`;
     dispatch({
       type: "ADD_TEMPLATE",
-      payload: buildSceneTemplate(currentScene, project.assets, templateName, {
+      payload: buildSceneTemplate(currentScene, availableAssets, templateName, {
         kind,
       }),
     });
@@ -1076,19 +1020,7 @@ export function LeftSidebar() {
           : undefined,
     };
 
-    setFavoriteComponents((currentFavorites) => {
-      const existingIndex = currentFavorites.findIndex(
-        (entry) => entry.type === "saved-element" && entry.id === favorite.id,
-      );
-
-      if (existingIndex === -1) {
-        return [favorite, ...currentFavorites];
-      }
-
-      const nextFavorites = [...currentFavorites];
-      nextFavorites[existingIndex] = favorite;
-      return nextFavorites;
-    });
+    dispatch({ type: "UPSERT_FAVORITE_COMPONENT", payload: favorite });
   };
 
   const addSavedFavoriteElement = (
@@ -1120,7 +1052,7 @@ export function LeftSidebar() {
 
         assetId = generateId();
         dispatch({
-          type: "ADD_ASSET",
+          type: "ADD_SHARED_ASSET",
           payload: {
             ...favorite.asset,
             id: assetId,
@@ -1796,8 +1728,8 @@ export function LeftSidebar() {
                             Assets
                           </div>
                           <div className="mt-1 text-[11px] text-slate-500">
-                            Keep your uploaded assets visible and browse Pexels
-                            separately.
+                            Keep your uploaded assets shared across projects
+                            and browse Pexels separately.
                           </div>
                         </div>
                         {!isOnline && (
@@ -1818,7 +1750,7 @@ export function LeftSidebar() {
                               : "text-slate-500 hover:bg-[#eef2ff] hover:text-[#4f46e5]"
                           }`}
                         >
-                          Local
+                          Library
                         </button>
                         <button
                           type="button"
@@ -1899,10 +1831,10 @@ export function LeftSidebar() {
                       <div>
                         <div className="mb-3 flex items-center justify-between">
                           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                            Local Assets
+                            Shared Assets
                           </div>
                           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                            {project.assets.length}
+                            {availableAssets.length}
                           </div>
                         </div>
 
@@ -1937,7 +1869,7 @@ export function LeftSidebar() {
                             />
                           </label>
 
-                          {project.assets.map((asset) => {
+                          {availableAssets.map((asset) => {
                             const usageCount = getAssetUsageCount(asset.id);
 
                             return (
@@ -2004,9 +1936,9 @@ export function LeftSidebar() {
                           })}
                         </div>
 
-                        {project.assets.length === 0 && (
+                        {availableAssets.length === 0 && (
                           <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                            Upload photos, transparent PNGs, or SVG graphics to start your local asset library
+                            Upload photos, transparent PNGs, or SVG graphics to start your shared asset library
                           </div>
                         )}
                       </div>
@@ -2019,7 +1951,7 @@ export function LeftSidebar() {
                             </div>
                             <div className="mt-1 text-[11px] text-slate-500">
                               Search Pexels and import a cropped copy into your
-                              local assets.
+                              shared assets.
                             </div>
                           </div>
                           {pexelsStatus === "loading" ? (

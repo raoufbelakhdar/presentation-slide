@@ -4,7 +4,7 @@ import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
-import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
@@ -301,7 +301,7 @@ export function PresentationView() {
 
 function PresentationImage({ element }: { element: ImageElement }) {
   const { state } = useAppContext();
-  const asset = state.project.assets.find(a => a.id === element.assetId);
+  const asset = mergeAssetLibraries(state.project.assets, state.sharedAssets).find((entry) => entry.id === element.assetId);
   const captionText = element.captionText?.trim() || '';
   const hasCaption = captionText.length > 0;
   const frameStyle = element.frameStyle || getDefaultImageFrameStyle(asset);
