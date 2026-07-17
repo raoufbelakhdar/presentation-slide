@@ -1,6 +1,6 @@
 import React from 'react';
 import { DynamicIcon } from 'lucide-react/dynamic';
-import { isKnownIconName } from '../iconLibrary';
+import { DEFAULT_ICON_COLOR, isKnownIconName } from '../iconLibrary';
 
 interface LucideIconGlyphProps {
   name: string;
@@ -11,7 +11,7 @@ interface LucideIconGlyphProps {
 
 function FallbackGlyph({
   className,
-  color = 'currentColor',
+  color = DEFAULT_ICON_COLOR,
   strokeWidth = 2,
 }: Omit<LucideIconGlyphProps, 'name'>) {
   return (
@@ -35,7 +35,7 @@ function FallbackGlyph({
 export function LucideIconGlyph({
   name,
   className,
-  color = 'currentColor',
+  color = DEFAULT_ICON_COLOR,
   strokeWidth = 2,
 }: LucideIconGlyphProps) {
   if (!isKnownIconName(name)) {

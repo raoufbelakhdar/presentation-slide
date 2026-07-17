@@ -2,7 +2,7 @@ import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Asset, ColorElement, Project, Scene, SceneElement, SceneTemplate, TextElement } from "./types";
 import { getDefaultImageFrameStyle } from "./assetUtils";
-import { formatIconName } from "./iconLibrary";
+import { DEFAULT_ICON_COLOR, formatIconName } from "./iconLibrary";
 import { getEmojiById } from "./emojiLibrary";
 
 export function cn(...inputs: ClassValue[]) {
@@ -172,7 +172,7 @@ function renderShapeElement(element: Extract<SceneElement, { type: 'shape' }>) {
   }
 
   if (element.shapeType === 'icon') {
-    const iconColor = element.iconColor || '#0f172a';
+    const iconColor = element.iconColor || DEFAULT_ICON_COLOR;
     const iconLabel = formatIconName(element.iconName || 'shape').slice(0, 24);
     const centerX = element.x + element.width / 2;
     const centerY = element.y + element.height / 2;

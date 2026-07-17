@@ -1,5 +1,7 @@
 import { iconNames } from 'lucide-react/dynamic';
 
+export const DEFAULT_ICON_COLOR = '#ffffff';
+
 const KNOWN_ICON_NAMES = Array.from(new Set(iconNames as readonly string[])).sort((a, b) => a.localeCompare(b));
 const KNOWN_ICON_NAME_SET = new Set(KNOWN_ICON_NAMES);
 

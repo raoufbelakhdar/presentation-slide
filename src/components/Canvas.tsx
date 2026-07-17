@@ -5,6 +5,7 @@ import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types'
 import { createAssetFromFile, getDefaultImageFrameStyle } from '../assetUtils';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
+import { DEFAULT_ICON_COLOR } from '../iconLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
@@ -569,12 +570,12 @@ function ShapeRenderer({ element }: { element: ShapeElement }) {
 
   if (element.shapeType === 'icon') {
     return (
-      <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
+      <div className="w-full h-full flex items-center justify-center text-white pointer-events-none">
         <div className="h-[84%] w-[84%]">
           <LucideIconGlyph
             name={element.iconName || 'circle'}
             className="h-full w-full drop-shadow-[0_12px_20px_rgba(15,23,42,0.16)]"
-            color={element.iconColor || '#0f172a'}
+            color={element.iconColor || DEFAULT_ICON_COLOR}
             strokeWidth={element.iconStrokeWidth || 2.25}
           />
         </div>

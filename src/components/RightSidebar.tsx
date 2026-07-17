@@ -4,7 +4,7 @@ import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Mov
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
-import { formatIconName } from '../iconLibrary';
+import { DEFAULT_ICON_COLOR, formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
@@ -325,7 +325,7 @@ function SavedElementLibraryPreview({
         <LucideIconGlyph
           name={element.iconName || 'circle'}
           className="h-full w-full"
-          color={element.iconColor || '#0f172a'}
+          color={element.iconColor || DEFAULT_ICON_COLOR}
           strokeWidth={element.iconStrokeWidth || 2.25}
         />
       </div>
@@ -1276,13 +1276,13 @@ export function RightSidebar() {
               <div className="flex items-center gap-2">
                 <input
                   type="color"
-                  value={shapeElement.iconColor || '#0f172a'}
+                  value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
                   onChange={(e) => handleUpdate({ iconColor: e.target.value })}
                   className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
                 />
                 <input
                   type="text"
-                  value={shapeElement.iconColor || '#0f172a'}
+                  value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
                   onChange={(e) => handleUpdate({ iconColor: e.target.value })}
                   className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
                 />

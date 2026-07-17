@@ -45,6 +45,7 @@ import {
   splitTextContent,
 } from "../utils";
 import {
+  DEFAULT_ICON_COLOR,
   FEATURED_ICON_NAMES,
   LUCIDE_ICON_NAMES,
   formatIconName,
@@ -301,7 +302,7 @@ function SavedElementFavoritePreview({
         <LucideIconGlyph
           name={element.iconName || "circle"}
           className="h-full w-full"
-          color={element.iconColor || "#0f172a"}
+          color={element.iconColor || DEFAULT_ICON_COLOR}
           strokeWidth={element.iconStrokeWidth || 2.25}
         />
       </div>
@@ -411,8 +412,8 @@ function IconPresetPreview({ iconName }: { iconName: string }) {
     >
       <LucideIconGlyph
         name={iconName}
-        className="h-5.5 w-5.5 text-[#0f172a]"
-        color="#0f172a"
+        className="h-5.5 w-5.5 text-white"
+        color={DEFAULT_ICON_COLOR}
         strokeWidth={2.25}
       />
     </div>
@@ -808,7 +809,7 @@ export function LeftSidebar() {
       type: "shape",
       shapeType: "icon",
       iconName,
-      iconColor: "#0f172a",
+      iconColor: DEFAULT_ICON_COLOR,
       iconStrokeWidth: 2.25,
       x: 160,
       y: 180,

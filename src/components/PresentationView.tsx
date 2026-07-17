@@ -4,6 +4,7 @@ import { X, ChevronLeft, ChevronRight, Maximize, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
+import { DEFAULT_ICON_COLOR } from '../iconLibrary';
 import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
@@ -410,12 +411,12 @@ function PresentationShape({ element }: { element: ShapeElement }) {
 
   if (element.shapeType === 'icon') {
     return (
-      <div className="w-full h-full flex items-center justify-center text-[#0f172a] pointer-events-none">
+      <div className="w-full h-full flex items-center justify-center text-white pointer-events-none">
         <div className="h-[84%] w-[84%]">
           <LucideIconGlyph
             name={element.iconName || 'circle'}
             className="h-full w-full drop-shadow-[0_18px_32px_rgba(15,23,42,0.18)]"
-            color={element.iconColor || '#0f172a'}
+            color={element.iconColor || DEFAULT_ICON_COLOR}
             strokeWidth={element.iconStrokeWidth || 2.25}
           />
         </div>
