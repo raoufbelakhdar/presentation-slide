@@ -9,6 +9,9 @@ import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
+const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
+  'bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_52%,#dbeafe_100%)]';
+
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
     const textVariant = getTextVariant(element);
@@ -277,7 +280,13 @@ function SavedElementLibraryPreview({
 
   if (element.type === 'image') {
     return asset ? (
-      <img src={asset.dataUrl} alt={name} className="h-full w-full object-cover" />
+      <img
+        src={asset.dataUrl}
+        alt={name}
+        className={`h-full w-full ${
+          getAssetKind(asset) === 'graphic' ? 'object-contain p-2' : 'object-cover'
+        }`}
+      />
     ) : (
       <div className="flex h-full w-full items-center justify-center px-2 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
         Missing Asset
@@ -1276,7 +1285,9 @@ export function RightSidebar() {
                               : 'border-[#dbe4f0] bg-white hover:border-[#4f46e5] hover:shadow-[0_6px_18px_rgba(15,23,42,0.06)]'
                           }`}
                         >
-                          <div className="relative overflow-hidden rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc]">
+                          <div
+                            className={`relative overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+                          >
                             <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
                               <button
                                 type="button"

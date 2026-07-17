@@ -107,6 +107,23 @@ const PEXELS_COLOR_OPTIONS: Array<{ value: PexelsColor; label: string }> = [
 type PresetId = FavoritePresetId;
 const SHARED_ASSETS_VISIBILITY_STORAGE_KEY =
   "visual-learning-shared-assets-visible";
+const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
+  "bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_52%,#dbeafe_100%)]";
+const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  { value: "text", label: "Text" },
+  { value: "text-block", label: "Text Block" },
+  { value: "image", label: "Image" },
+  { value: "color", label: "Color" },
+  { value: "emoji", label: "Emoji" },
+  { value: "icon", label: "Icon" },
+  { value: "yes", label: "Yes" },
+  { value: "no", label: "No" },
+  { value: "check", label: "Check" },
+  { value: "cross", label: "Cross" },
+] as const;
+type SavedComponentTypeFilter =
+  (typeof SAVED_COMPONENT_TYPE_FILTER_OPTIONS)[number]["value"];
 
 function cloneFavoriteElement(element: SceneElement): SceneElement {
   return {
@@ -137,6 +154,23 @@ function getSavedFavoriteTypeLabel(element: SceneElement) {
   return "Cross";
 }
 
+function getSavedFavoriteTypeFilterValue(
+  element: SceneElement,
+): SavedComponentTypeFilter {
+  if (element.type === "text") {
+    return getTextVariant(element) === "free" ? "text" : "text-block";
+  }
+
+  if (element.type === "image") return "image";
+  if (element.type === "color") return "color";
+  if (element.shapeType === "emoji") return "emoji";
+  if (element.shapeType === "icon") return "icon";
+  if (element.shapeType === "yes") return "yes";
+  if (element.shapeType === "no") return "no";
+  if (element.shapeType === "check") return "check";
+  return "cross";
+}
+
 function SavedElementFavoritePreview({
   favorite,
 }: {
@@ -161,7 +195,9 @@ function SavedElementFavoritePreview({
         : [];
 
     return (
-      <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] bg-white p-2.5">
+      <div
+        className={`flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] p-2.5 ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         {textVariant === "block" ? (
           <div
             className="flex h-full w-full flex-col justify-center rounded-[24px] bg-[#3b82f6] px-3 text-white"
@@ -207,12 +243,18 @@ function SavedElementFavoritePreview({
 
   if (element.type === "image") {
     return (
-      <div className="flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] bg-[#f8fafc]">
+      <div
+        className={`flex h-20 w-full items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         {asset ? (
           <img
             src={asset.dataUrl}
             alt={favorite.name}
-            className="h-full w-full object-cover"
+            className={`h-full w-full ${
+              getAssetKind(asset) === "graphic"
+                ? "object-contain p-2"
+                : "object-cover"
+            }`}
           />
         ) : (
           <div className="px-3 text-center text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -225,7 +267,9 @@ function SavedElementFavoritePreview({
 
   if (element.type === "color") {
     return (
-      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white p-3">
+      <div
+        className={`flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] p-3 ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         <div
           className="h-full w-full rounded-sm border border-slate-100 shadow-sm"
           style={{ backgroundColor: element.fillColor }}
@@ -237,7 +281,9 @@ function SavedElementFavoritePreview({
   if (element.shapeType === "emoji") {
     const emojiEntry = getEmojiById(element.emojiHexcode || "");
     return (
-      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <div
+        className={`flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         <EmojiGlyph
           id={element.emojiHexcode || "grinning-face"}
           fallback={emojiEntry?.emoji || element.emojiChar || "😀"}
@@ -249,7 +295,9 @@ function SavedElementFavoritePreview({
 
   if (element.shapeType === "icon") {
     return (
-      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white p-4">
+      <div
+        className={`flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] p-4 ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         <LucideIconGlyph
           name={element.iconName || "circle"}
           className="h-full w-full"
@@ -262,14 +310,18 @@ function SavedElementFavoritePreview({
 
   if (element.shapeType === "yes" || element.shapeType === "no") {
     return (
-      <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+      <div
+        className={`flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+      >
         <BadgePresetPreview type={element.shapeType} />
       </div>
     );
   }
 
   return (
-    <div className="flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-20 w-full items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       <MarkPresetPreview
         type={element.shapeType === "check" ? "check" : "cross"}
       />
@@ -492,6 +544,8 @@ export function LeftSidebar() {
       "false"
     );
   });
+  const [savedComponentTypeFilter, setSavedComponentTypeFilter] =
+    useState<SavedComponentTypeFilter>("all");
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
@@ -894,6 +948,31 @@ export function LeftSidebar() {
   const localSavedComponents = favoriteSavedElements.filter(
     (component) => !sharedSavedComponentIds.has(component.id),
   );
+  const allSavedComponents = [
+    ...localSavedComponents,
+    ...sharedSavedComponents,
+  ];
+  const savedComponentTypeCounts = allSavedComponents.reduce(
+    (counts, component) => {
+      const type = getSavedFavoriteTypeFilterValue(component.element);
+      counts.set(type, (counts.get(type) || 0) + 1);
+      return counts;
+    },
+    new Map<SavedComponentTypeFilter, number>(),
+  );
+  const matchesSavedComponentTypeFilter = (component: SavedComponent) =>
+    savedComponentTypeFilter === "all"
+      ? true
+      : getSavedFavoriteTypeFilterValue(component.element) ===
+        savedComponentTypeFilter;
+  const filteredLocalSavedComponents = localSavedComponents.filter(
+    matchesSavedComponentTypeFilter,
+  );
+  const filteredSharedSavedComponents = sharedSavedComponents.filter(
+    matchesSavedComponentTypeFilter,
+  );
+  const filteredSavedComponentCount =
+    filteredLocalSavedComponents.length + filteredSharedSavedComponents.length;
   const hasFavoriteCollections =
     favoriteComponents.length > 0 || sharedSavedComponents.length > 0;
   const visibleSharedAssets = showSharedAssets
@@ -1381,27 +1460,83 @@ export function LeftSidebar() {
                     </div>
                   ) : (
                     <div className="space-y-5">
-                      {localSavedComponents.length > 0 && (
+                      {allSavedComponents.length > 0 && (
+                        <div>
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              Component Type
+                            </div>
+                            <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                              {filteredSavedComponentCount}
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {SAVED_COMPONENT_TYPE_FILTER_OPTIONS.filter(
+                              (option) =>
+                                option.value === "all" ||
+                                savedComponentTypeCounts.has(option.value),
+                            ).map((option) => {
+                              const isActive =
+                                savedComponentTypeFilter === option.value;
+                              const count =
+                                option.value === "all"
+                                  ? allSavedComponents.length
+                                  : savedComponentTypeCounts.get(option.value) ||
+                                    0;
+
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setSavedComponentTypeFilter(option.value)
+                                  }
+                                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                                    isActive
+                                      ? "border-[#4f46e5] bg-[#4f46e5] text-white"
+                                      : "border-[#dbe4f0] bg-white text-slate-500 hover:border-[#a5b4fc] hover:text-[#4338ca]"
+                                  }`}
+                                >
+                                  {option.label} ({count})
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {filteredLocalSavedComponents.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Saved Components
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {localSavedComponents.map(renderSavedComponentCard)}
+                            {filteredLocalSavedComponents.map(
+                              renderSavedComponentCard,
+                            )}
                           </div>
                         </div>
                       )}
 
-                      {sharedSavedComponents.length > 0 && (
+                      {filteredSharedSavedComponents.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Shared Components
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {sharedSavedComponents.map(renderSavedComponentCard)}
+                            {filteredSharedSavedComponents.map(
+                              renderSavedComponentCard,
+                            )}
                           </div>
                         </div>
                       )}
+
+                      {allSavedComponents.length > 0 &&
+                        filteredSavedComponentCount === 0 && (
+                          <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                            No saved or shared components match this type
+                          </div>
+                        )}
 
                       {favoritePresets.length > 0 && (
                         <div>
