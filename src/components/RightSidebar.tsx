@@ -11,6 +11,7 @@ import { EmojiGlyph } from './EmojiGlyph';
 
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   'bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]';
+const RIGHT_SIDEBAR_CLASS = 'w-80 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -493,7 +494,7 @@ export function RightSidebar() {
       };
 
       return (
-        <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
+        <div className={`${RIGHT_SIDEBAR_CLASS} overflow-y-auto`}>
           <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
             <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Sequence Properties</h3>
             {(activeScene?.sequenceCount || 1) > 1 && (
@@ -576,7 +577,7 @@ export function RightSidebar() {
     }
 
     return (
-      <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 p-4 space-y-6">
+      <div className={`${RIGHT_SIDEBAR_CLASS} p-4 space-y-6`}>
         <div className="flex flex-col items-center justify-center text-center mt-6 mb-4">
           <Layers className="w-10 h-10 text-slate-300 mb-3" />
           <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Scene Properties</p>
@@ -612,7 +613,7 @@ export function RightSidebar() {
 
   if (isMultiSelecting) {
     return (
-      <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
+      <div className={`${RIGHT_SIDEBAR_CLASS} overflow-y-auto`}>
         <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
           <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Multiple Selected</h3>
           <button
@@ -843,7 +844,7 @@ export function RightSidebar() {
   };
 
   return (
-    <div className="w-64 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0 overflow-y-auto">
+    <div className={`${RIGHT_SIDEBAR_CLASS} overflow-y-auto`}>
       <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
         <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">{propertiesTitle}</h3>
         <button 
@@ -1288,7 +1289,8 @@ export function RightSidebar() {
                           <div
                             className={`relative overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
                           >
-                            <div className="absolute right-1.5 top-1.5 z-10 flex gap-1">
+                            <div className="absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10 group-focus-within:bg-slate-950/10" />
+                            <div className="absolute right-1.5 top-1.5 z-10 flex translate-y-1 gap-1 opacity-0 transition-all duration-150 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
                               <button
                                 type="button"
                                 onClick={(event) => {
@@ -1331,7 +1333,7 @@ export function RightSidebar() {
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            <div className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 items-center justify-center rounded-full bg-white/95 text-slate-700 shadow-sm">
+                            <div className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
                               {renderSavedElementLibraryGroupIcon(group.groupId)}
                             </div>
                             <button
@@ -1348,15 +1350,10 @@ export function RightSidebar() {
                             </button>
                           </div>
                           <div className="mt-2 flex items-center justify-between gap-2">
-                            <div className="truncate text-[10px] font-semibold text-[#0f172a]">
+                            <div className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#0f172a]">
                               {favorite.name}
                             </div>
                             <div className="flex items-center gap-1">
-                              {isSharedSavedComponent && (
-                                <div className="rounded-full bg-[#4f46e5]/10 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                                  Shared
-                                </div>
-                              )}
                               {isCurrentFavorite && (
                                 <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
                                   Current
