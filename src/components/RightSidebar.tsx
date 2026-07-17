@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../AppContext';
-import { Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, RotateCcw, Save, Star, Trash2, Type, Upload, X } from 'lucide-react';
+import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
@@ -857,6 +857,79 @@ export function RightSidebar() {
       </div>
 
       <div className="p-4 space-y-5">
+        <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-[#f8fafc]">
+          <div className="flex h-8 items-center gap-2 border-b border-[#e2e8f0] px-2.5">
+            <Move className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              Position
+            </span>
+            <div className="ml-auto flex items-center gap-1 font-mono text-[10px] text-[#4f46e5]">
+              <span className="rounded bg-white px-1.5 py-0.5">X {Math.round(displayedElement.x)}</span>
+              <span className="rounded bg-white px-1.5 py-0.5">Y {Math.round(displayedElement.y)}</span>
+            </div>
+          </div>
+
+          <div className="flex h-9 items-center gap-1 px-2">
+            <Layers className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              Layer
+            </span>
+            <span className="ml-0.5 font-mono text-[9px] text-[#4f46e5]">
+              {selectedElement.zIndex ?? 0}
+            </span>
+
+            <div className="ml-auto flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
+                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
+                title="Send to back"
+                aria-label="Send to back"
+              >
+                <SendToBack className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
+                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+                title="Bring to front"
+                aria-label="Bring to front"
+              >
+                <BringToFront className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="mx-1 h-4 w-px bg-[#e2e8f0]" />
+
+              <button
+                type="button"
+                onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
+                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+                title="Duplicate component"
+                aria-label="Duplicate component"
+              >
+                <Copy className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleUpdate({
+                    x: selectedElement.x,
+                    y: selectedElement.y,
+                    width: selectedElement.width,
+                    height: selectedElement.height,
+                  })
+                }
+                disabled={!canResetToInitialFrame}
+                className="flex h-7 w-7 items-center justify-center rounded text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                title={canResetToInitialFrame ? 'Reset to initial position' : 'Already at initial position'}
+                aria-label="Reset to initial position"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
         <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
           <div className="flex items-start gap-3">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
@@ -1426,56 +1499,6 @@ export function RightSidebar() {
           </div>
         )}
 
-        <div className="pt-4 border-t border-[#f1f5f9]">
-          <div className="flex items-center justify-between mb-2">
-             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Position</span>
-             <span className="text-[10px] font-mono text-[#4f46e5]">X: {Math.round(displayedElement.x)} | Y: {Math.round(displayedElement.y)}</span>
-          </div>
-          {canResetToInitialFrame && (
-            <button
-              onClick={() =>
-                handleUpdate({
-                  x: selectedElement.x,
-                  y: selectedElement.y,
-                  width: selectedElement.width,
-                  height: selectedElement.height,
-                })
-              }
-              className="mb-3 flex w-full items-center justify-center gap-2 rounded-sm border border-amber-200 bg-amber-50 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
-              title="Reset this sequence frame to the element's initial placement"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset To Initial Frame
-            </button>
-          )}
-          <div className="mb-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Layer Order</span>
-              <span className="text-[10px] font-mono text-[#4f46e5]">Z: {selectedElement.zIndex ?? 0}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
-                className="rounded-sm border border-[#e2e8f0] bg-white px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-50"
-              >
-                Send Back
-              </button>
-              <button
-                onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
-                className="rounded-sm border border-[#c7d2fe] bg-indigo-50 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-100"
-              >
-                Bring Front
-              </button>
-            </div>
-          </div>
-          <button 
-            onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
-            className="w-full py-1.5 text-[10px] font-bold border border-[#e2e8f0] bg-slate-50 uppercase text-slate-600 hover:bg-slate-100 hover:border-[#cbd5e1] transition-colors rounded-sm mt-2 flex items-center justify-center gap-2"
-          >
-            <Copy className="w-3 h-3" />
-            Duplicate
-          </button>
-        </div>
       </div>
 
       {selectedSequenceStep !== null && (
