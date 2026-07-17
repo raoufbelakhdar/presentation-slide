@@ -108,7 +108,7 @@ type PresetId = FavoritePresetId;
 const SHARED_ASSETS_VISIBILITY_STORAGE_KEY =
   "visual-learning-shared-assets-visible";
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
-  "bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_52%,#dbeafe_100%)]";
+  "bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]";
 const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
   { value: "all", label: "All" },
   { value: "text", label: "Text" },
@@ -334,8 +334,8 @@ function TextPresetPreview({ block = false }: { block?: boolean }) {
     <div
       className={`flex h-12 w-16 shrink-0 overflow-hidden rounded-md border border-[#dbe4f0] ${
         block
-          ? "items-center justify-center bg-[#eff6ff]"
-          : "items-start justify-start bg-white p-2.5"
+          ? `items-center justify-center ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`
+          : `items-start justify-start p-2.5 ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`
       }`}
     >
       {block ? (
@@ -359,7 +359,9 @@ function BadgePresetPreview({ type }: { type: "yes" | "no" }) {
   const isYes = type === "yes";
 
   return (
-    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       <div
         className={`flex h-10 w-10 flex-col items-center justify-center rounded-full text-white shadow-sm ${
           isYes ? "bg-[#3b82f6]" : "bg-[#ef4444]"
@@ -378,7 +380,9 @@ function BadgePresetPreview({ type }: { type: "yes" | "no" }) {
 
 function MarkPresetPreview({ type }: { type: "check" | "cross" }) {
   return (
-    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       {type === "check" ? (
         <Check className="h-8 w-8 text-sky-500" strokeWidth={3.5} />
       ) : (
@@ -390,7 +394,9 @@ function MarkPresetPreview({ type }: { type: "check" | "cross" }) {
 
 function ColorCardPresetPreview() {
   return (
-    <div className="flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-12 w-16 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       <div className="relative h-10 w-10 rounded-[3px] bg-[#f59e0b] shadow-sm">
         <div className="absolute inset-x-1.5 bottom-1.5 h-1 rounded-full bg-white/80" />
       </div>
@@ -400,7 +406,9 @@ function ColorCardPresetPreview() {
 
 function IconPresetPreview({ iconName }: { iconName: string }) {
   return (
-    <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       <LucideIconGlyph
         name={iconName}
         className="h-5.5 w-5.5 text-[#0f172a]"
@@ -419,7 +427,9 @@ function EmojiPresetPreview({
   fallback?: string;
 }) {
   return (
-    <div className="flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-white">
+    <div
+      className={`flex h-10 w-12 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
       <EmojiGlyph
         id={emojiId}
         fallback={fallback}

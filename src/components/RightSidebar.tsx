@@ -10,7 +10,7 @@ import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
-  'bg-[linear-gradient(135deg,#ffffff_0%,#eff6ff_52%,#dbeafe_100%)]';
+  'bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]';
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
