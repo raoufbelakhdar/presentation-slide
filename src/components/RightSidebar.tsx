@@ -1362,7 +1362,7 @@ export function RightSidebar() {
                           <div
                             className={`relative overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
                           >
-                            <div className="absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10 group-focus-within:bg-slate-950/10" />
+                            <div className="pointer-events-none absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10 group-focus-within:bg-slate-950/10" />
                             <div className="absolute right-1.5 top-1.5 z-10 flex translate-y-1 gap-1 opacity-0 transition-all duration-150 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
                               <button
                                 type="button"
@@ -1406,7 +1406,7 @@ export function RightSidebar() {
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
                             </div>
-                            <div className="absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                            <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
                               {renderSavedElementLibraryGroupIcon(group.groupId)}
                             </div>
                             <button
