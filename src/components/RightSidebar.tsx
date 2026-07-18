@@ -1146,85 +1146,53 @@ export function RightSidebar() {
   );
 
   const saveShareSection = (
-    <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-      <div className="flex items-start gap-3">
-        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
-          <SavedElementLibraryPreview
-            element={selectedElement}
-            asset={imageAsset}
-            name={selectedElementFavoriteName}
-          />
+    <div className="rounded-md border border-[#e2e8f0] bg-white p-2.5">
+      <div className="flex items-center gap-2">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#e2e8f0] bg-[#f8fafc] text-slate-500">
+          {renderSavedElementLibraryGroupIcon(
+            getSavedElementLibraryGroupId(selectedElement, imageAsset),
+          )}
         </div>
 
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
-                {renderSavedElementLibraryGroupIcon(
-                  getSavedElementLibraryGroupId(selectedElement, imageAsset),
-                )}
-              </div>
-              <div className="min-w-0">
-                <div className="truncate text-xs font-semibold text-[#0f172a]">
-                  {selectedElementFavoriteName}
-                </div>
-                <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                  {getElementTypeLabel(selectedElement)}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={saveSelectedElementToFavorites}
-                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
-              >
-                <Save className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={toggleSelectedElementSharing}
-                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                  isSelectedElementShared
-                    ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
-                    : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
-                }`}
-                title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
-              >
-                <Layers className="h-4 w-4" />
-              </button>
-              {(isSelectedElementSaved || isSelectedElementShared) && (
-                <button
-                  type="button"
-                  onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
-                  title="Delete saved component"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-3 flex items-center gap-2">
-            <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <button
+            type="button"
+            onClick={saveSelectedElementToFavorites}
+            className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors ${
               isSelectedElementSaved
-                ? 'bg-emerald-50 text-emerald-600'
-                : 'bg-white text-slate-500'
-            }`}>
-              {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
-            </div>
-            <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {filteredMatchingSavedComponents.length} In Library
-            </div>
-            {isSelectedElementShared && (
-              <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                Shared
-              </div>
-            )}
-          </div>
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                : 'border-[#dbe4f0] bg-[#f8fafc] text-slate-600 hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5]'
+            }`}
+            title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
+          >
+            <Save className="h-3.5 w-3.5 shrink-0" />
+            <span>{isSelectedElementSaved ? 'Saved' : 'Save'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={toggleSelectedElementSharing}
+            className={`inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border px-3 py-2 text-[11px] font-semibold transition-colors ${
+              isSelectedElementShared
+                ? 'border-[#c7d2fe] bg-[#eef2ff] text-[#4338ca] hover:bg-[#e0e7ff]'
+                : 'border-[#dbe4f0] bg-[#f8fafc] text-slate-600 hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5]'
+            }`}
+            title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
+          >
+            <Upload className="h-3.5 w-3.5 shrink-0" />
+            <span>{isSelectedElementShared ? 'Shared' : 'Share'}</span>
+          </button>
+
+          {(isSelectedElementSaved || isSelectedElementShared) && (
+            <button
+              type="button"
+              onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-[#dbe4f0] bg-[#f8fafc] text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+              title="Delete saved component"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1232,9 +1200,9 @@ export function RightSidebar() {
 
   const propertySections = (
     <>
+      {saveShareSection}
       {positionSection}
       {revealTimingSection}
-      {saveShareSection}
 
       {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
         <>
