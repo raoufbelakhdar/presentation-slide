@@ -551,7 +551,7 @@ export function LeftSidebar() {
   const [componentTab, setComponentTab] = useState<
     "favorites" | "presets" | "icons" | "emojis" | "assets"
   >("favorites");
-  const [templateTab, setTemplateTab] = useState<"scene" | "branch">("scene");
+  const [templateTab, setTemplateTab] = useState<"scene" | "branch">("branch");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
     null,
   );
@@ -2507,96 +2507,98 @@ export function LeftSidebar() {
           <div className="p-4 space-y-6">
             <div>
               <div className="mb-4 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">
-                    Template Library
-                  </h3>
-                  <p className="mt-1 text-[10px] font-medium text-slate-400">
-                    Scene templates create scenes. Branches append sequences
-                    into the current scene.
-                  </p>
-                </div>
+                <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">
+                  Template Library
+                </h3>
                 <div className="rounded-full bg-indigo-50 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[#4f46e5]">
                   {templates.length}
                 </div>
               </div>
-              <div className="mb-4 grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => saveCurrentAsTemplate("scene")}
-                  className="w-full p-3 border border-[#e2e8f0] bg-[#f8fafc] text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2 text-[#4f46e5]"
+              <div className="space-y-3">
+                <div
+                  className={`rounded-md border p-1.5 ${
+                    templateTab === "branch"
+                      ? "border-[#c7d2fe] bg-indigo-50/50"
+                      : "border-[#e2e8f0] bg-[#f8fafc]"
+                  }`}
                 >
-                  <Save className="w-4 h-4" />
-                  <span>Save Template</span>
-                </button>
-                <button
-                  onClick={() => saveCurrentAsTemplate("branch")}
-                  className="w-full p-3 border border-[#c7d2fe] bg-indigo-50 text-xs font-medium rounded-sm cursor-pointer hover:border-[#4f46e5] transition-colors flex items-center justify-center gap-2 text-[#4f46e5]"
-                >
-                  <GitBranch className="w-4 h-4" />
-                  <span>Save Branch</span>
-                </button>
-              </div>
-
-              {templates.length === 0 ? (
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider text-center py-4">
-                  No templates yet
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2 rounded-sm bg-[#f8fafc] p-1">
-                    <button
-                      type="button"
-                      onClick={() => setTemplateTab("scene")}
-                      className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
-                        templateTab === "scene"
-                          ? "bg-white text-[#1e293b] shadow-sm"
-                          : "text-slate-400 hover:text-slate-600"
-                      }`}
-                    >
-                      <span className="flex items-center justify-center gap-1.5">
-                        <span>Scenes</span>
-                        <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] text-slate-500">
-                          {sceneTemplates.length}
-                        </span>
-                      </span>
-                    </button>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
                       type="button"
                       onClick={() => setTemplateTab("branch")}
-                      className={`rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                      className={`flex items-center justify-between rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
                         templateTab === "branch"
                           ? "bg-white text-[#4f46e5] shadow-sm"
-                          : "text-slate-400 hover:text-slate-600"
+                          : "text-slate-500 hover:text-slate-700"
                       }`}
+                      title="Branches"
                     >
-                      <span className="flex items-center justify-center gap-1.5">
-                        <span>Branches</span>
-                        <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-[#4f46e5]">
-                          {branchTemplates.length}
-                        </span>
+                      <span>Branches</span>
+                      <span className="rounded-full bg-indigo-50 px-1.5 py-0.5 text-[8px] text-[#4f46e5]">
+                        {branchTemplates.length}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTemplateTab("scene")}
+                      className={`flex items-center justify-between rounded-sm px-2 py-2 text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                        templateTab === "scene"
+                          ? "bg-white text-[#1e293b] shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                      title="Scenes"
+                    >
+                      <span>Scenes</span>
+                      <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[8px] text-slate-500">
+                        {sceneTemplates.length}
                       </span>
                     </button>
                   </div>
-
-                  {activeTemplates.length === 0 ? (
-                    <p
-                      className={`rounded-sm border border-dashed px-3 py-3 text-[10px] font-bold uppercase tracking-wider ${
-                        templateTab === "scene"
-                          ? "border-[#dbe4f0] bg-white text-slate-300"
-                          : "border-[#c7d2fe] bg-indigo-50/40 text-indigo-300"
-                      }`}
-                    >
-                      {templateTab === "scene"
-                        ? "No scene templates yet"
-                        : "No branch templates yet"}
-                    </p>
-                  ) : (
-                    <div className="space-y-2">
-                      {activeTemplates.map(renderTemplateCard)}
-                    </div>
-                  )}
                 </div>
-              )}
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      saveCurrentAsTemplate(
+                        templateTab === "branch" ? "branch" : "scene",
+                      )
+                    }
+                    className={`flex h-8 items-center justify-center gap-1.5 rounded-sm border px-3 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                      templateTab === "branch"
+                        ? "border-[#c7d2fe] bg-indigo-50 text-[#4f46e5] hover:bg-[#eef2ff]"
+                        : "border-[#dbe4f0] bg-white text-slate-600 hover:border-[#c7d2fe] hover:text-[#4f46e5]"
+                    }`}
+                    title={
+                      templateTab === "branch" ? "Save branch" : "Save scene"
+                    }
+                    aria-label={
+                      templateTab === "branch" ? "Save branch" : "Save scene"
+                    }
+                  >
+                    <Save className="h-4 w-4" />
+                    <span>Save</span>
+                  </button>
+                </div>
+
+                {activeTemplates.length === 0 ? (
+                  <p
+                    className={`rounded-sm border border-dashed px-3 py-3 text-[10px] font-bold uppercase tracking-wider ${
+                      templateTab === "scene"
+                        ? "border-[#dbe4f0] bg-white text-slate-300"
+                        : "border-[#c7d2fe] bg-indigo-50/40 text-indigo-300"
+                    }`}
+                  >
+                    {templateTab === "scene"
+                      ? "No scene templates yet"
+                      : "No branch templates yet"}
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    {activeTemplates.map(renderTemplateCard)}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
