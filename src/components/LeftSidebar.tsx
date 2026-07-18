@@ -123,6 +123,15 @@ const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
 type SavedComponentTypeFilter =
   (typeof SAVED_COMPONENT_TYPE_FILTER_OPTIONS)[number]["value"];
 
+function matchesSearchQuery(
+  query: string,
+  ...values: Array<string | null | undefined>
+) {
+  if (!query) return true;
+
+  return values.some((value) => value?.toLowerCase().includes(query));
+}
+
 function cloneFavoriteElement(element: SceneElement): SceneElement {
   return {
     ...element,
@@ -163,6 +172,39 @@ function getSavedFavoriteTypeFilterValue(
   if (element.type === "color") return "all";
   if (element.shapeType === "emoji") return "emoji";
   return "icon";
+}
+
+function getSavedComponentSearchText(favorite: SavedComponent) {
+  const searchParts = [favorite.name, getSavedFavoriteTypeLabel(favorite.element)];
+  const { element } = favorite;
+
+  if (element.type === "text") {
+    searchParts.push(element.text);
+  }
+
+  if (element.type === "image") {
+    searchParts.push(favorite.asset?.name);
+  }
+
+  if (element.type === "shape") {
+    if (element.shapeType === "icon") {
+      searchParts.push(
+        element.iconName,
+        formatIconName(element.iconName || ""),
+      );
+    }
+
+    if (element.shapeType === "emoji") {
+      const emojiEntry = getEmojiById(element.emojiHexcode || "");
+      searchParts.push(
+        element.emojiChar,
+        element.emojiHexcode,
+        emojiEntry ? getEmojiLabel(emojiEntry) : undefined,
+      );
+    }
+  }
+
+  return searchParts.filter(Boolean).join(" ").toLowerCase();
 }
 
 function SavedElementFavoritePreview({
@@ -514,6 +556,7 @@ export function LeftSidebar() {
     null,
   );
   const [editingTemplateName, setEditingTemplateName] = useState("");
+  const [libraryQuery, setLibraryQuery] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [emojiQuery, setEmojiQuery] = useState("");
   const [assetLibraryTab, setAssetLibraryTab] = useState<"local" | "pexels">(
@@ -551,9 +594,11 @@ export function LeftSidebar() {
   const [savedComponentTypeFilter, setSavedComponentTypeFilter] =
     useState<SavedComponentTypeFilter>("all");
   const defaultRevealStep = selectedSequenceStep ?? 1;
+  const deferredLibraryQuery = useDeferredValue(libraryQuery);
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
   const deferredPexelsQuery = useDeferredValue(pexelsQuery);
+  const normalizedLibraryQuery = deferredLibraryQuery.trim().toLowerCase();
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
     : FEATURED_ICON_NAMES;
@@ -918,9 +963,24 @@ export function LeftSidebar() {
     (favorite): favorite is Extract<FavoriteComponent, { type: "preset" }> =>
       favorite.type === "preset",
   );
+  const filteredFavoritePresets = favoritePresets.filter((favorite) => {
+    const preset = presetDefinitionsById.get(favorite.id);
+    return matchesSearchQuery(
+      normalizedLibraryQuery,
+      preset?.label,
+      favorite.id,
+    );
+  });
   const favoriteIcons = favoriteComponents.filter(
     (favorite): favorite is Extract<FavoriteComponent, { type: "icon" }> =>
       favorite.type === "icon",
+  );
+  const filteredFavoriteIcons = favoriteIcons.filter((favorite) =>
+    matchesSearchQuery(
+      normalizedLibraryQuery,
+      favorite.id,
+      formatIconName(favorite.id),
+    ),
   );
   const favoriteEmojis = favoriteComponents
     .filter(
@@ -931,6 +991,14 @@ export function LeftSidebar() {
     .filter((entry): entry is NonNullable<ReturnType<typeof getEmojiById>> =>
       Boolean(entry),
     );
+  const filteredFavoriteEmojis = favoriteEmojis.filter((emojiEntry) =>
+    matchesSearchQuery(
+      normalizedLibraryQuery,
+      emojiEntry.id,
+      emojiEntry.emoji,
+      getEmojiLabel(emojiEntry),
+    ),
+  );
   const favoriteAssets = favoriteComponents
     .filter(
       (favorite): favorite is Extract<FavoriteComponent, { type: "asset" }> =>
@@ -940,6 +1008,14 @@ export function LeftSidebar() {
     .filter((asset): asset is (typeof availableAssets)[number] =>
       Boolean(asset),
     );
+  const filteredFavoriteAssets = favoriteAssets.filter((asset) =>
+    matchesSearchQuery(
+      normalizedLibraryQuery,
+      asset.name,
+      asset.id,
+      getAssetKind(asset),
+    ),
+  );
   const favoriteSavedElements = favoriteComponents.filter(
     (
       favorite,
@@ -952,9 +1028,15 @@ export function LeftSidebar() {
   const localSavedComponents = favoriteSavedElements.filter(
     (component) => !sharedSavedComponentIds.has(component.id),
   );
+  const searchedLocalSavedComponents = localSavedComponents.filter((component) =>
+    matchesSearchQuery(normalizedLibraryQuery, getSavedComponentSearchText(component)),
+  );
+  const searchedSharedSavedComponents = sharedSavedComponents.filter((component) =>
+    matchesSearchQuery(normalizedLibraryQuery, getSavedComponentSearchText(component)),
+  );
   const allSavedComponents = [
-    ...localSavedComponents,
-    ...sharedSavedComponents,
+    ...searchedLocalSavedComponents,
+    ...searchedSharedSavedComponents,
   ];
   const savedComponentTypeCounts = allSavedComponents.reduce(
     (counts, component) => {
@@ -969,10 +1051,10 @@ export function LeftSidebar() {
       ? true
       : getSavedFavoriteTypeFilterValue(component.element) ===
         savedComponentTypeFilter;
-  const filteredLocalSavedComponents = localSavedComponents.filter(
+  const filteredLocalSavedComponents = searchedLocalSavedComponents.filter(
     matchesSavedComponentTypeFilter,
   );
-  const filteredSharedSavedComponents = sharedSavedComponents.filter(
+  const filteredSharedSavedComponents = searchedSharedSavedComponents.filter(
     matchesSavedComponentTypeFilter,
   );
   const filteredSavedComponentCount =
@@ -982,6 +1064,32 @@ export function LeftSidebar() {
   const visibleSharedAssets = showSharedAssets
     ? sharedAssets.filter((asset) => !localAssetIds.has(asset.id))
     : [];
+  const filteredVisibleSharedAssets = visibleSharedAssets.filter((asset) =>
+    matchesSearchQuery(
+      normalizedLibraryQuery,
+      asset.name,
+      asset.id,
+      getAssetKind(asset),
+    ),
+  );
+  const filteredLocalAssets = localAssets.filter((asset) =>
+    matchesSearchQuery(
+      normalizedLibraryQuery,
+      asset.name,
+      asset.id,
+      getAssetKind(asset),
+    ),
+  );
+  const filteredPresetDefinitions = presetDefinitions.filter((preset) =>
+    matchesSearchQuery(normalizedLibraryQuery, preset.label, preset.id),
+  );
+  const hasFavoriteSearchResults =
+    filteredSavedComponentCount > 0 ||
+    filteredFavoritePresets.length > 0 ||
+    filteredFavoriteIcons.length > 0 ||
+    filteredFavoriteEmojis.length > 0 ||
+    filteredFavoriteAssets.length > 0 ||
+    filteredVisibleSharedAssets.length > 0;
 
   const getAssetUsageCount = (assetId: string) => {
     return project.scenes.reduce((count, scene) => {
@@ -1456,11 +1564,36 @@ export function LeftSidebar() {
                 </button>
               </div>
 
+              {(componentTab === "favorites" ||
+                componentTab === "presets" ||
+                (componentTab === "assets" && assetLibraryTab === "local")) && (
+                <label className="mb-4 flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
+                  <Search className="h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={libraryQuery}
+                    onChange={(event) => setLibraryQuery(event.target.value)}
+                    placeholder={
+                      componentTab === "favorites"
+                        ? "Search your library..."
+                        : componentTab === "presets"
+                          ? "Search presets..."
+                          : "Search assets..."
+                    }
+                    className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+                  />
+                </label>
+              )}
+
               {componentTab === "favorites" ? (
                 <div className="space-y-6">
                   {!hasFavoriteCollections ? (
                     <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                       No favorites yet
+                    </div>
+                  ) : !hasFavoriteSearchResults ? (
+                    <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      No library items match that search
                     </div>
                   ) : (
                     <div className="space-y-5">
@@ -1555,13 +1688,13 @@ export function LeftSidebar() {
                           </div>
                         )}
 
-                      {favoritePresets.length > 0 && (
+                      {filteredFavoritePresets.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Presets
                           </div>
                           <div className="grid grid-cols-2 gap-2">
-                            {favoritePresets.map((favorite) => {
+                            {filteredFavoritePresets.map((favorite) => {
                               const preset = presetDefinitionsById.get(
                                 favorite.id,
                               );
@@ -1594,13 +1727,13 @@ export function LeftSidebar() {
                         </div>
                       )}
 
-                      {favoriteIcons.length > 0 && (
+                      {filteredFavoriteIcons.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Icons
                           </div>
                           <div className="grid grid-cols-3 gap-2">
-                            {favoriteIcons.map((favorite) => (
+                            {filteredFavoriteIcons.map((favorite) => (
                               <div key={favorite.id} className="relative">
                                 <FavoriteToggleButton
                                   active
@@ -1627,13 +1760,13 @@ export function LeftSidebar() {
                         </div>
                       )}
 
-                      {favoriteEmojis.length > 0 && (
+                      {filteredFavoriteEmojis.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Emojis
                           </div>
                           <div className="grid grid-cols-3 gap-2">
-                            {favoriteEmojis.map((emojiEntry) => (
+                            {filteredFavoriteEmojis.map((emojiEntry) => (
                               <div key={emojiEntry.id} className="relative">
                                 <FavoriteToggleButton
                                   active
@@ -1664,13 +1797,13 @@ export function LeftSidebar() {
                         </div>
                       )}
 
-                      {favoriteAssets.length > 0 && (
+                      {filteredFavoriteAssets.length > 0 && (
                         <div>
                           <div className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                             Assets
                           </div>
                           <div className="grid grid-cols-2 gap-3">
-                            {favoriteAssets.map((asset) => {
+                            {filteredFavoriteAssets.map((asset) => {
                               const usageCount = getAssetUsageCount(asset.id);
 
                               return (
@@ -1743,7 +1876,7 @@ export function LeftSidebar() {
                       <div className="flex items-center gap-3">
                         {showSharedAssets && (
                           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                            {visibleSharedAssets.length}
+                            {filteredVisibleSharedAssets.length}
                           </div>
                         )}
                         <div className="inline-flex rounded-sm border border-[#dbe4f0] bg-white p-1">
@@ -1774,9 +1907,9 @@ export function LeftSidebar() {
                     </div>
 
                     {showSharedAssets ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-3">
-                          {visibleSharedAssets.map((asset) => {
+                        <>
+                          <div className="grid grid-cols-2 gap-3">
+                          {filteredVisibleSharedAssets.map((asset) => {
                             const usageCount = getAssetUsageCount(asset.id);
 
                             return (
@@ -1848,9 +1981,11 @@ export function LeftSidebar() {
                           })}
                         </div>
 
-                        {visibleSharedAssets.length === 0 && (
+                        {filteredVisibleSharedAssets.length === 0 && (
                           <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                            No separate shared assets yet. Promote a local asset when you want to reuse it across projects.
+                            {normalizedLibraryQuery
+                              ? "No shared assets match that search"
+                              : "No separate shared assets yet. Promote a local asset when you want to reuse it across projects."}
                           </div>
                         )}
                       </>
@@ -1868,7 +2003,7 @@ export function LeftSidebar() {
                       Component Presets
                     </h3>
                     <div className="grid grid-cols-2 gap-2">
-                      {presetDefinitions.map((preset) => (
+                      {filteredPresetDefinitions.map((preset) => (
                         <div key={preset.id} className="relative">
                           <FavoriteToggleButton
                             active={isFavorite({
@@ -1891,6 +2026,11 @@ export function LeftSidebar() {
                         </div>
                       ))}
                     </div>
+                    {filteredPresetDefinitions.length === 0 && (
+                      <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        No presets match that search
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : componentTab === "icons" ? (
@@ -2117,7 +2257,7 @@ export function LeftSidebar() {
                               Local Assets
                             </div>
                             <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-                              {localAssets.length}
+                              {filteredLocalAssets.length}
                             </div>
                           </div>
 
@@ -2139,7 +2279,7 @@ export function LeftSidebar() {
                               />
                             </label>
 
-                            {localAssets.map((asset) => {
+                            {filteredLocalAssets.map((asset) => {
                               const usageCount = getAssetUsageCount(asset.id);
                               const isSharedAsset = sharedAssetIds.has(asset.id);
 
@@ -2237,9 +2377,11 @@ export function LeftSidebar() {
                             })}
                           </div>
 
-                          {localAssets.length === 0 && (
+                          {filteredLocalAssets.length === 0 && (
                             <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                              Upload photos, transparent PNGs, or SVG graphics to start this project&apos;s asset library
+                              {normalizedLibraryQuery
+                                ? "No local assets match that search"
+                                : "Upload photos, transparent PNGs, or SVG graphics to start this project&apos;s asset library"}
                             </div>
                           )}
                         </div>
