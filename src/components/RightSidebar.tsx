@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
@@ -12,6 +12,63 @@ import { EmojiGlyph } from './EmojiGlyph';
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   'bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]';
 const RIGHT_SIDEBAR_CLASS = 'w-80 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0';
+type RightSidebarTab = 'properties' | 'library' | 'layers';
+
+function SidebarTabs({
+  activeTab,
+  onChange,
+}: {
+  activeTab: RightSidebarTab;
+  onChange: (tab: RightSidebarTab) => void;
+}) {
+  const tabs: Array<{ id: RightSidebarTab; label: string }> = [
+    { id: 'properties', label: 'Properties' },
+    { id: 'library', label: 'Library' },
+    { id: 'layers', label: 'Layers' },
+  ];
+
+  return (
+    <div className="border-b border-[#f1f5f9] px-4 py-2">
+      <div className="grid grid-cols-3 gap-1 rounded-md bg-[#f8fafc] p-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            className={`rounded-sm px-2 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+              activeTab === tab.id
+                ? 'bg-white text-[#4f46e5] shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SidebarTabEmptyState({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="flex min-h-[180px] items-center justify-center rounded-md border border-dashed border-[#dbe4f0] bg-[#fcfdff] px-4 text-center">
+      <div>
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#64748b]">
+          {title}
+        </div>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 function getElementName(element: SceneElement, assetsById: Map<string, Asset>) {
   if (element.type === 'text') {
@@ -359,7 +416,7 @@ function SavedElementLibraryPreview({
   );
 }
 
-function SequenceLayersPanel({
+function LayersPanel({
   step,
   elements,
   assets,
@@ -367,20 +424,23 @@ function SequenceLayersPanel({
   onSelectElement,
   onToggleVisibility,
 }: {
-  step: number;
+  step?: number | null;
   elements: SceneElement[];
   assets: Asset[];
   selectedElementIds: string[];
   onSelectElement: (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => void;
-  onToggleVisibility: (element: SceneElement, hidden: boolean) => void;
+  onToggleVisibility?: (element: SceneElement, hidden: boolean) => void;
 }) {
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+  const sequenceStep = step ?? null;
   const managedElements = elements
-    .filter((element) => element.revealStep <= step)
+    .filter((element) => (sequenceStep === null ? true : element.revealStep <= sequenceStep))
     .sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
 
   const renderElementRow = (element: SceneElement) => {
-    const hidden = getEffectiveElementState(element, step).hidden;
+    const hidden = sequenceStep === null
+      ? false
+      : Boolean(getEffectiveElementState(element, sequenceStep).hidden);
 
     return (
     <div
@@ -402,41 +462,55 @@ function SequenceLayersPanel({
         <div className="text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
           {getElementTypeLabel(element)}
         </div>
-        <div className={`mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
-          hidden ? 'text-rose-400' : 'text-emerald-500'
-        }`}>
-          {hidden ? 'Hidden' : 'Visible'}
-        </div>
+        {sequenceStep === null ? (
+          <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+            Layer {(element.zIndex ?? 0).toString().padStart(2, '0')}
+          </div>
+        ) : (
+          <div className={`mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] ${
+            hidden ? 'text-rose-400' : 'text-emerald-500'
+          }`}>
+            {hidden ? 'Hidden' : 'Visible'}
+          </div>
+        )}
       </button>
 
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          onToggleVisibility(element, !hidden);
-        }}
-        className={`rounded-sm border p-1 transition-colors ${
-          hidden
-            ? 'border-rose-200 text-rose-500 hover:bg-rose-50'
-            : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
-        }`}
-        title={hidden ? 'Reveal in this sequence' : 'Hide in this sequence'}
-      >
-        {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-      </button>
+      {sequenceStep !== null && onToggleVisibility && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleVisibility(element, !hidden);
+          }}
+          className={`rounded-sm border p-1 transition-colors ${
+            hidden
+              ? 'border-rose-200 text-rose-500 hover:bg-rose-50'
+              : 'border-emerald-200 text-emerald-600 hover:bg-emerald-50'
+          }`}
+          title={hidden ? 'Reveal in this sequence' : 'Hide in this sequence'}
+        >
+          {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+        </button>
+      )}
     </div>
     );
   };
 
   return (
-    <div className="border-b border-[#f1f5f9] bg-[#fcfdff] p-4">
+    <div className="rounded-md border border-[#e2e8f0] bg-[#fcfdff] p-4">
       <div className="mb-3 flex items-center justify-between">
         <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#64748b]">
-          Sequence Layers
+          {sequenceStep === null ? 'Scene Layers' : 'Sequence Layers'}
         </div>
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-          S{step}
-        </div>
+        {sequenceStep === null ? (
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+            {managedElements.length}
+          </div>
+        ) : (
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+            S{sequenceStep}
+          </div>
+        )}
       </div>
 
       <div className="space-y-2">
@@ -459,7 +533,17 @@ export function RightSidebar() {
   
   const selectedElement = activeScene?.elements.find(el => el.id === selectedElementId);
   const selectedSequenceStep = state.selectedSequenceStep;
+  const [activeTab, setActiveTab] = useState<RightSidebarTab>(
+    !selectedElement && selectedSequenceStep !== null ? 'layers' : 'properties',
+  );
   const isMultiSelecting = selectedElementIds.length > 1;
+
+  useEffect(() => {
+    if (!selectedElement && selectedSequenceStep !== null) {
+      setActiveTab('layers');
+    }
+  }, [selectedElement, selectedSequenceStep]);
+
   const handleSelectElement = (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
       dispatch({ type: 'TOGGLE_ELEMENT_SELECTION', payload: elementId });
@@ -510,103 +594,138 @@ export function RightSidebar() {
               </button>
             )}
           </div>
-          
-          <div className="p-4 space-y-5">
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Sequence Step</label>
-              <input 
-                type="text" 
-                value={`Sequence ${selectedSequenceStep.toString().padStart(2, '0')}`}
-                disabled
-                className="w-full bg-[#f1f5f9] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold text-slate-500"
-              />
-            </div>
-            
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Animation Type</label>
-              <select 
-                value={config.animationType}
-                onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { animationType: e.target.value as any } } })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-              >
-                <option value="none">None</option>
-                <option value="fade">Fade</option>
-                <option value="slide-up">Slide Up</option>
-                <option value="slide-left">Slide Left</option>
-                <option value="scale">Scale</option>
-              </select>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Duration (s)</label>
-                <input 
-                  type="number" 
-                  step="0.1"
-                  min="0"
-                  value={config.duration}
-                  onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { duration: parseFloat(e.target.value) || 0 } } })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-              
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Delay (s)</label>
-                <input 
-                  type="number" 
-                  step="0.1"
-                  min="0"
-                  value={config.delay}
-                  onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { delay: parseFloat(e.target.value) || 0 } } })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            </div>
-          </div>
+          <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
 
-          <SequenceLayersPanel
-            step={selectedSequenceStep}
-            elements={activeScene?.elements || []}
-            assets={availableAssets}
-            selectedElementIds={selectedElementIds}
-            onSelectElement={handleSelectElement}
-            onToggleVisibility={handleSequenceVisibilityToggle}
-          />
+          <div className="p-4 space-y-5">
+            {activeTab === 'properties' && (
+              <>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Sequence Step</label>
+                  <input 
+                    type="text" 
+                    value={`Sequence ${selectedSequenceStep.toString().padStart(2, '0')}`}
+                    disabled
+                    className="w-full bg-[#f1f5f9] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold text-slate-500"
+                  />
+                </div>
+                
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Animation Type</label>
+                  <select 
+                    value={config.animationType}
+                    onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { animationType: e.target.value as any } } })}
+                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+                  >
+                    <option value="none">None</option>
+                    <option value="fade">Fade</option>
+                    <option value="slide-up">Slide Up</option>
+                    <option value="slide-left">Slide Left</option>
+                    <option value="scale">Scale</option>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Duration (s)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      min="0"
+                      value={config.duration}
+                      onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { duration: parseFloat(e.target.value) || 0 } } })}
+                      className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Delay (s)</label>
+                    <input 
+                      type="number" 
+                      step="0.1"
+                      min="0"
+                      value={config.delay}
+                      onChange={(e) => dispatch({ type: 'UPDATE_SEQUENCE_CONFIG', payload: { sceneIndex: activeSceneIndex, step: selectedSequenceStep, config: { delay: parseFloat(e.target.value) || 0 } } })}
+                      className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {activeTab === 'library' && (
+              <SidebarTabEmptyState
+                title="Library"
+                description="Select a component to browse matching saved components and asset choices."
+              />
+            )}
+
+            {activeTab === 'layers' && (
+              <LayersPanel
+                step={selectedSequenceStep}
+                elements={activeScene?.elements || []}
+                assets={availableAssets}
+                selectedElementIds={selectedElementIds}
+                onSelectElement={handleSelectElement}
+                onToggleVisibility={handleSequenceVisibilityToggle}
+              />
+            )}
+          </div>
         </div>
       );
     }
 
     return (
-      <div className={`${RIGHT_SIDEBAR_CLASS} p-4 space-y-6`}>
-        <div className="flex flex-col items-center justify-center text-center mt-6 mb-4">
-          <Layers className="w-10 h-10 text-slate-300 mb-3" />
-          <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Scene Properties</p>
-          <p className="text-[10px] font-medium text-slate-400 mt-2">Select an element to edit</p>
-        </div>
-        
-        {activeScene && (
-          <div className="space-y-4">
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Scene Name</label>
-              <input 
-                type="text" 
-                value={activeScene.name}
-                onChange={(e) => dispatch({ 
-                  type: 'UPDATE_SCENE', 
-                  payload: { index: activeSceneIndex, scene: { ...activeScene, name: e.target.value } } 
-                })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
-            
-            <div className="pt-4 border-t border-[#f1f5f9] space-y-2">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
-                <span>Elements</span>
-                <span className="text-[#4f46e5] font-mono">{activeScene.elements.length} Active</span>
-              </p>
-            </div>
+      <div className={`${RIGHT_SIDEBAR_CLASS} overflow-y-auto`}>
+        <div className="p-4 border-b border-[#f1f5f9]">
+          <div className="flex flex-col items-center justify-center text-center mt-2">
+            <Layers className="w-10 h-10 text-slate-300 mb-3" />
+            <p className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">Scene Properties</p>
+            <p className="text-[10px] font-medium text-slate-400 mt-2">Select an element to edit</p>
           </div>
-        )}
+        </div>
+        <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
+
+        <div className="p-4 space-y-5">
+          {activeTab === 'properties' && activeScene && (
+            <>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Scene Name</label>
+                <input 
+                  type="text" 
+                  value={activeScene.name}
+                  onChange={(e) => dispatch({ 
+                    type: 'UPDATE_SCENE', 
+                    payload: { index: activeSceneIndex, scene: { ...activeScene, name: e.target.value } } 
+                  })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+              
+              <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex justify-between">
+                  <span>Elements</span>
+                  <span className="text-[#4f46e5] font-mono">{activeScene.elements.length} Active</span>
+                </p>
+              </div>
+            </>
+          )}
+
+          {activeTab === 'library' && (
+            <SidebarTabEmptyState
+              title="Library"
+              description="Select a component to access its saved library and swap in related assets."
+            />
+          )}
+
+          {activeTab === 'layers' && activeScene && (
+            <LayersPanel
+              elements={activeScene.elements}
+              assets={availableAssets}
+              selectedElementIds={selectedElementIds}
+              onSelectElement={handleSelectElement}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -624,39 +743,51 @@ export function RightSidebar() {
             <Trash2 className="w-4 h-4" />
           </button>
         </div>
+        <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
 
         <div className="p-4 space-y-4">
-          <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Selection
-            </div>
-            <div className="mt-2 text-sm font-semibold text-[#0f172a]">
-              {selectedElementIds.length} components selected
-            </div>
-            <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
-              Ctrl, Cmd, or Shift click components on the canvas or in sequence layers to add or remove them from this selection.
-            </p>
-          </div>
+          {activeTab === 'properties' && (
+            <>
+              <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Selection
+                </div>
+                <div className="mt-2 text-sm font-semibold text-[#0f172a]">
+                  {selectedElementIds.length} components selected
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+                  Ctrl, Cmd, or Shift click components on the canvas or in sequence layers to add or remove them from this selection.
+                </p>
+              </div>
 
-          <button
-            onClick={() => dispatch({ type: 'DUPLICATE_ELEMENTS', payload: selectedElementIds })}
-            className="w-full py-1.5 text-[10px] font-bold border border-[#e2e8f0] bg-slate-50 uppercase text-slate-600 hover:bg-slate-100 hover:border-[#cbd5e1] transition-colors rounded-sm mt-2 flex items-center justify-center gap-2"
-          >
-            <Copy className="w-3 h-3" />
-            Duplicate Selected
-          </button>
+              <button
+                onClick={() => dispatch({ type: 'DUPLICATE_ELEMENTS', payload: selectedElementIds })}
+                className="w-full py-1.5 text-[10px] font-bold border border-[#e2e8f0] bg-slate-50 uppercase text-slate-600 hover:bg-slate-100 hover:border-[#cbd5e1] transition-colors rounded-sm mt-2 flex items-center justify-center gap-2"
+              >
+                <Copy className="w-3 h-3" />
+                Duplicate Selected
+              </button>
+            </>
+          )}
+
+          {activeTab === 'library' && (
+            <SidebarTabEmptyState
+              title="Library"
+              description="Library actions are available when a single component is selected."
+            />
+          )}
+
+          {activeTab === 'layers' && (
+            <LayersPanel
+              step={selectedSequenceStep}
+              elements={activeScene?.elements || []}
+              assets={availableAssets}
+              selectedElementIds={selectedElementIds}
+              onSelectElement={handleSelectElement}
+              onToggleVisibility={selectedSequenceStep !== null ? handleSequenceVisibilityToggle : undefined}
+            />
+          )}
         </div>
-
-        {selectedSequenceStep !== null && (
-          <SequenceLayersPanel
-            step={selectedSequenceStep}
-            elements={activeScene?.elements || []}
-            assets={availableAssets}
-            selectedElementIds={selectedElementIds}
-            onSelectElement={handleSelectElement}
-            onToggleVisibility={handleSequenceVisibilityToggle}
-          />
-        )}
       </div>
     );
   }
@@ -843,6 +974,667 @@ export function RightSidebar() {
     });
   };
 
+  const propertySections = (
+    <>
+      {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
+        <>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Render Style</label>
+            <select
+              value={imageFrameStyle || 'polaroid'}
+              onChange={(e) => handleUpdate({ frameStyle: e.target.value as import('../types').ImageFrameStyle })}
+              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+            >
+              <option value="polaroid">Polaroid Frame</option>
+              <option value="plain">Frameless Graphic</option>
+            </select>
+            {imageAsset && (
+              <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                Asset Type: {getAssetKind(imageAsset)}
+              </div>
+            )}
+          </div>
+
+          {imageFrameStyle === 'polaroid' ? (
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
+              <input
+                type="text"
+                value={imageElement.captionText || ''}
+                placeholder="Optional label under the image"
+                onChange={(e) => handleUpdate({ captionText: e.target.value })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+          ) : (
+            <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              Frameless graphics render directly on the canvas without the white image card.
+            </div>
+          )}
+        </>
+      )}
+
+      {selectedElement.type === 'color' && colorElement && !selectedElementHiddenInSequence && (
+        <>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
+            <input
+              type="text"
+              value={colorElement.captionText || ''}
+              placeholder="Optional label under the color card"
+              onChange={(e) => handleUpdate({ captionText: e.target.value })}
+              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Fill Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={colorElement.fillColor}
+                onChange={(e) => handleUpdate({ fillColor: e.target.value })}
+                className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+              />
+              <input
+                type="text"
+                value={colorElement.fillColor}
+                onChange={(e) => handleUpdate({ fillColor: e.target.value })}
+                className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {selectedElement.type === 'text' && textElement && (
+        <>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text Style</label>
+            <select
+              value={textVariant || 'block'}
+              onChange={(e) => handleUpdate({ variant: e.target.value as TextElement['variant'] })}
+              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+            >
+              <option value="free">Free Text</option>
+              <option value="block">Text Block</option>
+            </select>
+          </div>
+
+          {textVariant === 'free' ? (
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text</label>
+              <textarea 
+                value={textElement.text} 
+                onChange={(e) => handleUpdate({ text: e.target.value })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[120px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+          ) : (
+            <>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Title</label>
+                <input
+                  type="text"
+                  value={textParts?.title || ''}
+                  onChange={(e) => handleUpdate({ text: combineTextContent(e.target.value, textParts?.subtitle || '') })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle</label>
+                <textarea 
+                  value={textParts?.subtitle || ''} 
+                  onChange={(e) => handleUpdate({ text: combineTextContent(textParts?.title || '', e.target.value) })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[84px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+            </>
+          )}
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{textVariant === 'free' ? 'Text Size' : 'Title Size'}</label>
+              <input 
+                type="number" 
+                min={8} 
+                value={textElement.fontSize} 
+                onChange={(e) => handleUpdate({ fontSize: Math.max(8, parseInt(e.target.value) || 16) })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+            
+            <div>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Weight</label>
+              <select 
+                value={textElement.fontWeight} 
+                onChange={(e) => handleUpdate({ fontWeight: e.target.value })}
+                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+              >
+                <option value="normal">Normal</option>
+                <option value="bold">Bold</option>
+                <option value="lighter">Lighter</option>
+                <option value="bolder">Bolder</option>
+                </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Alignment</label>
+            <select
+              value={textAlign || 'center'}
+              onChange={(e) => handleUpdate({ align: e.target.value as TextElement['align'] })}
+              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+            >
+              <option value="left">Left</option>
+              <option value="center">Center</option>
+              <option value="right">Right</option>
+            </select>
+          </div>
+
+          {textVariant === 'block' && (
+            <>
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle Size</label>
+                <input 
+                  type="number" 
+                  min={8}
+                  value={textElement.subtitleFontSize || Math.max(16, Math.round(textElement.fontSize * 0.6))}
+                  onChange={(e) => handleUpdate({ subtitleFontSize: Math.max(8, parseInt(e.target.value) || 16) })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Padding</label>
+                <input 
+                  type="number" 
+                  min={8}
+                  value={textElement.padding || 20}
+                  onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 20) })}
+                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+                />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Color</label>
+            <div className="flex items-center gap-2">
+              <input 
+                type="color" 
+                value={textElement.color} 
+                onChange={(e) => handleUpdate({ color: e.target.value })}
+                className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+              />
+              <input 
+                type="text" 
+                value={textElement.color}
+                onChange={(e) => handleUpdate({ color: e.target.value })}
+                className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+          </div>
+        </>
+      )}
+
+      {selectedElement.type === 'shape' && shapeElement?.shapeType === 'emoji' && !selectedElementHiddenInSequence && (
+        <div>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Emoji</label>
+          <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+            <div className="text-xs font-semibold text-[#0f172a]">
+              {selectedEmoji ? getEmojiLabel(selectedEmoji) : shapeElement.emojiChar || 'Emoji'}
+            </div>
+            <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+              {selectedEmoji?.id || shapeElement.emojiHexcode || 'emoji'}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedElement.type === 'shape' && shapeElement?.shapeType === 'icon' && !selectedElementHiddenInSequence && (
+        <>
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Icon</label>
+            <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
+              <div className="text-xs font-semibold text-[#0f172a]">{formatIconName(shapeElement.iconName || 'Icon')}</div>
+              <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
+                {shapeElement.iconName || 'icon'}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Color</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
+                onChange={(e) => handleUpdate({ iconColor: e.target.value })}
+                className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+              />
+              <input
+                type="text"
+                value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
+                onChange={(e) => handleUpdate({ iconColor: e.target.value })}
+                className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Width</label>
+            <input
+              type="number"
+              min={0.5}
+              step={0.1}
+              value={shapeElement.iconStrokeWidth || 2.25}
+              onChange={(e) => handleUpdate({ iconStrokeWidth: Math.max(0.5, parseFloat(e.target.value) || 0.5) })}
+              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
+            />
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  const librarySections = (
+    <>
+      <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+        <div className="flex items-start gap-3">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
+            <SavedElementLibraryPreview
+              element={selectedElement}
+              asset={imageAsset}
+              name={selectedElementFavoriteName}
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
+                  {renderSavedElementLibraryGroupIcon(
+                    getSavedElementLibraryGroupId(selectedElement, imageAsset),
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-semibold text-[#0f172a]">
+                    {selectedElementFavoriteName}
+                  </div>
+                  <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    {getElementTypeLabel(selectedElement)}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={saveSelectedElementToFavorites}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                  title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
+                >
+                  <Save className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleSelectedElementSharing}
+                  className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                    isSelectedElementShared
+                      ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                      : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
+                  }`}
+                  title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
+                >
+                  <Layers className="h-4 w-4" />
+                </button>
+                {(isSelectedElementSaved || isSelectedElementShared) && (
+                  <button
+                    type="button"
+                    onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
+                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+                    title="Delete saved component"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-center gap-2">
+              <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+                isSelectedElementSaved
+                  ? 'bg-emerald-50 text-emerald-600'
+                  : 'bg-white text-slate-500'
+              }`}>
+                {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
+              </div>
+              <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+                {matchingSavedComponents.length} In Library
+              </div>
+              {isSelectedElementShared && (
+                <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                  Shared
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Component Library
+          </div>
+          <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            {matchingSavedComponents.length}
+          </div>
+        </div>
+
+        {visibleFavoriteSavedGroups.length === 0 ? (
+          <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-[#dbe4f0] bg-white/70 px-4">
+            <div className="flex flex-col items-center gap-2 text-center text-slate-400">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                {renderSavedElementLibraryGroupIcon(
+                  getSavedElementLibraryGroupId(selectedElement, imageAsset),
+                )}
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em]">
+                No saved {selectedElement.type}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {visibleFavoriteSavedGroups.map((group) => (
+              <div key={group.groupId}>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm">
+                      {renderSavedElementLibraryGroupIcon(group.groupId)}
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
+                      {group.label}
+                    </div>
+                  </div>
+                  <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    {group.favorites.length}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {group.favorites.map((favorite) => {
+                    const isCurrentFavorite = favorite.id === selectedElementFavoriteId;
+                    const isSharedSavedComponent = sharedSavedComponentIds.has(favorite.id);
+                    const isSavedFavorite = favoriteSavedElements.some((entry) => entry.id === favorite.id);
+
+                    return (
+                      <div
+                        key={favorite.id}
+                        className={`group rounded-xl border p-1.5 text-left transition-all ${
+                          isCurrentFavorite
+                            ? 'border-[#a5b4fc] bg-indigo-50 shadow-[0_6px_18px_rgba(79,70,229,0.08)]'
+                            : 'border-[#dbe4f0] bg-white hover:border-[#4f46e5] hover:shadow-[0_6px_18px_rgba(15,23,42,0.06)]'
+                        }`}
+                      >
+                        <div
+                          className={`relative overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+                        >
+                          <div className="pointer-events-none absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10 group-focus-within:bg-slate-950/10" />
+                          <div className="absolute right-1.5 top-1.5 z-10 flex translate-y-1 gap-1 opacity-0 transition-all duration-150 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleSavedComponentFavorite(favorite);
+                              }}
+                              className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
+                                isSavedFavorite
+                                  ? 'border-amber-300 bg-amber-50 text-amber-500'
+                                  : 'border-white/70 bg-white/90 text-slate-400 hover:text-amber-500'
+                              }`}
+                              title={`${isSavedFavorite ? 'Remove from' : 'Add to'} favorites`}
+                            >
+                              <Star className={`h-3.5 w-3.5 ${isSavedFavorite ? 'fill-current' : ''}`} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                toggleSharedSavedComponent(favorite);
+                              }}
+                              className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
+                                isSharedSavedComponent
+                                  ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                                  : 'border-white/70 bg-white/90 text-slate-400 hover:text-[#4f46e5]'
+                              }`}
+                              title={isSharedSavedComponent ? 'Remove from shared library' : 'Add to shared library'}
+                            >
+                              <Layers className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                deleteSavedComponent(favorite);
+                              }}
+                              className="rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm backdrop-blur transition-colors hover:text-rose-500"
+                              title="Delete saved component"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                          <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
+                            {renderSavedElementLibraryGroupIcon(group.groupId)}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => replaceSelectedElementWithFavorite(favorite)}
+                            title={favorite.name}
+                            className="block aspect-[1.08/1] w-full"
+                          >
+                            <SavedElementLibraryPreview
+                              element={favorite.element}
+                              asset={favorite.asset}
+                              name={favorite.name}
+                            />
+                          </button>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-2">
+                          <div className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#0f172a]">
+                            {favorite.name}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            {isCurrentFavorite && (
+                              <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                                Current
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Asset Source</label>
+            {imageAsset && (
+              <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {getAssetKind(imageAsset)}
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {availableAssets.map((asset) => (
+              <button
+                key={asset.id}
+                type="button"
+                onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
+                className={`aspect-square overflow-hidden rounded-lg border transition-all ${
+                  imageElement.assetId === asset.id
+                    ? 'border-[#4f46e5] bg-indigo-50'
+                    : 'border-[#dbe4f0] bg-white hover:border-slate-300'
+                }`}
+                title={asset.name}
+              >
+                <img src={asset.dataUrl} alt={asset.name} className="h-full w-full object-contain" />
+              </button>
+            ))}
+          </div>
+          <label className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] bg-slate-50 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-100">
+            <Upload className="h-3.5 w-3.5" />
+            Upload
+            <input
+              type="file"
+              accept="image/*,.svg"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  void (async () => {
+                    const asset = await createAssetFromFile(file);
+                    dispatch({
+                      type: 'ADD_ASSET',
+                      payload: asset,
+                    });
+                    handleUpdate({
+                      assetId: asset.id,
+                      frameStyle: getDefaultImageFrameStyle(asset),
+                    });
+                  })();
+                }
+              }}
+            />
+          </label>
+        </div>
+      )}
+    </>
+  );
+
+  const layerSections = (
+    <>
+      <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-[#f8fafc]">
+        <div className="flex h-8 items-center gap-2 border-b border-[#e2e8f0] px-2.5">
+          <Move className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            Position
+          </span>
+          <div className="ml-auto flex items-center gap-1 font-mono text-[10px] text-[#4f46e5]">
+            <span className="rounded bg-white px-1.5 py-0.5">X {Math.round(displayedElement.x)}</span>
+            <span className="rounded bg-white px-1.5 py-0.5">Y {Math.round(displayedElement.y)}</span>
+          </div>
+        </div>
+
+        <div className="flex h-9 items-center gap-1 px-2">
+          <Layers className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            Layer
+          </span>
+          <span className="ml-0.5 font-mono text-[9px] text-[#4f46e5]">
+            {selectedElement.zIndex ?? 0}
+          </span>
+
+          <div className="ml-auto flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
+              title="Send to back"
+              aria-label="Send to back"
+            >
+              <SendToBack className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+              title="Bring to front"
+              aria-label="Bring to front"
+            >
+              <BringToFront className="h-3.5 w-3.5" />
+            </button>
+
+            <div className="mx-1 h-4 w-px bg-[#e2e8f0]" />
+
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
+              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+              title="Duplicate component"
+              aria-label="Duplicate component"
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                handleUpdate({
+                  x: selectedElement.x,
+                  y: selectedElement.y,
+                  width: selectedElement.width,
+                  height: selectedElement.height,
+                })
+              }
+              disabled={!canResetToInitialFrame}
+              className="flex h-7 w-7 items-center justify-center rounded text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+              title={canResetToInitialFrame ? 'Reset to initial position' : 'Already at initial position'}
+              aria-label="Reset to initial position"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
+          <input 
+            type="number" 
+            min={1} 
+            value={selectedElement.revealStep} 
+            onChange={(e) => handleUpdate({ revealStep: Math.max(1, parseInt(e.target.value) || 1) })}
+            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+          />
+        </div>
+        <div className="flex-1">
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Hide On</label>
+          <input 
+            type="number" 
+            min={selectedElement.revealStep + 1}
+            placeholder="Never"
+            value={selectedElement.hideStep || ''} 
+            onChange={(e) => {
+              const val = e.target.value;
+              handleUpdate({ hideStep: val ? Math.max(selectedElement.revealStep + 1, parseInt(val) || 0) : null });
+            }}
+            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+          />
+        </div>
+      </div>
+
+      <LayersPanel
+        step={selectedSequenceStep}
+        elements={activeScene.elements}
+        assets={availableAssets}
+        selectedElementIds={selectedElementIds}
+        onSelectElement={handleSelectElement}
+        onToggleVisibility={selectedSequenceStep !== null ? handleSequenceVisibilityToggle : undefined}
+      />
+    </>
+  );
+
   return (
     <div className={`${RIGHT_SIDEBAR_CLASS} overflow-y-auto`}>
       <div className="p-4 border-b border-[#f1f5f9] flex items-center justify-between">
@@ -855,662 +1647,13 @@ export function RightSidebar() {
           <Trash2 className="w-4 h-4" />
         </button>
       </div>
+      <SidebarTabs activeTab={activeTab} onChange={setActiveTab} />
 
       <div className="p-4 space-y-5">
-        <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-[#f8fafc]">
-          <div className="flex h-8 items-center gap-2 border-b border-[#e2e8f0] px-2.5">
-            <Move className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              Position
-            </span>
-            <div className="ml-auto flex items-center gap-1 font-mono text-[10px] text-[#4f46e5]">
-              <span className="rounded bg-white px-1.5 py-0.5">X {Math.round(displayedElement.x)}</span>
-              <span className="rounded bg-white px-1.5 py-0.5">Y {Math.round(displayedElement.y)}</span>
-            </div>
-          </div>
-
-          <div className="flex h-9 items-center gap-1 px-2">
-            <Layers className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              Layer
-            </span>
-            <span className="ml-0.5 font-mono text-[9px] text-[#4f46e5]">
-              {selectedElement.zIndex ?? 0}
-            </span>
-
-            <div className="ml-auto flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
-                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
-                title="Send to back"
-                aria-label="Send to back"
-              >
-                <SendToBack className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
-                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
-                title="Bring to front"
-                aria-label="Bring to front"
-              >
-                <BringToFront className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="mx-1 h-4 w-px bg-[#e2e8f0]" />
-
-              <button
-                type="button"
-                onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
-                className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
-                title="Duplicate component"
-                aria-label="Duplicate component"
-              >
-                <Copy className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  handleUpdate({
-                    x: selectedElement.x,
-                    y: selectedElement.y,
-                    width: selectedElement.width,
-                    height: selectedElement.height,
-                  })
-                }
-                disabled={!canResetToInitialFrame}
-                className="flex h-7 w-7 items-center justify-center rounded text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
-                title={canResetToInitialFrame ? 'Reset to initial position' : 'Already at initial position'}
-                aria-label="Reset to initial position"
-              >
-                <RotateCcw className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-          <div className="flex items-start gap-3">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
-              <SavedElementLibraryPreview
-                element={selectedElement}
-                asset={imageAsset}
-                name={selectedElementFavoriteName}
-              />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
-                    {renderSavedElementLibraryGroupIcon(
-                      getSavedElementLibraryGroupId(selectedElement, imageAsset),
-                    )}
-                  </div>
-                  <div className="min-w-0">
-                    <div className="truncate text-xs font-semibold text-[#0f172a]">
-                      {selectedElementFavoriteName}
-                    </div>
-                    <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      {getElementTypeLabel(selectedElement)}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={saveSelectedElementToFavorites}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                    title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
-                  >
-                    <Save className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={toggleSelectedElementSharing}
-                    className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                      isSelectedElementShared
-                        ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
-                        : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
-                    }`}
-                    title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
-                  >
-                    <Layers className="h-4 w-4" />
-                  </button>
-                  {(isSelectedElementSaved || isSelectedElementShared) && (
-                    <button
-                      type="button"
-                      onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
-                      title="Delete saved component"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 flex items-center gap-2">
-                <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
-                  isSelectedElementSaved
-                    ? 'bg-emerald-50 text-emerald-600'
-                    : 'bg-white text-slate-500'
-                }`}>
-                  {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
-                </div>
-                <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                  {matchingSavedComponents.length} In Library
-                </div>
-                {isSelectedElementShared && (
-                  <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                    Shared
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-4">
-          <div className="flex-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
-            <input 
-              type="number" 
-              min={1} 
-              value={selectedElement.revealStep} 
-              onChange={(e) => handleUpdate({ revealStep: Math.max(1, parseInt(e.target.value) || 1) })}
-              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-            />
-          </div>
-          <div className="flex-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Hide On</label>
-            <input 
-              type="number" 
-              min={selectedElement.revealStep + 1}
-              placeholder="Never"
-              value={selectedElement.hideStep || ''} 
-              onChange={(e) => {
-                const val = e.target.value;
-                handleUpdate({ hideStep: val ? Math.max(selectedElement.revealStep + 1, parseInt(val) || 0) : null });
-              }}
-              className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-            />
-          </div>
-        </div>
-
-        {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
-          <>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Render Style</label>
-              <select
-                value={imageFrameStyle || 'polaroid'}
-                onChange={(e) => handleUpdate({ frameStyle: e.target.value as import('../types').ImageFrameStyle })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-              >
-                <option value="polaroid">Polaroid Frame</option>
-                <option value="plain">Frameless Graphic</option>
-              </select>
-              {imageAsset && (
-                <div className="mt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                  Asset Type: {getAssetKind(imageAsset)}
-                </div>
-              )}
-            </div>
-
-            {imageFrameStyle === 'polaroid' ? (
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
-                <input
-                  type="text"
-                  value={imageElement.captionText || ''}
-                  placeholder="Optional label under the image"
-                  onChange={(e) => handleUpdate({ captionText: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            ) : (
-              <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                Frameless graphics render directly on the canvas without the white image card.
-              </div>
-            )}
-          </>
-        )}
-
-        {selectedElement.type === 'color' && colorElement && !selectedElementHiddenInSequence && (
-          <>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Bottom Caption</label>
-              <input
-                type="text"
-                value={colorElement.captionText || ''}
-                placeholder="Optional label under the color card"
-                onChange={(e) => handleUpdate({ captionText: e.target.value })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Fill Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={colorElement.fillColor}
-                  onChange={(e) => handleUpdate({ fillColor: e.target.value })}
-                  className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
-                />
-                <input
-                  type="text"
-                  value={colorElement.fillColor}
-                  onChange={(e) => handleUpdate({ fillColor: e.target.value })}
-                  className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        {selectedElement.type === 'text' && textElement && (
-          <>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text Style</label>
-              <select
-                value={textVariant || 'block'}
-                onChange={(e) => handleUpdate({ variant: e.target.value as TextElement['variant'] })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-              >
-                <option value="free">Free Text</option>
-                <option value="block">Text Block</option>
-              </select>
-            </div>
-
-            {textVariant === 'free' ? (
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text</label>
-                <textarea 
-                  value={textElement.text} 
-                  onChange={(e) => handleUpdate({ text: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[120px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            ) : (
-              <>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Title</label>
-                  <input
-                    type="text"
-                    value={textParts?.title || ''}
-                    onChange={(e) => handleUpdate({ text: combineTextContent(e.target.value, textParts?.subtitle || '') })}
-                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 leading-relaxed focus:outline-none focus:border-[#4f46e5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle</label>
-                  <textarea 
-                    value={textParts?.subtitle || ''} 
-                    onChange={(e) => handleUpdate({ text: combineTextContent(textParts?.title || '', e.target.value) })}
-                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-3 min-h-[84px] leading-relaxed resize-none focus:outline-none focus:border-[#4f46e5]"
-                  />
-                </div>
-              </>
-            )}
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">{textVariant === 'free' ? 'Text Size' : 'Title Size'}</label>
-                <input 
-                  type="number" 
-                  min={8} 
-                  value={textElement.fontSize} 
-                  onChange={(e) => handleUpdate({ fontSize: Math.max(8, parseInt(e.target.value) || 16) })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-              
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Weight</label>
-                <select 
-                  value={textElement.fontWeight} 
-                  onChange={(e) => handleUpdate({ fontWeight: e.target.value })}
-                  className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-                >
-                  <option value="normal">Normal</option>
-                  <option value="bold">Bold</option>
-                  <option value="lighter">Lighter</option>
-                  <option value="bolder">Bolder</option>
-                  </select>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Alignment</label>
-              <select
-                value={textAlign || 'center'}
-                onChange={(e) => handleUpdate({ align: e.target.value as TextElement['align'] })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-              >
-                <option value="left">Left</option>
-                <option value="center">Center</option>
-                <option value="right">Right</option>
-              </select>
-            </div>
-
-            {textVariant === 'block' && (
-              <>
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Subtitle Size</label>
-                  <input 
-                    type="number" 
-                    min={8}
-                    value={textElement.subtitleFontSize || Math.max(16, Math.round(textElement.fontSize * 0.6))}
-                    onChange={(e) => handleUpdate({ subtitleFontSize: Math.max(8, parseInt(e.target.value) || 16) })}
-                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Padding</label>
-                  <input 
-                    type="number" 
-                    min={8}
-                    value={textElement.padding || 20}
-                    onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 20) })}
-                    className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-                  />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Color</label>
-              <div className="flex items-center gap-2">
-                <input 
-                  type="color" 
-                  value={textElement.color} 
-                  onChange={(e) => handleUpdate({ color: e.target.value })}
-                  className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
-                />
-                <input 
-                  type="text" 
-                  value={textElement.color}
-                  onChange={(e) => handleUpdate({ color: e.target.value })}
-                  className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            </div>
-          </>
-        )}
-
-        {selectedElement.type === 'shape' && shapeElement?.shapeType === 'emoji' && !selectedElementHiddenInSequence && (
-          <>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Emoji</label>
-              <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-                <div className="text-xs font-semibold text-[#0f172a]">
-                  {selectedEmoji ? getEmojiLabel(selectedEmoji) : shapeElement.emojiChar || 'Emoji'}
-                </div>
-                <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
-                  {selectedEmoji?.id || shapeElement.emojiHexcode || 'emoji'}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        {selectedElement.type === 'shape' && shapeElement?.shapeType === 'icon' && !selectedElementHiddenInSequence && (
-          <>
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Icon</label>
-              <div className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2">
-                <div className="text-xs font-semibold text-[#0f172a]">{formatIconName(shapeElement.iconName || 'Icon')}</div>
-                <div className="mt-1 text-[10px] font-mono uppercase tracking-[0.14em] text-slate-400">
-                  {shapeElement.iconName || 'icon'}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Color</label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="color"
-                  value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
-                  onChange={(e) => handleUpdate({ iconColor: e.target.value })}
-                  className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
-                />
-                <input
-                  type="text"
-                  value={shapeElement.iconColor || DEFAULT_ICON_COLOR}
-                  onChange={(e) => handleUpdate({ iconColor: e.target.value })}
-                  className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Stroke Width</label>
-              <input
-                type="number"
-                min={0.5}
-                step={0.1}
-                value={shapeElement.iconStrokeWidth || 2.25}
-                onChange={(e) => handleUpdate({ iconStrokeWidth: Math.max(0.5, parseFloat(e.target.value) || 0.5) })}
-                className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
-              />
-            </div>
-          </>
-        )}
-
-        <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              Component Library
-            </div>
-            <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-              {matchingSavedComponents.length}
-            </div>
-          </div>
-
-          {visibleFavoriteSavedGroups.length === 0 ? (
-            <div className="flex min-h-[120px] items-center justify-center rounded-xl border border-dashed border-[#dbe4f0] bg-white/70 px-4">
-              <div className="flex flex-col items-center gap-2 text-center text-slate-400">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                  {renderSavedElementLibraryGroupIcon(
-                    getSavedElementLibraryGroupId(selectedElement, imageAsset),
-                  )}
-                </div>
-                <div className="text-[10px] font-bold uppercase tracking-[0.16em]">
-                  No saved {selectedElement.type}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {visibleFavoriteSavedGroups.map((group) => (
-                <div key={group.groupId}>
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-white text-slate-700 shadow-sm">
-                        {renderSavedElementLibraryGroupIcon(group.groupId)}
-                      </div>
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-500">
-                        {group.label}
-                      </div>
-                    </div>
-                    <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                      {group.favorites.length}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    {group.favorites.map((favorite) => {
-                      const isCurrentFavorite = favorite.id === selectedElementFavoriteId;
-                      const isSharedSavedComponent = sharedSavedComponentIds.has(favorite.id);
-                      const isSavedFavorite = favoriteSavedElements.some((entry) => entry.id === favorite.id);
-
-                      return (
-                        <div
-                          key={favorite.id}
-                          className={`group rounded-xl border p-1.5 text-left transition-all ${
-                            isCurrentFavorite
-                              ? 'border-[#a5b4fc] bg-indigo-50 shadow-[0_6px_18px_rgba(79,70,229,0.08)]'
-                              : 'border-[#dbe4f0] bg-white hover:border-[#4f46e5] hover:shadow-[0_6px_18px_rgba(15,23,42,0.06)]'
-                          }`}
-                        >
-                          <div
-                            className={`relative overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
-                          >
-                            <div className="pointer-events-none absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10 group-focus-within:bg-slate-950/10" />
-                            <div className="absolute right-1.5 top-1.5 z-10 flex translate-y-1 gap-1 opacity-0 transition-all duration-150 pointer-events-none group-hover:translate-y-0 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:translate-y-0 group-focus-within:opacity-100 group-focus-within:pointer-events-auto">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleSavedComponentFavorite(favorite);
-                                }}
-                                className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
-                                  isSavedFavorite
-                                    ? 'border-amber-300 bg-amber-50 text-amber-500'
-                                    : 'border-white/70 bg-white/90 text-slate-400 hover:text-amber-500'
-                                }`}
-                                title={`${isSavedFavorite ? 'Remove from' : 'Add to'} favorites`}
-                              >
-                                <Star className={`h-3.5 w-3.5 ${isSavedFavorite ? 'fill-current' : ''}`} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  toggleSharedSavedComponent(favorite);
-                                }}
-                                className={`rounded-full border p-1 shadow-sm backdrop-blur transition-colors ${
-                                  isSharedSavedComponent
-                                    ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
-                                    : 'border-white/70 bg-white/90 text-slate-400 hover:text-[#4f46e5]'
-                                }`}
-                                title={isSharedSavedComponent ? 'Remove from shared library' : 'Add to shared library'}
-                              >
-                                <Layers className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  deleteSavedComponent(favorite);
-                                }}
-                                className="rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm backdrop-blur transition-colors hover:text-rose-500"
-                                title="Delete saved component"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                            <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:translate-y-0 group-focus-within:opacity-100">
-                              {renderSavedElementLibraryGroupIcon(group.groupId)}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => replaceSelectedElementWithFavorite(favorite)}
-                              title={favorite.name}
-                              className="block aspect-[1.08/1] w-full"
-                            >
-                              <SavedElementLibraryPreview
-                                element={favorite.element}
-                                asset={favorite.asset}
-                                name={favorite.name}
-                              />
-                            </button>
-                          </div>
-                          <div className="mt-2 flex items-center justify-between gap-2">
-                            <div className="min-w-0 flex-1 truncate text-[10px] font-semibold text-[#0f172a]">
-                              {favorite.name}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {isCurrentFavorite && (
-                                <div className="rounded-full bg-indigo-100 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                                  Current
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
-          <div>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Asset Source</label>
-              {imageAsset && (
-                <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                  {getAssetKind(imageAsset)}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {availableAssets.map((asset) => (
-                <button
-                  key={asset.id}
-                  type="button"
-                  onClick={() => handleUpdate({ assetId: asset.id, frameStyle: getDefaultImageFrameStyle(asset) })}
-                  className={`aspect-square overflow-hidden rounded-lg border transition-all ${
-                    imageElement.assetId === asset.id
-                      ? 'border-[#4f46e5] bg-indigo-50'
-                      : 'border-[#dbe4f0] bg-white hover:border-slate-300'
-                  }`}
-                  title={asset.name}
-                >
-                  <img src={asset.dataUrl} alt={asset.name} className="h-full w-full object-contain" />
-                </button>
-              ))}
-            </div>
-            <label className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] bg-slate-50 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-100">
-              <Upload className="h-3.5 w-3.5" />
-              Upload
-              <input
-                type="file"
-                accept="image/*,.svg"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    void (async () => {
-                      const asset = await createAssetFromFile(file);
-                      dispatch({
-                        type: 'ADD_ASSET',
-                        payload: asset,
-                      });
-                      handleUpdate({
-                        assetId: asset.id,
-                        frameStyle: getDefaultImageFrameStyle(asset),
-                      });
-                    })();
-                  }
-                }}
-              />
-            </label>
-          </div>
-        )}
-
+        {activeTab === 'properties' && propertySections}
+        {activeTab === 'library' && librarySections}
+        {activeTab === 'layers' && layerSections}
       </div>
-
-      {selectedSequenceStep !== null && (
-        <SequenceLayersPanel
-          step={selectedSequenceStep}
-          elements={activeScene.elements}
-          assets={availableAssets}
-          selectedElementIds={selectedElementIds}
-          onSelectElement={handleSelectElement}
-          onToggleVisibility={handleSequenceVisibilityToggle}
-        />
-      )}
     </div>
   );
 }
