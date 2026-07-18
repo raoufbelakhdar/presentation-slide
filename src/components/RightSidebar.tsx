@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useDeferredValue, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
+import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
@@ -112,6 +112,49 @@ function getElementTypeLabel(element: SceneElement) {
   if (element.shapeType === 'no') return 'No';
   if (element.shapeType === 'check') return 'Check';
   return 'Cross';
+}
+
+function matchesSearchQuery(
+  query: string,
+  ...values: Array<string | null | undefined>
+) {
+  if (!query) return true;
+
+  return values.some((value) => value?.toLowerCase().includes(query));
+}
+
+function getSavedComponentSearchText(favorite: SavedComponent) {
+  const searchParts = [favorite.name, getElementTypeLabel(favorite.element)];
+  const { element } = favorite;
+
+  if (element.type === 'text') {
+    searchParts.push(element.text);
+  }
+
+  if (element.type === 'image') {
+    searchParts.push(favorite.asset?.name);
+  }
+
+  if (element.type === 'color') {
+    searchParts.push(element.captionText, element.fillColor);
+  }
+
+  if (element.type === 'shape') {
+    if (element.shapeType === 'icon') {
+      searchParts.push(element.iconName, formatIconName(element.iconName || ''));
+    }
+
+    if (element.shapeType === 'emoji') {
+      const emojiEntry = getEmojiById(element.emojiHexcode || '');
+      searchParts.push(
+        element.emojiChar,
+        element.emojiHexcode,
+        emojiEntry ? getEmojiLabel(emojiEntry) : undefined,
+      );
+    }
+  }
+
+  return searchParts.filter(Boolean).join(' ').toLowerCase();
 }
 
 function cloneFavoriteElement(element: SceneElement): SceneElement {
@@ -536,7 +579,10 @@ export function RightSidebar() {
   const [activeTab, setActiveTab] = useState<RightSidebarTab>(
     !selectedElement && selectedSequenceStep !== null ? 'layers' : 'properties',
   );
+  const [libraryQuery, setLibraryQuery] = useState('');
   const isMultiSelecting = selectedElementIds.length > 1;
+  const deferredLibraryQuery = useDeferredValue(libraryQuery);
+  const normalizedLibraryQuery = deferredLibraryQuery.trim().toLowerCase();
 
   useEffect(() => {
     if (!selectedElement && selectedSequenceStep !== null) {
@@ -805,6 +851,16 @@ export function RightSidebar() {
   const shapeElement = selectedElement.type === 'shape' ? (selectedElement as ShapeElement) : null;
   const imageAsset = imageElement ? availableAssets.find((asset) => asset.id === imageElement.assetId) || null : null;
   const imageFrameStyle = imageElement ? (imageElement.frameStyle || getDefaultImageFrameStyle(imageAsset)) : null;
+  const filteredAvailableAssets = imageElement
+    ? availableAssets.filter((asset) =>
+        matchesSearchQuery(
+          normalizedLibraryQuery,
+          asset.name,
+          asset.id,
+          getAssetKind(asset),
+        ),
+      )
+    : availableAssets;
   const displayedElement =
     selectedSequenceStep !== null && selectedElement.revealStep <= selectedSequenceStep
       ? getEffectiveElementState(selectedElement, selectedSequenceStep)
@@ -829,9 +885,12 @@ export function RightSidebar() {
   const matchingSavedComponents = combinedSavedComponents.filter(
     (component) => component.element.type === selectedElement.type,
   );
+  const filteredMatchingSavedComponents = matchingSavedComponents.filter((component) =>
+    matchesSearchQuery(normalizedLibraryQuery, getSavedComponentSearchText(component)),
+  );
   const favoriteSavedElementsByGroup = new Map<SavedElementLibraryGroupId, SavedComponent[]>([]);
 
-  for (const favorite of matchingSavedComponents) {
+  for (const favorite of filteredMatchingSavedComponents) {
     const favoriteGroupId = getSavedElementLibraryGroupId(favorite.element, favorite.asset);
     const groupFavorites = favoriteSavedElementsByGroup.get(favoriteGroupId) || [];
     groupFavorites.push(favorite);
@@ -1312,7 +1371,7 @@ export function RightSidebar() {
                 {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
               </div>
               <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                {matchingSavedComponents.length} In Library
+                {filteredMatchingSavedComponents.length} In Library
               </div>
               {isSelectedElementShared && (
                 <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
@@ -1324,13 +1383,24 @@ export function RightSidebar() {
         </div>
       </div>
 
+      <label className="flex items-center gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
+        <Search className="h-3.5 w-3.5 text-slate-400" />
+        <input
+          type="text"
+          value={libraryQuery}
+          onChange={(event) => setLibraryQuery(event.target.value)}
+          placeholder="Search library..."
+          className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+        />
+      </label>
+
       <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
             Component Library
           </div>
           <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            {matchingSavedComponents.length}
+            {filteredMatchingSavedComponents.length}
           </div>
         </div>
 
@@ -1343,7 +1413,7 @@ export function RightSidebar() {
                 )}
               </div>
               <div className="text-[10px] font-bold uppercase tracking-[0.16em]">
-                No saved {selectedElement.type}
+                {normalizedLibraryQuery ? 'No library matches' : `No saved ${selectedElement.type}`}
               </div>
             </div>
           </div>
@@ -1471,12 +1541,12 @@ export function RightSidebar() {
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Asset Source</label>
             {imageAsset && (
               <div className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {getAssetKind(imageAsset)}
+                {filteredAvailableAssets.length}
               </div>
             )}
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {availableAssets.map((asset) => (
+            {filteredAvailableAssets.map((asset) => (
               <button
                 key={asset.id}
                 type="button"
@@ -1492,6 +1562,11 @@ export function RightSidebar() {
               </button>
             ))}
           </div>
+          {filteredAvailableAssets.length === 0 && (
+            <div className="mt-2 rounded-lg border border-dashed border-[#dbe4f0] bg-white px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              No assets match that search
+            </div>
+          )}
           <label className="mt-2 flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-[#e2e8f0] bg-slate-50 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#cbd5e1] hover:bg-slate-100">
             <Upload className="h-3.5 w-3.5" />
             Upload
