@@ -112,16 +112,10 @@ const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   "bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]";
 const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
   { value: "all", label: "All" },
-  { value: "text", label: "Text" },
+  { value: "image", label: "Images" },
   { value: "text-block", label: "Text Block" },
-  { value: "image", label: "Image" },
-  { value: "color", label: "Color" },
+  { value: "icon", label: "Icons" },
   { value: "emoji", label: "Emoji" },
-  { value: "icon", label: "Icon" },
-  { value: "yes", label: "Yes" },
-  { value: "no", label: "No" },
-  { value: "check", label: "Check" },
-  { value: "cross", label: "Cross" },
 ] as const;
 type SavedComponentTypeFilter =
   (typeof SAVED_COMPONENT_TYPE_FILTER_OPTIONS)[number]["value"];
@@ -159,17 +153,13 @@ function getSavedFavoriteTypeFilterValue(
   element: SceneElement,
 ): SavedComponentTypeFilter {
   if (element.type === "text") {
-    return getTextVariant(element) === "free" ? "text" : "text-block";
+    return "text-block";
   }
 
   if (element.type === "image") return "image";
-  if (element.type === "color") return "color";
+  if (element.type === "color") return "all";
   if (element.shapeType === "emoji") return "emoji";
-  if (element.shapeType === "icon") return "icon";
-  if (element.shapeType === "yes") return "yes";
-  if (element.shapeType === "no") return "no";
-  if (element.shapeType === "check") return "check";
-  return "cross";
+  return "icon";
 }
 
 function SavedElementFavoritePreview({
