@@ -585,10 +585,18 @@ export function RightSidebar() {
   const normalizedLibraryQuery = deferredLibraryQuery.trim().toLowerCase();
 
   useEffect(() => {
-    if (!selectedElement && selectedSequenceStep !== null) {
-      setActiveTab('layers');
+    if (selectedElementId) {
+      setActiveTab('properties');
+      return;
     }
-  }, [selectedElement, selectedSequenceStep]);
+
+    if (selectedSequenceStep !== null) {
+      setActiveTab('layers');
+      return;
+    }
+
+    setActiveTab('properties');
+  }, [selectedElementId, selectedSequenceStep]);
 
   const handleSelectElement = (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
