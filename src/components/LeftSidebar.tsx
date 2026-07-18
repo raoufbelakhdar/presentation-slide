@@ -17,6 +17,9 @@ import {
   Smile,
   Lightbulb,
   Loader2,
+  LayoutGrid,
+  Shapes,
+  TextCursorInput,
   WifiOff,
 } from "lucide-react";
 import {
@@ -111,11 +114,11 @@ const SHARED_ASSETS_VISIBILITY_STORAGE_KEY =
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   "bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]";
 const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
-  { value: "all", label: "All" },
-  { value: "image", label: "Images" },
-  { value: "text-block", label: "Text Block" },
-  { value: "icon", label: "Icons" },
-  { value: "emoji", label: "Emoji" },
+  { value: "all", label: "All", icon: LayoutGrid },
+  { value: "image", label: "Images", icon: Image },
+  { value: "text-block", label: "Text Block", icon: TextCursorInput },
+  { value: "icon", label: "Icons", icon: Shapes },
+  { value: "emoji", label: "Emoji", icon: Smile },
 ] as const;
 type SavedComponentTypeFilter =
   (typeof SAVED_COMPONENT_TYPE_FILTER_OPTIONS)[number]["value"];
@@ -1477,6 +1480,7 @@ export function LeftSidebar() {
                                 option.value === "all" ||
                                 savedComponentTypeCounts.has(option.value),
                             ).map((option) => {
+                              const Icon = option.icon;
                               const isActive =
                                 savedComponentTypeFilter === option.value;
                               const count =
@@ -1492,13 +1496,25 @@ export function LeftSidebar() {
                                   onClick={() =>
                                     setSavedComponentTypeFilter(option.value)
                                   }
-                                  className={`rounded-full border px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                                  className={`group relative flex h-10 w-10 items-center justify-center rounded-2xl border shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f46e5]/30 ${
                                     isActive
-                                      ? "border-[#4f46e5] bg-[#4f46e5] text-white"
-                                      : "border-[#dbe4f0] bg-white text-slate-500 hover:border-[#a5b4fc] hover:text-[#4338ca]"
+                                      ? "border-[#4f46e5] bg-[#4f46e5] text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)]"
+                                      : "border-[#dbe4f0] bg-white text-slate-500 hover:-translate-y-0.5 hover:border-[#a5b4fc] hover:text-[#4338ca]"
                                   }`}
+                                  aria-label={`${option.label} (${count})`}
+                                  title={`${option.label} (${count})`}
                                 >
-                                  {option.label} ({count})
+                                  <Icon className="h-4 w-4" strokeWidth={2.1} />
+                                  <span className="sr-only">{option.label}</span>
+                                  <span
+                                    className={`absolute -right-1 -top-1 min-w-[18px] rounded-full px-1.5 py-0.5 text-center text-[8px] font-bold tracking-[0.02em] ${
+                                      isActive
+                                        ? "bg-white text-[#4338ca]"
+                                        : "bg-[#eef2ff] text-[#4f46e5]"
+                                    }`}
+                                  >
+                                    {count}
+                                  </span>
                                 </button>
                               );
                             })}
