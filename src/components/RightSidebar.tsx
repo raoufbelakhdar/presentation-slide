@@ -1033,8 +1033,201 @@ export function RightSidebar() {
     });
   };
 
+  const positionSection = (
+    <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-[#f8fafc]">
+      <div className="flex h-8 items-center gap-2 border-b border-[#e2e8f0] px-2.5">
+        <Move className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Position
+        </span>
+        <div className="ml-auto flex items-center gap-1 font-mono text-[10px] text-[#4f46e5]">
+          <span className="rounded bg-white px-1.5 py-0.5">X {Math.round(displayedElement.x)}</span>
+          <span className="rounded bg-white px-1.5 py-0.5">Y {Math.round(displayedElement.y)}</span>
+        </div>
+      </div>
+
+      <div className="flex h-9 items-center gap-1 px-2">
+        <Layers className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+        <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          Layer
+        </span>
+        <span className="ml-0.5 font-mono text-[9px] text-[#4f46e5]">
+          {selectedElement.zIndex ?? 0}
+        </span>
+
+        <div className="ml-auto flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
+            className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
+            title="Send to back"
+            aria-label="Send to back"
+          >
+            <SendToBack className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
+            className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+            title="Bring to front"
+            aria-label="Bring to front"
+          >
+            <BringToFront className="h-3.5 w-3.5" />
+          </button>
+
+          <div className="mx-1 h-4 w-px bg-[#e2e8f0]" />
+
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
+            className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
+            title="Duplicate component"
+            aria-label="Duplicate component"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              handleUpdate({
+                x: selectedElement.x,
+                y: selectedElement.y,
+                width: selectedElement.width,
+                height: selectedElement.height,
+              })
+            }
+            disabled={!canResetToInitialFrame}
+            className="flex h-7 w-7 items-center justify-center rounded text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+            title={canResetToInitialFrame ? 'Reset to initial position' : 'Already at initial position'}
+            aria-label="Reset to initial position"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  const revealTimingSection = (
+    <div className="flex gap-4">
+      <div className="flex-1">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
+        <input
+          type="number"
+          min={1}
+          value={selectedElement.revealStep}
+          onChange={(e) => handleUpdate({ revealStep: Math.max(1, parseInt(e.target.value) || 1) })}
+          className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+        />
+      </div>
+      <div className="flex-1">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Hide On</label>
+        <input
+          type="number"
+          min={selectedElement.revealStep + 1}
+          placeholder="Never"
+          value={selectedElement.hideStep || ''}
+          onChange={(e) => {
+            const val = e.target.value;
+            handleUpdate({ hideStep: val ? Math.max(selectedElement.revealStep + 1, parseInt(val) || 0) : null });
+          }}
+          className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
+        />
+      </div>
+    </div>
+  );
+
+  const saveShareSection = (
+    <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+      <div className="flex items-start gap-3">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
+          <SavedElementLibraryPreview
+            element={selectedElement}
+            asset={imageAsset}
+            name={selectedElementFavoriteName}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
+                {renderSavedElementLibraryGroupIcon(
+                  getSavedElementLibraryGroupId(selectedElement, imageAsset),
+                )}
+              </div>
+              <div className="min-w-0">
+                <div className="truncate text-xs font-semibold text-[#0f172a]">
+                  {selectedElementFavoriteName}
+                </div>
+                <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {getElementTypeLabel(selectedElement)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={saveSelectedElementToFavorites}
+                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
+                title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
+              >
+                <Save className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={toggleSelectedElementSharing}
+                className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
+                  isSelectedElementShared
+                    ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
+                    : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
+                }`}
+                title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
+              >
+                <Layers className="h-4 w-4" />
+              </button>
+              {(isSelectedElementSaved || isSelectedElementShared) && (
+                <button
+                  type="button"
+                  onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+                  title="Delete saved component"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="mt-3 flex items-center gap-2">
+            <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
+              isSelectedElementSaved
+                ? 'bg-emerald-50 text-emerald-600'
+                : 'bg-white text-slate-500'
+            }`}>
+              {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
+            </div>
+            <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {filteredMatchingSavedComponents.length} In Library
+            </div>
+            {isSelectedElementShared && (
+              <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                Shared
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const propertySections = (
     <>
+      {positionSection}
+      {revealTimingSection}
+      {saveShareSection}
+
       {selectedElement.type === 'image' && imageElement && !selectedElementHiddenInSequence && (
         <>
           <div>
@@ -1300,89 +1493,6 @@ export function RightSidebar() {
 
   const librarySections = (
     <>
-      <div className="rounded-md border border-[#dbe4f0] bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] p-3 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
-        <div className="flex items-start gap-3">
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-[#dbe4f0] bg-white shadow-sm">
-            <SavedElementLibraryPreview
-              element={selectedElement}
-              asset={imageAsset}
-              name={selectedElementFavoriteName}
-            />
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-900 text-white">
-                  {renderSavedElementLibraryGroupIcon(
-                    getSavedElementLibraryGroupId(selectedElement, imageAsset),
-                  )}
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-[#0f172a]">
-                    {selectedElementFavoriteName}
-                  </div>
-                  <div className="mt-0.5 text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    {getElementTypeLabel(selectedElement)}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={saveSelectedElementToFavorites}
-                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#c7d2fe] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]"
-                  title={isSelectedElementSaved ? 'Update saved component' : 'Save component'}
-                >
-                  <Save className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleSelectedElementSharing}
-                  className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
-                    isSelectedElementShared
-                      ? 'border-[#4f46e5] bg-[#4f46e5] text-white hover:bg-[#4338ca]'
-                      : 'border-[#dbe4f0] bg-white text-slate-500 hover:border-[#4f46e5] hover:text-[#4f46e5]'
-                  }`}
-                  title={isSelectedElementShared ? 'Remove from shared library' : 'Add to shared library'}
-                >
-                  <Layers className="h-4 w-4" />
-                </button>
-                {(isSelectedElementSaved || isSelectedElementShared) && (
-                  <button
-                    type="button"
-                    onClick={() => deleteSavedComponent(buildSelectedSavedComponent())}
-                    className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
-                    title="Delete saved component"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2">
-              <div className={`rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] ${
-                isSelectedElementSaved
-                  ? 'bg-emerald-50 text-emerald-600'
-                  : 'bg-white text-slate-500'
-              }`}>
-                {isSelectedElementSaved ? 'Saved' : 'Not Saved'}
-              </div>
-              <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-                {filteredMatchingSavedComponents.length} In Library
-              </div>
-              {isSelectedElementShared && (
-                <div className="rounded-full bg-[#4f46e5]/10 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                  Shared
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
       <label className="flex items-center gap-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
         <Search className="h-3.5 w-3.5 text-slate-400" />
         <input
@@ -1599,106 +1709,6 @@ export function RightSidebar() {
 
   const layerSections = (
     <>
-      <div className="overflow-hidden rounded-md border border-[#e2e8f0] bg-[#f8fafc]">
-        <div className="flex h-8 items-center gap-2 border-b border-[#e2e8f0] px-2.5">
-          <Move className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            Position
-          </span>
-          <div className="ml-auto flex items-center gap-1 font-mono text-[10px] text-[#4f46e5]">
-            <span className="rounded bg-white px-1.5 py-0.5">X {Math.round(displayedElement.x)}</span>
-            <span className="rounded bg-white px-1.5 py-0.5">Y {Math.round(displayedElement.y)}</span>
-          </div>
-        </div>
-
-        <div className="flex h-9 items-center gap-1 px-2">
-          <Layers className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-          <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-            Layer
-          </span>
-          <span className="ml-0.5 font-mono text-[9px] text-[#4f46e5]">
-            {selectedElement.zIndex ?? 0}
-          </span>
-
-          <div className="ml-auto flex items-center gap-0.5">
-            <button
-              type="button"
-              onClick={() => handleUpdate({ zIndex: minOtherZIndex - 1 })}
-              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-slate-800"
-              title="Send to back"
-              aria-label="Send to back"
-            >
-              <SendToBack className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => handleUpdate({ zIndex: maxOtherZIndex + 1 })}
-              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
-              title="Bring to front"
-              aria-label="Bring to front"
-            >
-              <BringToFront className="h-3.5 w-3.5" />
-            </button>
-
-            <div className="mx-1 h-4 w-px bg-[#e2e8f0]" />
-
-            <button
-              type="button"
-              onClick={() => dispatch({ type: 'DUPLICATE_ELEMENT', payload: selectedElement.id })}
-              className="flex h-7 w-7 items-center justify-center rounded text-slate-500 transition-colors hover:bg-white hover:text-[#4f46e5]"
-              title="Duplicate component"
-              aria-label="Duplicate component"
-            >
-              <Copy className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                handleUpdate({
-                  x: selectedElement.x,
-                  y: selectedElement.y,
-                  width: selectedElement.width,
-                  height: selectedElement.height,
-                })
-              }
-              disabled={!canResetToInitialFrame}
-              className="flex h-7 w-7 items-center justify-center rounded text-amber-600 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
-              title={canResetToInitialFrame ? 'Reset to initial position' : 'Already at initial position'}
-              aria-label="Reset to initial position"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex gap-4">
-        <div className="flex-1">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
-          <input 
-            type="number" 
-            min={1} 
-            value={selectedElement.revealStep} 
-            onChange={(e) => handleUpdate({ revealStep: Math.max(1, parseInt(e.target.value) || 1) })}
-            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Hide On</label>
-          <input 
-            type="number" 
-            min={selectedElement.revealStep + 1}
-            placeholder="Never"
-            value={selectedElement.hideStep || ''} 
-            onChange={(e) => {
-              const val = e.target.value;
-              handleUpdate({ hideStep: val ? Math.max(selectedElement.revealStep + 1, parseInt(val) || 0) : null });
-            }}
-            className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
-          />
-        </div>
-      </div>
-
       <LayersPanel
         step={selectedSequenceStep}
         elements={activeScene.elements}
