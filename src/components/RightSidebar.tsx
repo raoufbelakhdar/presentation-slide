@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
-import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { combineTextContent, DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR, DEFAULT_TEXT_BLOCK_FONT_SIZE, DEFAULT_TEXT_BLOCK_PADDING, DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE, generateId, getEffectiveElementState, getTextAlign, getTextBlockBackgroundColor, getTextBlockFitSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { DEFAULT_ICON_COLOR, formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
@@ -337,7 +337,10 @@ function SavedElementLibraryPreview({
 
     if (textVariant === 'block') {
       return (
-        <div className="flex h-full w-full items-center justify-center rounded-[18px] bg-[#2563eb] px-3 text-white">
+        <div
+          className="flex h-full w-full items-center justify-center rounded-[18px] px-3 text-white"
+          style={{ backgroundColor: getTextBlockBackgroundColor(element) }}
+        >
           <div className="w-full" style={{ textAlign }}>
             <div
               className="truncate font-bold leading-tight"
@@ -847,9 +850,23 @@ export function RightSidebar() {
   }
 
   const handleUpdate = (updates: any) => {
+    const nextTextElement = selectedElement.type === 'text'
+      ? { ...(selectedElement as TextElement), ...(updates as Partial<TextElement>) }
+      : null;
+    const shouldFitTextBlock =
+      nextTextElement !== null &&
+      getTextVariant(nextTextElement) === 'block' &&
+      ['text', 'fontSize', 'subtitleFontSize', 'padding', 'fontWeight'].some((key) => key in updates);
+    const nextUpdates = shouldFitTextBlock
+      ? {
+          ...updates,
+          ...getTextBlockFitSize(nextTextElement),
+        }
+      : updates;
+
     dispatch({
       type: 'UPDATE_ELEMENT',
-      payload: { id: selectedElement.id, updates },
+      payload: { id: selectedElement.id, updates: nextUpdates },
     });
   };
 
@@ -1281,7 +1298,20 @@ export function RightSidebar() {
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Text Style</label>
             <select
               value={textVariant || 'block'}
-              onChange={(e) => handleUpdate({ variant: e.target.value as TextElement['variant'] })}
+              onChange={(e) => {
+                const variant = e.target.value as TextElement['variant'];
+                handleUpdate(
+                  variant === 'block'
+                    ? {
+                        variant,
+                        fontSize: DEFAULT_TEXT_BLOCK_FONT_SIZE,
+                        subtitleFontSize: DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
+                        padding: DEFAULT_TEXT_BLOCK_PADDING,
+                        backgroundColor: textElement.backgroundColor || DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR,
+                      }
+                    : { variant },
+                );
+              }}
               className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
             >
               <option value="free">Free Text</option>
@@ -1383,6 +1413,24 @@ export function RightSidebar() {
                   onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 20) })}
                   className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Background</label>
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="color" 
+                    value={getTextBlockBackgroundColor(textElement)}
+                    onChange={(e) => handleUpdate({ backgroundColor: e.target.value })}
+                    className="h-8 w-8 rounded-sm cursor-pointer border-0 p-0 shrink-0"
+                  />
+                  <input 
+                    type="text" 
+                    value={getTextBlockBackgroundColor(textElement)}
+                    onChange={(e) => handleUpdate({ backgroundColor: e.target.value })}
+                    className="flex-1 bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono uppercase focus:outline-none focus:border-[#4f46e5]"
+                  />
+                </div>
               </div>
             </>
           )}

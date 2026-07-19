@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, TextElement, ImageElement, ShapeElement, Scene, ColorElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
 import { DEFAULT_ICON_COLOR } from '../iconLibrary';
-import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextBlockBackgroundColor, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
@@ -210,7 +210,7 @@ export function PresentationView() {
                               : 'flex flex-col items-start justify-start text-left'
                           }`}
                           style={{
-                            backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                            backgroundColor: textVariant === 'block' ? getTextBlockBackgroundColor(textElement) : 'transparent',
                             color: textElement.color,
                             padding: textVariant === 'block' ? `${textPadding}px ${blockTextPaddingX}px` : '0px',
                           }}

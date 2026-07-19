@@ -58,6 +58,7 @@ export interface TextElement extends BaseElement {
   fontSize: number;
   subtitleFontSize?: number;
   padding?: number;
+  backgroundColor?: string;
   fontWeight: 'normal' | 'bold' | 'lighter' | 'bolder';
   color: string;
 }

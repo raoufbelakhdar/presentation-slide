@@ -46,6 +46,44 @@ export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 
   return Math.max(8, Math.round(element.subtitleFontSize || element.fontSize * 0.6));
 }
 
+export const DEFAULT_TEXT_BLOCK_FONT_SIZE = 32;
+export const DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE = 30;
+export const DEFAULT_TEXT_BLOCK_PADDING = 20;
+export const DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR = '#3b82f6';
+
+export function getTextBlockBackgroundColor(element: Pick<TextElement, 'backgroundColor'>) {
+  return element.backgroundColor || DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR;
+}
+
+function estimateTextLineWidth(line: string, fontSize: number, fontWeight: TextElement['fontWeight']) {
+  const weightMultiplier = fontWeight === 'bold' || fontWeight === 'bolder' ? 0.6 : 0.56;
+  return Math.ceil(line.length * fontSize * weightMultiplier);
+}
+
+export function getTextBlockFitSize(
+  element: Pick<TextElement, 'text' | 'fontSize' | 'subtitleFontSize' | 'padding' | 'fontWeight'>,
+) {
+  const { title, subtitle } = splitTextContent(element.text);
+  const subtitleLines = subtitle.split('\n').filter(Boolean);
+  const padding = getTextPadding(element);
+  const titleFontSize = Math.max(8, Math.round(element.fontSize));
+  const subtitleFontSize = getTextSubtitleFontSize(element);
+  const textWidths = [
+    estimateTextLineWidth(title || ' ', titleFontSize, element.fontWeight),
+    ...subtitleLines.map((line) => estimateTextLineWidth(line, subtitleFontSize, 'normal')),
+  ];
+  const titleLineHeight = titleFontSize * 1.1;
+  const subtitleHeight = subtitleLines.reduce(
+    (height, _, index) => height + subtitleFontSize * 1.1 + (index === 0 ? 6 : 2),
+    0,
+  );
+
+  return {
+    width: Math.max(80, Math.ceil(Math.max(...textWidths) + padding * 2)),
+    height: Math.max(56, Math.ceil(titleLineHeight + subtitleHeight + padding * 2)),
+  };
+}
+
 export function getSceneSequenceCount(scene: Scene) {
   return Math.max(scene.sequenceCount || 1, ...scene.elements.map((element) => element.revealStep), 1);
 }
@@ -95,6 +133,7 @@ export function getSceneTemplateAssets(scene: Scene, assets: Asset[]): Asset[] {
 function renderTextElement(element: TextElement) {
   const textVariant = getTextVariant(element);
   const textAlign = getTextAlign(element);
+  const blockBackgroundColor = getTextBlockBackgroundColor(element);
   const { title, subtitle } = splitTextContent(element.text);
   const lines = textVariant === 'free'
     ? element.text.split('\n')
@@ -118,7 +157,7 @@ function renderTextElement(element: TextElement) {
 
   return `
     ${textVariant === 'block'
-      ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="${Math.min(element.height / 2, 64)}" fill="#3b82f6" />`
+      ? `<rect x="${element.x}" y="${element.y}" width="${element.width}" height="${element.height}" rx="${Math.min(element.height / 2, 64)}" fill="${escapeXml(blockBackgroundColor)}" />`
       : ''
     }
     ${lines.map((line, index) => {

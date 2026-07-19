@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { Rnd } from 'react-rnd';
 import { TextElement, ImageElement, ShapeElement, ColorElement } from '../types';
 import { createAssetFromFile, getDefaultImageFrameStyle } from '../assetUtils';
-import { getEffectiveElementState, getTextAlign, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { getEffectiveElementState, getTextAlign, getTextBlockBackgroundColor, getTextBlockFitSize, getTextPadding, getTextSubtitleFontSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { Check, X } from 'lucide-react';
 import { DEFAULT_ICON_COLOR } from '../iconLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
@@ -225,6 +225,7 @@ function CanvasElement({
   const subtitleFontSize = element.type === 'text' ? getTextSubtitleFontSize(element) : 0;
   const textPadding = element.type === 'text' && textVariant === 'block' ? getTextPadding(element) : 0;
   const blockTextPaddingX = textPadding;
+  const blockBackgroundColor = element.type === 'text' ? getTextBlockBackgroundColor(element) : 'transparent';
 
   const syncFrame = (nextFrame: Frame | ((current: Frame) => Frame)) => {
     const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(frameRef.current) : nextFrame;
@@ -347,12 +348,16 @@ function CanvasElement({
                 fontSize: `${element.fontSize}px`, 
                 fontWeight: element.fontWeight, 
                 color: element.color,
-                backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                backgroundColor: textVariant === 'block' ? blockBackgroundColor : 'transparent',
                 lineHeight: 1.12,
                 textAlign,
               }}
               value={element.text}
-              onChange={(e) => dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { text: e.target.value } } })}
+              onChange={(e) => {
+                const text = e.target.value;
+                const sizeUpdates = textVariant === 'block' ? getTextBlockFitSize({ ...element, text }) : {};
+                dispatch({ type: 'UPDATE_ELEMENT', payload: { id: element.id, updates: { text, ...sizeUpdates } } });
+              }}
               onBlur={() => setIsEditingText(false)}
               onKeyDown={(e) => {
                 if (e.key === 'Escape') setIsEditingText(false);
@@ -366,7 +371,7 @@ function CanvasElement({
                   : 'flex flex-col items-start justify-start text-left'
               }`}
               style={{
-                backgroundColor: textVariant === 'block' ? '#3b82f6' : 'transparent',
+                backgroundColor: textVariant === 'block' ? blockBackgroundColor : 'transparent',
                 color: element.color,
                 padding: textVariant === 'block' ? `${textPadding}px ${blockTextPaddingX}px` : '0px',
               }}

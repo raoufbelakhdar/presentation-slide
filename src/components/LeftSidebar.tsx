@@ -45,8 +45,14 @@ import {
 import {
   buildSceneTemplate,
   combineTextContent,
+  DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR,
+  DEFAULT_TEXT_BLOCK_FONT_SIZE,
+  DEFAULT_TEXT_BLOCK_PADDING,
+  DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
   generateId,
   getTextAlign,
+  getTextBlockBackgroundColor,
+  getTextBlockFitSize,
   getTextSubtitleFontSize,
   getTextVariant,
   mergeAssetLibraries,
@@ -265,8 +271,8 @@ function SavedElementFavoritePreview({
       >
         {textVariant === "block" ? (
           <div
-            className="flex h-full w-full flex-col justify-center rounded-[24px] bg-[#3b82f6] px-3 text-white"
-            style={{ textAlign }}
+            className="flex h-full w-full flex-col justify-center rounded-[24px] px-3 text-white"
+            style={{ textAlign, backgroundColor: getTextBlockBackgroundColor(element) }}
           >
             <div
               className="truncate text-[11px] font-bold leading-tight"
@@ -851,19 +857,28 @@ export function LeftSidebar() {
   };
 
   const addTextBlockElement = () => {
+    const text = "Main Title\nSubtitle text here";
+    const fitSize = getTextBlockFitSize({
+      text,
+      fontSize: DEFAULT_TEXT_BLOCK_FONT_SIZE,
+      subtitleFontSize: DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
+      padding: DEFAULT_TEXT_BLOCK_PADDING,
+      fontWeight: "bold",
+    });
     const newElement: TextElement = {
       id: generateId(),
       type: "text",
       variant: "block",
-      text: "Main Title\nSubtitle text here",
+      text,
       x: 100,
       y: 100,
-      width: 400,
-      height: 120,
+      width: fitSize.width,
+      height: fitSize.height,
       revealStep: defaultRevealStep,
-      fontSize: 40,
-      subtitleFontSize: 20,
-      padding: 20,
+      fontSize: DEFAULT_TEXT_BLOCK_FONT_SIZE,
+      subtitleFontSize: DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
+      padding: DEFAULT_TEXT_BLOCK_PADDING,
+      backgroundColor: DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR,
       fontWeight: "bold",
       color: "#ffffff",
     };
@@ -1483,27 +1498,39 @@ export function LeftSidebar() {
 
   const createDictionaryTextBlockComponent = (
     entry: DictionaryEntry,
-  ): SavedComponent => ({
-    type: "saved-element",
-    id: getDictionaryAssignmentId(entry, "preset:text-block"),
-    name: `${entry.arabicWord} Text Block`,
-    element: {
-      id: generateId(),
-      type: "text",
-      variant: "block",
-      text: getDictionaryTextContent(entry),
-      x: 100,
-      y: 100,
-      width: 400,
-      height: 120,
-      revealStep: defaultRevealStep,
-      fontSize: 40,
-      subtitleFontSize: 20,
-      padding: 20,
+  ): SavedComponent => {
+    const text = getDictionaryTextContent(entry);
+    const fitSize = getTextBlockFitSize({
+      text,
+      fontSize: DEFAULT_TEXT_BLOCK_FONT_SIZE,
+      subtitleFontSize: DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
+      padding: DEFAULT_TEXT_BLOCK_PADDING,
       fontWeight: "bold",
-      color: "#ffffff",
-    },
-  });
+    });
+
+    return {
+      type: "saved-element",
+      id: getDictionaryAssignmentId(entry, "preset:text-block"),
+      name: `${entry.arabicWord} Text Block`,
+      element: {
+        id: generateId(),
+        type: "text",
+        variant: "block",
+        text,
+        x: 100,
+        y: 100,
+        width: fitSize.width,
+        height: fitSize.height,
+        revealStep: defaultRevealStep,
+        fontSize: DEFAULT_TEXT_BLOCK_FONT_SIZE,
+        subtitleFontSize: DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE,
+        padding: DEFAULT_TEXT_BLOCK_PADDING,
+        backgroundColor: DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR,
+        fontWeight: "bold",
+        color: "#ffffff",
+      },
+    };
+  };
 
   const getSceneElementName = (element: SceneElement) => {
     if (element.type === "text") {
