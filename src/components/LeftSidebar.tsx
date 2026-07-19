@@ -581,6 +581,9 @@ export function LeftSidebar() {
     EMPTY_MANUAL_DICTIONARY_ENTRY,
   );
   const [manualDictionaryError, setManualDictionaryError] = useState("");
+  const [dictionaryModalMode, setDictionaryModalMode] = useState<
+    "manual" | "import" | null
+  >(null);
   const [dictionaryJson, setDictionaryJson] = useState("");
   const [dictionaryImportError, setDictionaryImportError] = useState("");
   const [dictionaryTemplateCopied, setDictionaryTemplateCopied] =
@@ -656,6 +659,24 @@ export function LeftSidebar() {
       window.removeEventListener("offline", handleOffline);
     };
   }, []);
+
+  useEffect(() => {
+    if (!dictionaryModalMode) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeDictionaryModal();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [dictionaryModalMode]);
 
   useEffect(() => {
     setPexelsPage(1);
@@ -758,6 +779,22 @@ export function LeftSidebar() {
         });
       })();
     });
+  };
+
+  const openManualDictionaryModal = () => {
+    setDictionaryModalMode("manual");
+    setManualDictionaryError("");
+  };
+
+  const openDictionaryImportModal = () => {
+    setDictionaryModalMode("import");
+    setDictionaryImportError("");
+  };
+
+  const closeDictionaryModal = () => {
+    setDictionaryModalMode(null);
+    setManualDictionaryError("");
+    setDictionaryImportError("");
   };
 
   const addTextBlockElement = () => {
@@ -1259,6 +1296,7 @@ export function LeftSidebar() {
     setManualDictionaryEntry(EMPTY_MANUAL_DICTIONARY_ENTRY);
     setManualDictionaryError("");
     setComponentTab("dictionary");
+    setDictionaryModalMode(null);
   };
 
   const copyDictionaryJsonTemplate = () => {
@@ -1290,7 +1328,7 @@ export function LeftSidebar() {
         setDictionaryImportError(
           "No dictionary words found. Use an array or an object with a words array.",
         );
-        return;
+        return false;
       }
 
       dispatch({
@@ -1300,8 +1338,11 @@ export function LeftSidebar() {
       setDictionaryJson("");
       setDictionaryImportError("");
       setComponentTab("dictionary");
+      setDictionaryModalMode(null);
+      return true;
     } catch {
       setDictionaryImportError("Invalid JSON. Check commas and quotes.");
+      return false;
     }
   };
 
@@ -1747,8 +1788,245 @@ export function LeftSidebar() {
     </div>
   );
 
+  const dictionaryManagementModal = dictionaryModalMode ? (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-6 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="dictionary-management-title"
+      onMouseDown={closeDictionaryModal}
+    >
+      <div
+        className="flex max-h-[calc(100vh-48px)] w-full max-w-[680px] flex-col overflow-hidden rounded-md border border-[#dbe4f0] bg-white shadow-2xl"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-[#e2e8f0] px-5 py-4">
+          <div>
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+              Dictionary
+            </div>
+            <h2
+              id="dictionary-management-title"
+              className="mt-1 text-lg font-bold leading-tight text-[#0f172a]"
+            >
+              {dictionaryModalMode === "manual" ? "Add Word" : "Import Words"}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={closeDictionaryModal}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700"
+            title="Close"
+            aria-label="Close dictionary dialog"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="border-b border-[#f1f5f9] bg-[#f8fafc] px-5 py-3">
+          <div className="inline-grid grid-cols-2 gap-1 rounded-sm border border-[#dbe4f0] bg-white p-1">
+            <button
+              type="button"
+              onClick={openManualDictionaryModal}
+              className={`flex h-9 items-center justify-center gap-2 rounded-sm px-3 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                dictionaryModalMode === "manual"
+                  ? "bg-[#4f46e5] text-white"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-[#4f46e5]"
+              }`}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+            <button
+              type="button"
+              onClick={openDictionaryImportModal}
+              className={`flex h-9 items-center justify-center gap-2 rounded-sm px-3 text-[10px] font-bold uppercase tracking-[0.16em] transition-colors ${
+                dictionaryModalMode === "import"
+                  ? "bg-[#4f46e5] text-white"
+                  : "text-slate-500 hover:bg-slate-50 hover:text-[#4f46e5]"
+              }`}
+            >
+              <Upload className="h-3.5 w-3.5" />
+              Import
+            </button>
+          </div>
+        </div>
+
+        <div className="overflow-y-auto px-5 py-5">
+          {dictionaryModalMode === "manual" ? (
+            <form onSubmit={addManualDictionaryWord} className="space-y-4">
+              <div>
+                <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Arabic Word
+                </label>
+                <input
+                  type="text"
+                  value={manualDictionaryEntry.arabicWord}
+                  onChange={(event) => {
+                    setManualDictionaryEntry((entry) => ({
+                      ...entry,
+                      arabicWord: event.target.value,
+                    }));
+                    setManualDictionaryError("");
+                  }}
+                  placeholder="Arabic Word"
+                  dir="auto"
+                  autoFocus
+                  className="h-11 w-full rounded-sm border border-[#dbe4f0] bg-white px-3 text-[14px] font-semibold text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                />
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    English Meaning
+                  </label>
+                  <input
+                    type="text"
+                    value={manualDictionaryEntry.englishMeaning}
+                    onChange={(event) => {
+                      setManualDictionaryEntry((entry) => ({
+                        ...entry,
+                        englishMeaning: event.target.value,
+                      }));
+                      setManualDictionaryError("");
+                    }}
+                    placeholder="English Meaning"
+                    className="h-11 w-full rounded-sm border border-[#dbe4f0] bg-white px-3 text-[13px] text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                    Phonetic Pronunciation
+                  </label>
+                  <input
+                    type="text"
+                    value={manualDictionaryEntry.phoneticPronunciation}
+                    onChange={(event) => {
+                      setManualDictionaryEntry((entry) => ({
+                        ...entry,
+                        phoneticPronunciation: event.target.value,
+                      }));
+                      setManualDictionaryError("");
+                    }}
+                    placeholder="Phonetic Pronunciation"
+                    className="h-11 w-full rounded-sm border border-[#dbe4f0] bg-white px-3 text-[13px] text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                  />
+                </div>
+              </div>
+
+              {manualDictionaryError && (
+                <div className="rounded-sm border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600">
+                  {manualDictionaryError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 border-t border-[#f1f5f9] pt-4">
+                <button
+                  type="button"
+                  onClick={closeDictionaryModal}
+                  className="flex h-10 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!manualDictionaryEntry.arabicWord.trim()}
+                  className="flex h-10 items-center justify-center gap-2 rounded-sm bg-[#4f46e5] px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add Word
+                </button>
+              </div>
+            </form>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  JSON Import
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={copyDictionaryJsonTemplate}
+                    title="Copy JSON template"
+                    className="flex h-9 items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copy Template
+                  </button>
+                  <label
+                    title="Upload JSON"
+                    className="flex h-9 cursor-pointer items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                  >
+                    <Upload className="h-3.5 w-3.5" />
+                    Upload
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={handleDictionaryFileImport}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <pre className="max-h-44 overflow-auto rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3 font-mono text-[11px] leading-relaxed text-slate-500">
+                {DICTIONARY_JSON_TEMPLATE}
+              </pre>
+
+              {dictionaryTemplateCopied && (
+                <div className="rounded-sm border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] font-semibold text-emerald-700">
+                  JSON template copied.
+                </div>
+              )}
+
+              <textarea
+                value={dictionaryJson}
+                onChange={(event) => {
+                  setDictionaryJson(event.target.value);
+                  setDictionaryImportError("");
+                }}
+                placeholder='[{"Arabic Word":"...","English Meaning":"...","Phonetic Pronunciation":"..."}]'
+                autoFocus
+                className="min-h-[160px] w-full resize-y rounded-sm border border-[#dbe4f0] bg-white p-3 font-mono text-[12px] leading-relaxed text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+              />
+
+              {dictionaryImportError && (
+                <div className="rounded-sm border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-semibold text-rose-600">
+                  {dictionaryImportError}
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 border-t border-[#f1f5f9] pt-4">
+                <button
+                  type="button"
+                  onClick={closeDictionaryModal}
+                  className="flex h-10 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => importDictionaryJson()}
+                  disabled={!dictionaryJson.trim()}
+                  className="flex h-10 items-center justify-center gap-2 rounded-sm bg-[#4f46e5] px-4 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  Import Words
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   return (
-    <div className="w-72 bg-white border-r border-[#e2e8f0] flex flex-col h-full shrink-0">
+    <>
+      {dictionaryManagementModal}
+      <div className="w-72 bg-white border-r border-[#e2e8f0] flex flex-col h-full shrink-0">
       <div className="flex border-b border-[#f1f5f9]">
         <button
           className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${activeTab === "library" ? "text-[#1e293b] border-[#4f46e5] bg-white" : "text-slate-400 border-transparent hover:bg-slate-50"}`}
@@ -2279,130 +2557,26 @@ export function LeftSidebar() {
                   </div>
                 </div>
               ) : componentTab === "dictionary" ? (
-                <div className="space-y-5">
-                  <form
-                    onSubmit={addManualDictionaryWord}
-                    className="space-y-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3"
-                  >
-                    <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                      Manual Word
-                    </div>
-                    <input
-                      type="text"
-                      value={manualDictionaryEntry.arabicWord}
-                      onChange={(event) => {
-                        setManualDictionaryEntry((entry) => ({
-                          ...entry,
-                          arabicWord: event.target.value,
-                        }));
-                        setManualDictionaryError("");
-                      }}
-                      placeholder="Arabic Word"
-                      dir="auto"
-                      className="h-9 w-full rounded-sm border border-[#e2e8f0] bg-white px-2 text-[12px] font-semibold text-[#0f172a] outline-none focus:border-[#4f46e5]"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <input
-                        type="text"
-                        value={manualDictionaryEntry.englishMeaning}
-                        onChange={(event) => {
-                          setManualDictionaryEntry((entry) => ({
-                            ...entry,
-                            englishMeaning: event.target.value,
-                          }));
-                          setManualDictionaryError("");
-                        }}
-                        placeholder="English Meaning"
-                        className="h-9 min-w-0 rounded-sm border border-[#e2e8f0] bg-white px-2 text-[12px] text-[#0f172a] outline-none focus:border-[#4f46e5]"
-                      />
-                      <input
-                        type="text"
-                        value={manualDictionaryEntry.phoneticPronunciation}
-                        onChange={(event) => {
-                          setManualDictionaryEntry((entry) => ({
-                            ...entry,
-                            phoneticPronunciation: event.target.value,
-                          }));
-                          setManualDictionaryError("");
-                        }}
-                        placeholder="Phonetic Pronunciation"
-                        className="h-9 min-w-0 rounded-sm border border-[#e2e8f0] bg-white px-2 text-[12px] text-[#0f172a] outline-none focus:border-[#4f46e5]"
-                      />
-                    </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      type="submit"
-                      disabled={!manualDictionaryEntry.arabicWord.trim()}
-                      className="flex w-full items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-[#dbe4f0]"
+                      type="button"
+                      onClick={openManualDictionaryModal}
+                      className="flex h-10 items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-[#4f46e5] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca]"
+                      title="Add dictionary word"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       Add Word
                     </button>
-                    {manualDictionaryError && (
-                      <div className="rounded-sm border border-rose-100 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-600">
-                        {manualDictionaryError}
-                      </div>
-                    )}
-                  </form>
-
-                  <div className="space-y-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                        JSON Import
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <button
-                          type="button"
-                          onClick={copyDictionaryJsonTemplate}
-                          title="Copy JSON template"
-                          className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </button>
-                        <label
-                          title="Upload JSON"
-                          className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
-                        >
-                          <Upload className="h-4 w-4" />
-                          <input
-                            type="file"
-                            accept="application/json,.json"
-                            className="hidden"
-                            onChange={handleDictionaryFileImport}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                    <pre className="max-h-52 overflow-auto rounded-sm border border-[#e2e8f0] bg-white p-2 font-mono text-[10px] leading-relaxed text-slate-500">
-                      {DICTIONARY_JSON_TEMPLATE}
-                    </pre>
-                    {dictionaryTemplateCopied && (
-                      <div className="rounded-sm border border-emerald-100 bg-emerald-50 px-3 py-2 text-[10px] font-semibold text-emerald-700">
-                        JSON template copied.
-                      </div>
-                    )}
-                    <textarea
-                      value={dictionaryJson}
-                      onChange={(event) => {
-                        setDictionaryJson(event.target.value);
-                        setDictionaryImportError("");
-                      }}
-                      placeholder='[{"Arabic Word":"...","English Meaning":"...","Phonetic Pronunciation":"..."}]'
-                      className="min-h-[96px] w-full resize-none rounded-sm border border-[#e2e8f0] bg-white p-2 font-mono text-[11px] leading-relaxed text-[#0f172a] outline-none focus:border-[#4f46e5]"
-                    />
                     <button
                       type="button"
-                      onClick={() => importDictionaryJson()}
-                      disabled={!dictionaryJson.trim()}
-                      className="flex w-full items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-[#dbe4f0]"
+                      onClick={openDictionaryImportModal}
+                      className="flex h-10 items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                      title="Import dictionary words"
                     >
-                      <BookOpen className="h-3.5 w-3.5" />
-                      Import Words
+                      <Upload className="h-3.5 w-3.5" />
+                      Import
                     </button>
-                    {dictionaryImportError && (
-                      <div className="rounded-sm border border-rose-100 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-600">
-                        {dictionaryImportError}
-                      </div>
-                    )}
                   </div>
 
                   <div>
@@ -3038,5 +3212,6 @@ export function LeftSidebar() {
         )}
       </div>
     </div>
+    </>
   );
 }
