@@ -13,6 +13,7 @@ import {
   Search,
   Star,
   Link2,
+  Unlink2,
   Layers,
   Image,
   Smile,
@@ -62,13 +63,11 @@ import { getDictionarySearchText, parseDictionaryJson } from "../dictionary";
 import {
   DEFAULT_ICON_COLOR,
   FEATURED_ICON_NAMES,
-  LUCIDE_ICON_NAMES,
   formatIconName,
   searchLucideIcons,
 } from "../iconLibrary";
 import { LucideIconGlyph } from "./LucideIconGlyph";
 import {
-  EMOJI_LIBRARY,
   FEATURED_EMOJI_IDS,
   getEmojiById,
   getEmojiLabel,
@@ -142,7 +141,16 @@ const SHARED_ASSETS_VISIBILITY_STORAGE_KEY =
   "visual-learning-shared-assets-visible";
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   "bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]";
-const DICTIONARY_ASSIGNMENT_RESULT_LIMIT = 72;
+const DICTIONARY_ASSIGNMENT_RESULT_LIMIT = 20;
+const DICTIONARY_ASSIGNMENT_PRESET_PRIORITIES: Record<PresetId, number> = {
+  "text-block": 1000,
+  "free-text": 990,
+  "yes-badge": 340,
+  "no-badge": 330,
+  "color-card": 320,
+  "blue-check": 310,
+  "red-cross": 300,
+};
 const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
   { value: "all", label: "All", icon: LayoutGrid },
   { value: "image", label: "Images", icon: Image },
@@ -162,6 +170,17 @@ const DICTIONARY_ASSIGNMENT_TAB_OPTIONS = [
 ] as const;
 type DictionaryAssignmentTab =
   (typeof DICTIONARY_ASSIGNMENT_TAB_OPTIONS)[number]["value"];
+const createDictionaryAssignmentVisibleLimits = (): Record<
+  DictionaryAssignmentTab,
+  number
+> => ({
+  all: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+  presets: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+  components: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+  assets: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+  icons: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+  emojis: DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+});
 type DictionaryAssignmentOption = {
   id: string;
   sourceId: string;
@@ -169,6 +188,8 @@ type DictionaryAssignmentOption = {
   label: string;
   typeLabel: string;
   searchText: string;
+  preview: React.ReactNode;
+  priority: number;
   createComponent: (entry: DictionaryEntry) => SavedComponent;
 };
 
@@ -496,6 +517,37 @@ function ColorCardPresetPreview() {
   );
 }
 
+function AssignmentAssetPreview({ asset }: { asset: Asset }) {
+  return (
+    <div
+      className={`flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[#dbe4f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}
+    >
+      <img
+        src={asset.dataUrl}
+        alt={asset.name}
+        className="h-full w-full object-contain p-1.5"
+        draggable={false}
+      />
+    </div>
+  );
+}
+
+function AssignmentSavedComponentPreview({
+  component,
+}: {
+  component: SavedComponent;
+}) {
+  if (component.element.type === "image" && component.asset) {
+    return <AssignmentAssetPreview asset={component.asset} />;
+  }
+
+  return (
+    <div className="h-20 w-24 shrink-0 overflow-hidden">
+      <SavedElementFavoritePreview favorite={component} />
+    </div>
+  );
+}
+
 function IconPresetPreview({ iconName }: { iconName: string }) {
   return (
     <div
@@ -631,6 +683,12 @@ export function LeftSidebar() {
     useState("");
   const [dictionaryAssignmentTab, setDictionaryAssignmentTab] =
     useState<DictionaryAssignmentTab>("all");
+  const [
+    dictionaryAssignmentVisibleLimits,
+    setDictionaryAssignmentVisibleLimits,
+  ] = useState<Record<DictionaryAssignmentTab, number>>(
+    createDictionaryAssignmentVisibleLimits,
+  );
   const [expandedDictionaryEntryIds, setExpandedDictionaryEntryIds] = useState<
     Set<string>
   >(new Set());
@@ -740,6 +798,12 @@ export function LeftSidebar() {
       closeDictionaryAssignmentModal();
     }
   }, [dictionaryAssignmentEntryId, dictionaryEntries]);
+
+  useEffect(() => {
+    setDictionaryAssignmentVisibleLimits(
+      createDictionaryAssignmentVisibleLimits(),
+    );
+  }, [deferredDictionaryAssignmentQuery, dictionaryAssignmentEntryId]);
 
   useEffect(() => {
     setPexelsPage(1);
@@ -864,12 +928,18 @@ export function LeftSidebar() {
     setDictionaryAssignmentEntryId(entry.id);
     setDictionaryAssignmentQuery("");
     setDictionaryAssignmentTab("all");
+    setDictionaryAssignmentVisibleLimits(
+      createDictionaryAssignmentVisibleLimits(),
+    );
   };
 
   const closeDictionaryAssignmentModal = () => {
     setDictionaryAssignmentEntryId(null);
     setDictionaryAssignmentQuery("");
     setDictionaryAssignmentTab("all");
+    setDictionaryAssignmentVisibleLimits(
+      createDictionaryAssignmentVisibleLimits(),
+    );
   };
 
   const toggleDictionaryEntryExpanded = (entryId: string) => {
@@ -1885,6 +1955,14 @@ export function LeftSidebar() {
   );
   const normalizedDictionaryAssignmentQuery =
     deferredDictionaryAssignmentQuery.trim().toLowerCase();
+  const hasDictionaryAssignmentQuery = Boolean(
+    normalizedDictionaryAssignmentQuery,
+  );
+  const dictionaryAssignmentVisibleLimit =
+    dictionaryAssignmentVisibleLimits[dictionaryAssignmentTab] ||
+    DICTIONARY_ASSIGNMENT_RESULT_LIMIT;
+  const dictionaryAssignmentSearchFetchLimit =
+    dictionaryAssignmentVisibleLimit + DICTIONARY_ASSIGNMENT_RESULT_LIMIT;
   const selectedElementAsset =
     selectedElement?.type === "image"
       ? projectAssetsById.get(selectedElement.assetId)
@@ -1900,59 +1978,70 @@ export function LeftSidebar() {
     dictionaryAssignmentTab === "all" || dictionaryAssignmentTab === "icons";
   const shouldShowDictionaryAssignmentEmojis =
     dictionaryAssignmentTab === "all" || dictionaryAssignmentTab === "emojis";
+  const dictionaryAssignmentPresetDefinitions =
+    shouldShowDictionaryAssignmentPresets
+      ? [...presetDefinitions].sort(
+          (firstPreset, secondPreset) =>
+            DICTIONARY_ASSIGNMENT_PRESET_PRIORITIES[secondPreset.id] -
+            DICTIONARY_ASSIGNMENT_PRESET_PRIORITIES[firstPreset.id],
+        )
+      : [];
   const dictionaryAssignmentSavedComponentCandidates =
     shouldShowDictionaryAssignmentComponents
-      ? normalizedDictionaryAssignmentQuery
-        ? dictionaryAssignmentSavedComponents
-        : dictionaryAssignmentSavedComponents.slice(
-            0,
-            DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
-          )
+      ? dictionaryAssignmentSavedComponents
       : [];
   const dictionaryAssignmentAssetCandidates = shouldShowDictionaryAssignmentAssets
-    ? normalizedDictionaryAssignmentQuery
-      ? availableAssets
-      : availableAssets.slice(0, DICTIONARY_ASSIGNMENT_RESULT_LIMIT)
+    ? availableAssets
     : [];
-  const dictionaryAssignmentIconNames = shouldShowDictionaryAssignmentIcons
-    ? searchLucideIcons(
-        normalizedDictionaryAssignmentQuery,
-        DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
-      )
-    : [];
-  const dictionaryAssignmentEmojiEntries = shouldShowDictionaryAssignmentEmojis
-    ? searchEmojis(
-        normalizedDictionaryAssignmentQuery,
-        DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
-      )
-    : [];
+  const dictionaryAssignmentIconNames =
+    shouldShowDictionaryAssignmentIcons && hasDictionaryAssignmentQuery
+      ? searchLucideIcons(
+          normalizedDictionaryAssignmentQuery,
+          dictionaryAssignmentSearchFetchLimit,
+        )
+      : [];
+  const dictionaryAssignmentEmojiEntries =
+    shouldShowDictionaryAssignmentEmojis && hasDictionaryAssignmentQuery
+      ? searchEmojis(
+          normalizedDictionaryAssignmentQuery,
+          dictionaryAssignmentSearchFetchLimit,
+        )
+      : [];
   const dictionaryAssignmentOptions: DictionaryAssignmentOption[] =
     dictionaryAssignmentEntry
       ? [
-          ...(shouldShowDictionaryAssignmentPresets
-            ? presetDefinitions.map((preset) => ({
-                id: `preset:${preset.id}`,
-                sourceId: `preset:${preset.id}`,
-                group: "presets" as const,
-                label: preset.label,
-                typeLabel: "Preset",
-                searchText: [
-                  preset.id,
-                  preset.label,
-                  dictionaryAssignmentEntry.arabicWord,
-                  dictionaryAssignmentEntry.englishMeaning,
-                  dictionaryAssignmentEntry.phoneticPronunciation,
-                ]
-                  .join(" ")
-                  .toLowerCase(),
-                createComponent: (entry: DictionaryEntry) =>
-                  createDictionaryPresetComponent(entry, preset.id),
-              }))
-            : []),
+          ...dictionaryAssignmentPresetDefinitions.map((preset) => {
+            const previewComponent = createDictionaryPresetComponent(
+              dictionaryAssignmentEntry,
+              preset.id,
+            );
+
+            return {
+              id: `preset:${preset.id}`,
+              sourceId: `preset:${preset.id}`,
+              group: "presets" as const,
+              label: preset.label,
+              typeLabel: "Preset",
+              searchText: [preset.id, preset.label].join(" ").toLowerCase(),
+              preview: (
+                <AssignmentSavedComponentPreview component={previewComponent} />
+              ),
+              priority: DICTIONARY_ASSIGNMENT_PRESET_PRIORITIES[preset.id],
+              createComponent: (entry: DictionaryEntry) =>
+                createDictionaryPresetComponent(entry, preset.id),
+            };
+          }),
           ...(shouldShowDictionaryAssignmentComponents && selectedElement
             ? [
                 (() => {
                   const selectedElementName = getSceneElementName(selectedElement);
+                  const previewComponent = createDictionaryComponentFromElement(
+                    dictionaryAssignmentEntry,
+                    `selected:${selectedElement.id}`,
+                    `${dictionaryAssignmentEntry.arabicWord} ${selectedElementName}`,
+                    selectedElement,
+                    selectedElementAsset,
+                  );
 
                   return {
                     id: `selected:${selectedElement.id}`,
@@ -1964,12 +2053,13 @@ export function LeftSidebar() {
                       "selected",
                       selectedElementName,
                       getSavedFavoriteTypeLabel(selectedElement),
-                      dictionaryAssignmentEntry.arabicWord,
-                      dictionaryAssignmentEntry.englishMeaning,
-                      dictionaryAssignmentEntry.phoneticPronunciation,
                     ]
                       .join(" ")
                       .toLowerCase(),
+                    preview: (
+                      <AssignmentSavedComponentPreview component={previewComponent} />
+                    ),
+                    priority: 980,
                     createComponent: (entry: DictionaryEntry) =>
                       createDictionaryComponentFromElement(
                         entry,
@@ -1983,22 +2073,41 @@ export function LeftSidebar() {
               ]
             : []),
           ...(shouldShowDictionaryAssignmentComponents
-            ? dictionaryAssignmentSavedComponentCandidates.map((component) => ({
-                id: `saved:${component.id}`,
-                sourceId: `saved:${component.id}`,
-                group: "components" as const,
-                label: component.name,
-                typeLabel: getSavedFavoriteTypeLabel(component.element),
-                searchText: getSavedComponentSearchText(component),
-                createComponent: (entry: DictionaryEntry) =>
-                  createDictionaryComponentFromElement(
-                    entry,
-                    `saved:${component.id}`,
-                    component.name,
-                    component.element,
-                    component.asset,
+            ? dictionaryAssignmentSavedComponentCandidates.map((component) => {
+                const previewComponent = customizeComponentForDictionaryEntry(
+                  component,
+                  dictionaryAssignmentEntry,
+                );
+                const elementTypePriority =
+                  component.element.type === "text"
+                    ? getTextVariant(component.element) === "block"
+                      ? 740
+                      : 730
+                    : component.element.type === "image"
+                      ? 720
+                      : 520;
+
+                return {
+                  id: `saved:${component.id}`,
+                  sourceId: `saved:${component.id}`,
+                  group: "components" as const,
+                  label: component.name,
+                  typeLabel: getSavedFavoriteTypeLabel(component.element),
+                  searchText: getSavedComponentSearchText(component),
+                  preview: (
+                    <AssignmentSavedComponentPreview component={previewComponent} />
                   ),
-              }))
+                  priority: elementTypePriority,
+                  createComponent: (entry: DictionaryEntry) =>
+                    createDictionaryComponentFromElement(
+                      entry,
+                      `saved:${component.id}`,
+                      component.name,
+                      component.element,
+                      component.asset,
+                    ),
+                };
+              })
             : []),
           ...(shouldShowDictionaryAssignmentAssets
             ? dictionaryAssignmentAssetCandidates.map((asset) => ({
@@ -2007,16 +2116,11 @@ export function LeftSidebar() {
                 group: "assets" as const,
                 label: asset.name,
                 typeLabel: getAssetKind(asset),
-                searchText: [
-                  asset.id,
-                  asset.name,
-                  getAssetKind(asset),
-                  dictionaryAssignmentEntry.arabicWord,
-                  dictionaryAssignmentEntry.englishMeaning,
-                  dictionaryAssignmentEntry.phoneticPronunciation,
-                ]
+                searchText: [asset.id, asset.name, getAssetKind(asset)]
                   .join(" ")
                   .toLowerCase(),
+                preview: <AssignmentAssetPreview asset={asset} />,
+                priority: 760,
                 createComponent: (entry: DictionaryEntry) =>
                   createDictionaryAssetComponent(entry, asset),
               }))
@@ -2028,15 +2132,11 @@ export function LeftSidebar() {
               group: "icons" as const,
               label: formatIconName(iconName),
               typeLabel: "Icon",
-              searchText: [
-                iconName,
-                formatIconName(iconName),
-                dictionaryAssignmentEntry.arabicWord,
-                dictionaryAssignmentEntry.englishMeaning,
-                dictionaryAssignmentEntry.phoneticPronunciation,
-              ]
+              searchText: [iconName, formatIconName(iconName)]
                 .join(" ")
                 .toLowerCase(),
+              preview: <IconPresetPreview iconName={iconName} />,
+              priority: 620,
               createComponent: (entry: DictionaryEntry) =>
                 createDictionaryIconComponent(entry, iconName),
             };
@@ -2053,12 +2153,16 @@ export function LeftSidebar() {
                 emojiEntry.label,
                 emojiEntry.emoji,
                 emojiEntry.searchText,
-                dictionaryAssignmentEntry.arabicWord,
-                dictionaryAssignmentEntry.englishMeaning,
-                dictionaryAssignmentEntry.phoneticPronunciation,
               ]
                 .join(" ")
                 .toLowerCase(),
+              preview: (
+                <EmojiPresetPreview
+                  emojiId={emojiEntry.id}
+                  fallback={emojiEntry.emoji}
+                />
+              ),
+              priority: 610,
               createComponent: (entry: DictionaryEntry) =>
                 createDictionaryEmojiComponent(entry, emojiEntry),
             };
@@ -2070,30 +2174,58 @@ export function LeftSidebar() {
       matchesSearchQuery(normalizedDictionaryAssignmentQuery, option.searchText),
   );
   const filteredDictionaryAssignmentOptions =
-    searchedDictionaryAssignmentOptions.slice(0, DICTIONARY_ASSIGNMENT_RESULT_LIMIT);
+    [...searchedDictionaryAssignmentOptions]
+      .sort((firstOption, secondOption) => {
+        if (secondOption.priority !== firstOption.priority) {
+          return secondOption.priority - firstOption.priority;
+        }
+
+        return 0;
+      })
+      .slice(0, dictionaryAssignmentVisibleLimit);
   const hiddenDictionaryAssignmentResultCount = Math.max(
     0,
     searchedDictionaryAssignmentOptions.length -
       filteredDictionaryAssignmentOptions.length,
   );
+  const dictionaryAssignmentTabLabel =
+    DICTIONARY_ASSIGNMENT_TAB_OPTIONS.find(
+      (option) => option.value === dictionaryAssignmentTab,
+    )?.label || "results";
+  const revealMoreDictionaryAssignmentOptions = () => {
+    setDictionaryAssignmentVisibleLimits((currentLimits) => ({
+      ...currentLimits,
+      [dictionaryAssignmentTab]:
+        (currentLimits[dictionaryAssignmentTab] ||
+          DICTIONARY_ASSIGNMENT_RESULT_LIMIT) +
+        DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+    }));
+  };
+  const dictionaryAssignmentEmptyMessage =
+    !hasDictionaryAssignmentQuery &&
+    (dictionaryAssignmentTab === "icons" || dictionaryAssignmentTab === "emojis")
+      ? `Search to load ${dictionaryAssignmentTab}`
+      : "No assignable items match that search";
   const dictionaryAssignmentCounts = new Map<DictionaryAssignmentTab, number>([
+    ["all", dictionaryAssignmentOptions.length],
     [
-      "all",
-      presetDefinitions.length +
-        dictionaryAssignmentSavedComponents.length +
-        (selectedElement ? 1 : 0) +
-        availableAssets.length +
-        LUCIDE_ICON_NAMES.length +
-        EMOJI_LIBRARY.length,
+      "presets",
+      dictionaryAssignmentOptions.filter((option) => option.group === "presets")
+        .length,
     ],
-    ["presets", presetDefinitions.length],
     [
       "components",
-      dictionaryAssignmentSavedComponents.length + (selectedElement ? 1 : 0),
+      dictionaryAssignmentOptions.filter(
+        (option) => option.group === "components",
+      ).length,
     ],
-    ["assets", availableAssets.length],
-    ["icons", LUCIDE_ICON_NAMES.length],
-    ["emojis", EMOJI_LIBRARY.length],
+    [
+      "assets",
+      dictionaryAssignmentOptions.filter((option) => option.group === "assets")
+        .length,
+    ],
+    ["icons", dictionaryAssignmentIconNames.length],
+    ["emojis", dictionaryAssignmentEmojiEntries.length],
   ]);
 
   const renderDictionaryAssignmentOption = (
@@ -2103,58 +2235,67 @@ export function LeftSidebar() {
       return null;
     }
 
-    const GroupIcon =
-      option.group === "presets"
-        ? Layers
-        : option.group === "components"
-          ? Shapes
-          : option.group === "assets"
-            ? Image
-            : option.group === "icons"
-              ? Lightbulb
-              : Smile;
-    const isAssigned = dictionaryAssignmentEntry.components.some(
+    const assignedComponent = dictionaryAssignmentEntry.components.find(
       (entryComponent) =>
         entryComponent.id ===
         getDictionaryAssignmentId(dictionaryAssignmentEntry, option.sourceId),
     );
+    const isAssigned = Boolean(assignedComponent);
 
     return (
-      <button
+      <div
         key={option.id}
-        type="button"
-        onClick={() => {
-          assignDictionaryComponent(
-            dictionaryAssignmentEntry,
-            option.createComponent(dictionaryAssignmentEntry),
-          );
-        }}
-        title={`Assign ${option.label}`}
-        className="flex min-h-16 items-center gap-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
+        className={`relative flex min-h-40 flex-col rounded-sm border bg-[#f8fafc] p-2.5 transition-colors hover:bg-white ${
+          isAssigned
+            ? "border-emerald-300 ring-1 ring-emerald-100"
+            : "border-[#e2e8f0] hover:border-[#4f46e5]"
+        }`}
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[#4f46e5]">
-          <GroupIcon className="h-4 w-4" />
+        <button
+          type="button"
+          onClick={() => {
+            if (assignedComponent) {
+              deleteDictionaryComponent(dictionaryAssignmentEntry, assignedComponent);
+              return;
+            }
+
+            assignDictionaryComponent(
+              dictionaryAssignmentEntry,
+              option.createComponent(dictionaryAssignmentEntry),
+            );
+          }}
+          title={
+            isAssigned ? `Deassign ${option.label}` : `Assign ${option.label}`
+          }
+          aria-label={
+            isAssigned ? `Deassign ${option.label}` : `Assign ${option.label}`
+          }
+          className={`absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-sm border bg-white shadow-sm transition-colors ${
+            isAssigned
+              ? "border-emerald-200 text-emerald-600 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+              : "border-[#dbe4f0] text-[#4f46e5] hover:border-[#4f46e5] hover:bg-indigo-50"
+          }`}
+        >
+          {isAssigned ? (
+            <Unlink2 className="h-3.5 w-3.5" />
+          ) : (
+            <Link2 className="h-3.5 w-3.5" />
+          )}
+        </button>
+        <div className="flex h-20 items-center justify-center pr-8">
+          {option.preview}
         </div>
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="truncate text-xs font-semibold text-[#0f172a]">
-              {option.label}
-            </div>
-            <div className="mt-1 flex min-w-0 items-center gap-2 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              <span className="truncate">{option.typeLabel}</span>
-              <span className="text-slate-300">/</span>
-              <span className="truncate">{option.group}</span>
-            </div>
+        <div className="mt-2 min-w-0">
+          <div className="truncate text-[11px] font-semibold text-[#0f172a]">
+            {option.label}
           </div>
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500">
-            {isAssigned ? (
-              <Check className="h-3.5 w-3.5 text-emerald-500" />
-            ) : (
-              <Link2 className="h-3.5 w-3.5 text-[#4f46e5]" />
-            )}
+          <div className="mt-1 flex min-w-0 items-center gap-1.5 text-[8px] font-bold uppercase tracking-[0.14em] text-slate-400">
+            <span className="truncate">{option.typeLabel}</span>
+            <span className="text-slate-300">/</span>
+            <span className="truncate">{option.group}</span>
           </div>
         </div>
-      </button>
+      </div>
     );
   };
 
@@ -2751,7 +2892,7 @@ export function LeftSidebar() {
       onMouseDown={closeDictionaryAssignmentModal}
     >
       <div
-        className="flex max-h-[calc(100vh-48px)] w-full max-w-[760px] flex-col overflow-hidden rounded-md border border-[#dbe4f0] bg-white shadow-2xl"
+        className="flex max-h-[calc(100vh-48px)] w-full max-w-[900px] flex-col overflow-hidden rounded-md border border-[#dbe4f0] bg-white shadow-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex items-start justify-between gap-4 border-b border-[#e2e8f0] px-5 py-4">
@@ -2789,7 +2930,7 @@ export function LeftSidebar() {
         </div>
 
         <div className="overflow-y-auto px-5 py-5">
-          <div className="mb-4 grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="mb-4 grid grid-cols-6 gap-2">
             {DICTIONARY_ASSIGNMENT_TAB_OPTIONS.map((option) => {
               const Icon = option.icon;
               const isActive = dictionaryAssignmentTab === option.value;
@@ -2802,14 +2943,14 @@ export function LeftSidebar() {
                   onClick={() => setDictionaryAssignmentTab(option.value)}
                   title={`${option.label} (${count})`}
                   aria-label={`${option.label} (${count})`}
-                  className={`flex h-12 min-w-0 items-center justify-center gap-1.5 rounded-sm border px-2 text-[9px] font-bold uppercase tracking-[0.12em] transition-colors ${
+                  aria-pressed={isActive}
+                  className={`flex h-10 min-w-0 items-center justify-center rounded-sm border transition-colors ${
                     isActive
                       ? "border-[#4f46e5] bg-[#4f46e5] text-white"
                       : "border-[#dbe4f0] bg-[#f8fafc] text-slate-500 hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5]"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{option.label}</span>
+                  <Icon className="h-4 w-4 shrink-0" />
                 </button>
               );
             })}
@@ -2840,20 +2981,24 @@ export function LeftSidebar() {
 
             {filteredDictionaryAssignmentOptions.length === 0 ? (
               <div className="rounded-sm border border-dashed border-[#dbe4f0] bg-[#f8fafc] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                No assignable items match that search
+                {dictionaryAssignmentEmptyMessage}
               </div>
             ) : (
               <>
-                <div className="grid gap-2">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {filteredDictionaryAssignmentOptions.map(
                     renderDictionaryAssignmentOption,
                   )}
                 </div>
                 {hiddenDictionaryAssignmentResultCount > 0 && (
-                  <div className="mt-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                    Showing first {DICTIONARY_ASSIGNMENT_RESULT_LIMIT} of{" "}
-                    {searchedDictionaryAssignmentOptions.length}
-                  </div>
+                  <button
+                    type="button"
+                    onClick={revealMoreDictionaryAssignmentOptions}
+                    className="mt-3 flex h-10 w-full items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-[#f8fafc] text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5]"
+                  >
+                    <ChevronDown className="h-3.5 w-3.5" />
+                    Reveal more {dictionaryAssignmentTabLabel}
+                  </button>
                 )}
               </>
             )}
