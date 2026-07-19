@@ -562,7 +562,7 @@ function upsertTemplate(templates: SceneTemplate[], template: SceneTemplate): Sc
 }
 
 function getDictionaryEntryKey(entry: Pick<DictionaryEntry, 'id' | 'arabicWord'>) {
-  return entry.id || entry.arabicWord.trim().toLowerCase();
+  return entry.arabicWord.trim().toLowerCase() || entry.id;
 }
 
 function mergeDictionaryComponents(

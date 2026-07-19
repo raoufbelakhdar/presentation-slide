@@ -106,7 +106,7 @@ export function normalizeDictionaryEntries(entries: unknown): DictionaryEntry[] 
   const entriesByKey = new Map<string, DictionaryEntry>();
 
   for (const entry of normalizedEntries) {
-    const key = entry.id || entry.arabicWord.toLowerCase();
+    const key = entry.arabicWord.trim().toLowerCase() || entry.id;
     entriesByKey.set(key, {
       ...(entriesByKey.get(key) || entry),
       ...entry,
