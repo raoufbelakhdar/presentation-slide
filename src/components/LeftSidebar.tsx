@@ -23,6 +23,7 @@ import {
   TextCursorInput,
   WifiOff,
   BookOpen,
+  ChevronDown,
 } from "lucide-react";
 import {
   Asset,
@@ -193,6 +194,13 @@ function getSavedFavoriteTypeFilterValue(
   if (element.type === "color") return "all";
   if (element.shapeType === "emoji") return "emoji";
   return "icon";
+}
+
+function isSavedTextBlockComponent(component: SavedComponent) {
+  return (
+    component.element.type === "text" &&
+    getTextVariant(component.element) === "block"
+  );
 }
 
 function getSavedComponentSearchText(favorite: SavedComponent) {
@@ -594,6 +602,9 @@ export function LeftSidebar() {
     useState<string | null>(null);
   const [dictionaryAssignmentQuery, setDictionaryAssignmentQuery] =
     useState("");
+  const [expandedDictionaryEntryIds, setExpandedDictionaryEntryIds] = useState<
+    Set<string>
+  >(new Set());
   const [dictionaryJson, setDictionaryJson] = useState("");
   const [dictionaryImportError, setDictionaryImportError] = useState("");
   const [dictionaryTemplateCopied, setDictionaryTemplateCopied] =
@@ -825,6 +836,18 @@ export function LeftSidebar() {
   const closeDictionaryAssignmentModal = () => {
     setDictionaryAssignmentEntryId(null);
     setDictionaryAssignmentQuery("");
+  };
+
+  const toggleDictionaryEntryExpanded = (entryId: string) => {
+    setExpandedDictionaryEntryIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(entryId)) {
+        nextIds.delete(entryId);
+      } else {
+        nextIds.add(entryId);
+      }
+      return nextIds;
+    });
   };
 
   const addTextBlockElement = () => {
@@ -1155,7 +1178,9 @@ export function LeftSidebar() {
   const filteredSavedComponentCount =
     filteredLocalSavedComponents.length + filteredSharedSavedComponents.length;
   const hasFavoriteCollections =
-    favoriteComponents.length > 0 || sharedSavedComponents.length > 0;
+    favoriteComponents.length > 0 ||
+    sharedSavedComponents.length > 0 ||
+    dictionaryEntries.length > 0;
   const visibleSharedAssets = showSharedAssets
     ? sharedAssets.filter((asset) => !localAssetIds.has(asset.id))
     : [];
@@ -1183,6 +1208,7 @@ export function LeftSidebar() {
   );
   const hasFavoriteSearchResults =
     filteredSavedComponentCount > 0 ||
+    filteredDictionaryEntries.length > 0 ||
     filteredFavoritePresets.length > 0 ||
     filteredFavoriteIcons.length > 0 ||
     filteredFavoriteEmojis.length > 0 ||
@@ -1645,7 +1671,7 @@ export function LeftSidebar() {
   );
   const dictionaryAssignmentSavedComponents = Array.from(
     dictionaryAssignmentSavedComponentMap.values(),
-  );
+  ).filter((component) => !isSavedTextBlockComponent(component));
   const normalizedDictionaryAssignmentQuery =
     dictionaryAssignmentQuery.trim().toLowerCase();
   const filteredDictionaryAssignmentSavedComponents =
@@ -1742,132 +1768,141 @@ export function LeftSidebar() {
     );
   };
 
-  const renderDictionaryCard = (entry: DictionaryEntry) => (
-    <div
-      key={entry.id}
-      className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (entry.components.length > 0) {
-              addDictionaryComponents(entry);
-            }
-          }}
-          className="min-w-0 flex-1 text-left"
-          title={
-            entry.components.length > 0
-              ? `Add ${entry.components.length} mapped component${entry.components.length === 1 ? "" : "s"}`
-              : entry.arabicWord
-          }
-        >
-          <div
-            className="truncate text-lg font-bold leading-tight text-[#0f172a]"
-            dir="auto"
-          >
-            {entry.arabicWord}
-          </div>
-          <div className="mt-1 truncate text-[11px] font-semibold text-[#4f46e5]">
-            {entry.englishMeaning || "No English meaning"}
-          </div>
-          <div className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
-            {entry.phoneticPronunciation || "No phonetic pronunciation"}
-          </div>
-        </button>
+  const renderDictionaryCard = (entry: DictionaryEntry) => {
+    const isExpanded = expandedDictionaryEntryIds.has(entry.id);
 
-        <div className="flex shrink-0 items-center gap-1">
+    return (
+      <div
+        key={entry.id}
+        className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2"
+      >
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={() => openDictionaryAssignmentModal(entry)}
-            className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-[#4f46e5] hover:bg-indigo-50 hover:text-[#4f46e5]"
-            title="Assign component to word"
+            onClick={() => toggleDictionaryEntryExpanded(entry.id)}
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-sm px-1 py-1 text-left transition-colors hover:bg-white"
+            title={
+              isExpanded
+                ? "Hide assigned components"
+                : "Show assigned components"
+            }
+            aria-expanded={isExpanded}
           >
-            <Link2 className="h-4 w-4" />
+            <ChevronDown
+              className={`h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform ${
+                isExpanded ? "rotate-180" : ""
+              }`}
+            />
+            <div className="min-w-0 flex-1">
+              <div
+                className="truncate text-base font-bold leading-tight text-[#0f172a]"
+                dir="auto"
+              >
+                {entry.arabicWord}
+              </div>
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] font-semibold leading-tight">
+                <span className="truncate text-[#4f46e5]">
+                  {entry.englishMeaning || "No English meaning"}
+                </span>
+                <span className="text-slate-300">/</span>
+                <span className="truncate text-slate-500">
+                  {entry.phoneticPronunciation || "No pronunciation"}
+                </span>
+              </div>
+            </div>
+            <div className="shrink-0 rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+              {entry.components.length}
+            </div>
           </button>
-          {entry.components.length > 0 && (
+
+          <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
-              onClick={() => addDictionaryComponents(entry)}
-              className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-50"
-              title="Add all mapped components"
+              onClick={() => openDictionaryAssignmentModal(entry)}
+              className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-[#4f46e5] hover:bg-indigo-50 hover:text-[#4f46e5]"
+              title="Assign component to word"
             >
-              <Plus className="h-4 w-4" />
+              <Link2 className="h-3.5 w-3.5" />
             </button>
-          )}
-          <button
-            type="button"
-            onClick={() => deleteDictionaryEntry(entry)}
-            className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-400 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
-            title="Delete dictionary word"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+            {entry.components.length > 0 && (
+              <button
+                type="button"
+                onClick={() => addDictionaryComponents(entry)}
+                className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-50"
+                title="Add all mapped components"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => deleteDictionaryEntry(entry)}
+              className="flex h-7 w-7 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-400 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+              title="Delete dictionary word"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#e2e8f0] pt-3">
-        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-          Components
-        </div>
-        <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
-          {entry.components.length}
-        </div>
-      </div>
-
-      {entry.components.length === 0 ? (
-        <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] bg-white px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-          No mapped components
-        </div>
-      ) : (
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          {entry.components.map((component, index) => {
-            const previewComponent = customizeComponentForDictionaryEntry(
-              component,
-              entry,
-            );
-
-            return (
-              <div key={component.id} className="relative">
-                <button
-                  type="button"
-                  onClick={() =>
-                    addSavedFavoriteElement(
-                      component,
-                      index,
-                      entry.components.length,
-                      entry,
-                    )
-                  }
-                  title={component.name}
-                  className="flex w-full flex-col rounded-sm border border-[#e2e8f0] bg-white p-2 text-left transition-colors hover:border-[#4f46e5]"
-                >
-                  <SavedElementFavoritePreview favorite={previewComponent} />
-                  <div className="mt-2 truncate text-[10px] font-semibold text-[#0f172a]">
-                    {component.name}
-                  </div>
-                  <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                    {getSavedFavoriteTypeLabel(component.element)}
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    deleteDictionaryComponent(entry, component);
-                  }}
-                  className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm transition-colors hover:text-rose-500"
-                  title="Remove from word"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+        {isExpanded && (
+          <div className="mt-2 border-t border-[#e2e8f0] pt-2">
+            {entry.components.length === 0 ? (
+              <div className="rounded-sm border border-dashed border-[#dbe4f0] bg-white px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                No mapped components
               </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {entry.components.map((component, index) => {
+                  const previewComponent = customizeComponentForDictionaryEntry(
+                    component,
+                    entry,
+                  );
+
+                  return (
+                    <div key={component.id} className="relative">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          addSavedFavoriteElement(
+                            component,
+                            index,
+                            entry.components.length,
+                            entry,
+                          )
+                        }
+                        title={component.name}
+                        className="flex w-full flex-col rounded-sm border border-[#e2e8f0] bg-white p-2 text-left transition-colors hover:border-[#4f46e5]"
+                      >
+                        <SavedElementFavoritePreview favorite={previewComponent} />
+                        <div className="mt-2 truncate text-[10px] font-semibold text-[#0f172a]">
+                          {component.name}
+                        </div>
+                        <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                          {getSavedFavoriteTypeLabel(component.element)}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          deleteDictionaryComponent(entry, component);
+                        }}
+                        className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm transition-colors hover:text-rose-500"
+                        title="Remove from word"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const renderTemplateCard = (template: (typeof templates)[number]) => (
     <div
@@ -2708,6 +2743,22 @@ export function LeftSidebar() {
                             No saved or shared components match this type
                           </div>
                         )}
+
+                      {filteredDictionaryEntries.length > 0 && (
+                        <div>
+                          <div className="mb-3 flex items-center justify-between gap-2">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                              Dictionary Words
+                            </div>
+                            <div className="rounded-full bg-[#eef2ff] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                              {filteredDictionaryEntries.length}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            {filteredDictionaryEntries.map(renderDictionaryCard)}
+                          </div>
+                        </div>
+                      )}
 
                       {filteredFavoritePresets.length > 0 && (
                         <div>
