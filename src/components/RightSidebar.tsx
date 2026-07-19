@@ -1265,7 +1265,7 @@ export function RightSidebar() {
             dictionaryEntries.map((entry) => (
               <option key={entry.id} value={entry.id}>
                 {entry.arabicWord}
-                {entry.phonetic ? ` - ${entry.phonetic}` : ''}
+                {entry.englishMeaning ? ` - ${entry.englishMeaning}` : ''}
               </option>
             ))
           )}

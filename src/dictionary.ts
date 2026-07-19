@@ -66,11 +66,26 @@ export function normalizeDictionaryEntry(entry: unknown): DictionaryEntry | null
     'ArabicWord',
     'arabic_word',
   ]);
-  const phonetic = getStringValue(record, ['phonetic', 'Phonetic']);
-  const pronunciation = getStringValue(record, [
+  const englishMeaning = getStringValue(record, [
+    'englishMeaning',
+    'english',
+    'meaning',
+    'definition',
+    'translation',
+    'English Meaning',
+    'English',
+    'Meaning',
+  ]);
+  const phoneticPronunciation = getStringValue(record, [
+    'phoneticPronunciation',
+    'phonetic pronunciation',
+    'Phonetic Pronunciation',
+    'phonetic_pronunciation',
     'pronunciation',
     'Pronunciation',
     'pronounce',
+    'phonetic',
+    'Phonetic',
   ]);
 
   if (!arabicWord) {
@@ -87,8 +102,8 @@ export function normalizeDictionaryEntry(entry: unknown): DictionaryEntry | null
   return {
     id: typeof record.id === 'string' && record.id ? record.id : generateId(),
     arabicWord,
-    phonetic,
-    pronunciation,
+    englishMeaning,
+    phoneticPronunciation,
     components,
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : now,
     updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : now,
@@ -130,8 +145,8 @@ export function parseDictionaryJson(value: string): DictionaryEntry[] {
 export function getDictionarySearchText(entry: DictionaryEntry) {
   return [
     entry.arabicWord,
-    entry.phonetic,
-    entry.pronunciation,
+    entry.englishMeaning,
+    entry.phoneticPronunciation,
     ...entry.components.flatMap((component) => [
       component.name,
       component.element.type,

@@ -81,22 +81,17 @@ import {
 const DICTIONARY_JSON_TEMPLATE = `{
   "words": [
     {
-      "arabicWord": "كتب",
-      "phonetic": "kataba",
-      "pronunciation": "ka-ta-ba"
-    },
-    {
-      "arabicWord": "مدرسة",
-      "phonetic": "madrasa",
-      "pronunciation": "mad-ra-sa"
+      "arabicWord": "الْمَرْأَةُ",
+      "englishMeaning": "The Woman",
+      "phoneticPronunciation": "Al-mar-a-tu"
     }
   ]
 }`;
 
 const EMPTY_MANUAL_DICTIONARY_ENTRY = {
   arabicWord: "",
-  phonetic: "",
-  pronunciation: "",
+  englishMeaning: "",
+  phoneticPronunciation: "",
 };
 
 const PEXELS_ORIENTATION_OPTIONS: Array<{
@@ -1237,8 +1232,9 @@ export function LeftSidebar() {
     event.preventDefault();
 
     const arabicWord = manualDictionaryEntry.arabicWord.trim();
-    const phonetic = manualDictionaryEntry.phonetic.trim();
-    const pronunciation = manualDictionaryEntry.pronunciation.trim();
+    const englishMeaning = manualDictionaryEntry.englishMeaning.trim();
+    const phoneticPronunciation =
+      manualDictionaryEntry.phoneticPronunciation.trim();
 
     if (!arabicWord) {
       setManualDictionaryError("Arabic word is required.");
@@ -1252,8 +1248,8 @@ export function LeftSidebar() {
         {
           id: generateId(),
           arabicWord,
-          phonetic,
-          pronunciation,
+          englishMeaning,
+          phoneticPronunciation,
           components: [],
           createdAt: now,
           updatedAt: now,
@@ -1536,10 +1532,10 @@ export function LeftSidebar() {
             {entry.arabicWord}
           </div>
           <div className="mt-1 truncate text-[11px] font-semibold text-[#4f46e5]">
-            {entry.phonetic || "No phonetic"}
+            {entry.englishMeaning || "No English meaning"}
           </div>
           <div className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
-            {entry.pronunciation || "No pronunciation"}
+            {entry.phoneticPronunciation || "No phonetic pronunciation"}
           </div>
         </button>
 
@@ -2308,28 +2304,28 @@ export function LeftSidebar() {
                     <div className="grid grid-cols-2 gap-2">
                       <input
                         type="text"
-                        value={manualDictionaryEntry.phonetic}
+                        value={manualDictionaryEntry.englishMeaning}
                         onChange={(event) => {
                           setManualDictionaryEntry((entry) => ({
                             ...entry,
-                            phonetic: event.target.value,
+                            englishMeaning: event.target.value,
                           }));
                           setManualDictionaryError("");
                         }}
-                        placeholder="Phonetic"
+                        placeholder="English Meaning"
                         className="h-9 min-w-0 rounded-sm border border-[#e2e8f0] bg-white px-2 text-[12px] text-[#0f172a] outline-none focus:border-[#4f46e5]"
                       />
                       <input
                         type="text"
-                        value={manualDictionaryEntry.pronunciation}
+                        value={manualDictionaryEntry.phoneticPronunciation}
                         onChange={(event) => {
                           setManualDictionaryEntry((entry) => ({
                             ...entry,
-                            pronunciation: event.target.value,
+                            phoneticPronunciation: event.target.value,
                           }));
                           setManualDictionaryError("");
                         }}
-                        placeholder="Pronunciation"
+                        placeholder="Phonetic Pronunciation"
                         className="h-9 min-w-0 rounded-sm border border-[#e2e8f0] bg-white px-2 text-[12px] text-[#0f172a] outline-none focus:border-[#4f46e5]"
                       />
                     </div>
@@ -2390,7 +2386,7 @@ export function LeftSidebar() {
                         setDictionaryJson(event.target.value);
                         setDictionaryImportError("");
                       }}
-                      placeholder='[{"Arabic Word":"...","Phonetic":"...","Pronunciation":"..."}]'
+                      placeholder='[{"Arabic Word":"...","English Meaning":"...","Phonetic Pronunciation":"..."}]'
                       className="min-h-[96px] w-full resize-none rounded-sm border border-[#e2e8f0] bg-white p-2 font-mono text-[11px] leading-relaxed text-[#0f172a] outline-none focus:border-[#4f46e5]"
                     />
                     <button

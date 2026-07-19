@@ -116,8 +116,8 @@ export type SavedComponent = Extract<FavoriteComponent, { type: 'saved-element' 
 export interface DictionaryEntry {
   id: string;
   arabicWord: string;
-  phonetic: string;
-  pronunciation: string;
+  englishMeaning: string;
+  phoneticPronunciation: string;
   components: SavedComponent[];
   createdAt?: string;
   updatedAt?: string;
