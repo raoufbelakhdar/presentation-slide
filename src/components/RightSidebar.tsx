@@ -1,7 +1,7 @@
 import React, { useDeferredValue, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
 import { BookOpen, BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
-import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, DictionaryEntry, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { DEFAULT_ICON_COLOR, formatIconName } from '../iconLibrary';
@@ -966,6 +966,37 @@ export function RightSidebar() {
           : undefined,
     };
   };
+  const getDictionaryTextContent = (entry: DictionaryEntry) =>
+    combineTextContent(
+      entry.phoneticPronunciation.trim() || entry.arabicWord.trim(),
+      entry.englishMeaning.trim(),
+    );
+  const customizeElementForDictionaryEntry = (
+    element: SceneElement,
+    entry: DictionaryEntry,
+  ): SceneElement => {
+    const nextElement = cloneFavoriteElement(element);
+
+    if (nextElement.type !== 'text') {
+      return nextElement;
+    }
+
+    if (getTextVariant(nextElement) === 'block') {
+      return {
+        ...nextElement,
+        variant: 'block',
+        text: getDictionaryTextContent(entry),
+      };
+    }
+
+    return {
+      ...nextElement,
+      text:
+        entry.phoneticPronunciation.trim() ||
+        entry.englishMeaning.trim() ||
+        entry.arabicWord.trim(),
+    };
+  };
   const selectedDictionaryEntry = dictionaryEntries.find(
     (entry) => entry.id === selectedDictionaryEntryId,
   );
@@ -975,6 +1006,12 @@ export function RightSidebar() {
     return {
       ...savedComponent,
       id: `dict:${selectedDictionaryEntryId}:${selectedElement.id}:${generateId()}`,
+      element: selectedDictionaryEntry
+        ? customizeElementForDictionaryEntry(
+            savedComponent.element,
+            selectedDictionaryEntry,
+          )
+        : savedComponent.element,
     };
   };
   const saveSelectedElementToFavorites = () => {
