@@ -1,11 +1,12 @@
 import React, { useDeferredValue, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
-import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
+import { BookOpen, BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
+import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, DictionaryEntry, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, DEFAULT_TEXT_BLOCK_BACKGROUND_COLOR, DEFAULT_TEXT_BLOCK_FONT_SIZE, DEFAULT_TEXT_BLOCK_PADDING, DEFAULT_TEXT_BLOCK_SUBTITLE_FONT_SIZE, generateId, getEffectiveElementState, getTextAlign, getTextBlockBackgroundColor, getTextBlockFitSize, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { DEFAULT_ICON_COLOR, formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
+import { getDictionarySearchText } from '../dictionary';
 import { LucideIconGlyph } from './LucideIconGlyph';
 import { EmojiGlyph } from './EmojiGlyph';
 
@@ -13,6 +14,13 @@ const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   'bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]';
 const RIGHT_SIDEBAR_CLASS = 'w-80 bg-white border-l border-[#e2e8f0] flex flex-col h-full shrink-0';
 type RightSidebarTab = 'properties' | 'library' | 'layers';
+type DictionaryLibraryItem = {
+  id: string;
+  entry: DictionaryEntry;
+  component: SavedComponent;
+  sourceLabel: string;
+  searchText: string;
+};
 
 function SidebarTabs({
   activeTab,
@@ -155,6 +163,70 @@ function getSavedComponentSearchText(favorite: SavedComponent) {
   }
 
   return searchParts.filter(Boolean).join(' ').toLowerCase();
+}
+
+function getDictionaryTextContent(entry: DictionaryEntry) {
+  return combineTextContent(
+    entry.phoneticPronunciation.trim() || entry.arabicWord.trim(),
+    entry.englishMeaning.trim(),
+  );
+}
+
+function customizeElementForDictionaryEntry(
+  element: SceneElement,
+  entry: DictionaryEntry,
+): SceneElement {
+  const nextElement = cloneFavoriteElement(element);
+
+  if (nextElement.type !== 'text') {
+    return nextElement;
+  }
+
+  if (getTextVariant(nextElement) === 'block') {
+    return {
+      ...nextElement,
+      variant: 'block',
+      text: getDictionaryTextContent(entry),
+    };
+  }
+
+  return {
+    ...nextElement,
+    text:
+      entry.phoneticPronunciation.trim() ||
+      entry.englishMeaning.trim() ||
+      entry.arabicWord.trim(),
+  };
+}
+
+function customizeComponentForDictionaryEntry(
+  component: SavedComponent,
+  entry: DictionaryEntry,
+): SavedComponent {
+  return {
+    ...component,
+    element: customizeElementForDictionaryEntry(component.element, entry),
+    asset: component.asset ? { ...component.asset } : undefined,
+  };
+}
+
+function createDictionaryWordComponent(
+  entry: DictionaryEntry,
+  selectedElement: SceneElement,
+): SavedComponent | null {
+  if (selectedElement.type !== 'text') {
+    return null;
+  }
+
+  const textVariant = getTextVariant(selectedElement);
+  const textElement = customizeElementForDictionaryEntry(selectedElement, entry) as TextElement;
+
+  return {
+    type: 'saved-element',
+    id: `dict-word:${entry.id}:${textVariant}`,
+    name: `${entry.arabicWord} ${textVariant === 'free' ? 'Free Text' : 'Text Block'}`,
+    element: textElement,
+  };
 }
 
 function cloneFavoriteElement(element: SceneElement): SceneElement {
@@ -572,7 +644,7 @@ function LayersPanel({
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds, sharedSavedComponents } = state;
+  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds, sharedSavedComponents, dictionaryEntries } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
   const projectAssetsById = new Map<string, Asset>(availableAssets.map((asset) => [asset.id, asset]));
@@ -929,6 +1001,44 @@ export function RightSidebar() {
       favorites: favoriteSavedElementsByGroup.get(groupId) || [],
     }))
     .filter((group) => group.favorites.length > 0);
+  const dictionaryLibraryItems = dictionaryEntries.flatMap((entry): DictionaryLibraryItem[] => {
+    const wordComponent = createDictionaryWordComponent(entry, selectedElement);
+    const mappedComponents = entry.components
+      .map((component) => customizeComponentForDictionaryEntry(component, entry))
+      .filter((component) => component.element.type === selectedElement.type);
+
+    return [
+      ...(wordComponent
+        ? [{
+            id: wordComponent.id,
+            entry,
+            component: wordComponent,
+            sourceLabel: 'Word',
+            searchText: [
+              getDictionarySearchText(entry),
+              wordComponent.name,
+              getSavedComponentSearchText(wordComponent),
+              'dictionary word',
+            ].join(' ').toLowerCase(),
+          }]
+        : []),
+      ...mappedComponents.map((component) => ({
+        id: `${entry.id}:${component.id}`,
+        entry,
+        component,
+        sourceLabel: getElementTypeLabel(component.element),
+        searchText: [
+          getDictionarySearchText(entry),
+          component.name,
+          getSavedComponentSearchText(component),
+          'dictionary mapped component',
+        ].join(' ').toLowerCase(),
+      })),
+    ];
+  });
+  const filteredDictionaryLibraryItems = dictionaryLibraryItems.filter((item) =>
+    matchesSearchQuery(normalizedLibraryQuery, item.searchText),
+  );
   const textParts = textElement ? splitTextContent(textElement.text) : null;
   const textVariant = textElement ? getTextVariant(textElement) : null;
   const textAlign = textElement ? getTextAlign(textElement) : null;
@@ -1665,6 +1775,70 @@ export function RightSidebar() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <BookOpen className="h-3.5 w-3.5 text-[#4f46e5]" />
+            <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+              Dictionary Words
+            </div>
+          </div>
+          <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+            {filteredDictionaryLibraryItems.length}
+          </div>
+        </div>
+
+        {filteredDictionaryLibraryItems.length === 0 ? (
+          <div className="flex min-h-[96px] items-center justify-center rounded-lg border border-dashed border-[#dbe4f0] bg-white/70 px-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            {normalizedLibraryQuery
+              ? 'No dictionary matches'
+              : selectedElement.type === 'text'
+                ? 'No dictionary words'
+                : `No mapped ${selectedElement.type} words`}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {filteredDictionaryLibraryItems.map((item) => {
+              const groupId = getSavedElementLibraryGroupId(item.component.element, item.component.asset);
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => replaceSelectedElementWithFavorite(item.component)}
+                  title={`${item.entry.arabicWord} - ${item.component.name}`}
+                  className="group rounded-xl border border-[#dbe4f0] bg-white p-1.5 text-left transition-all hover:border-[#4f46e5] hover:shadow-[0_6px_18px_rgba(15,23,42,0.06)]"
+                >
+                  <div className={`relative aspect-[1.08/1] overflow-hidden rounded-[10px] border border-[#e2e8f0] ${COMPONENT_THUMBNAIL_BACKGROUND_CLASS}`}>
+                    <div className="pointer-events-none absolute inset-0 bg-slate-950/0 transition-colors duration-150 group-hover:bg-slate-950/10" />
+                    <div className="pointer-events-none absolute left-1.5 top-1.5 z-10 flex h-6 w-6 translate-y-1 items-center justify-center rounded-full bg-white/95 text-slate-700 opacity-0 shadow-sm transition-all duration-150 group-hover:translate-y-0 group-hover:opacity-100">
+                      {renderSavedElementLibraryGroupIcon(groupId)}
+                    </div>
+                    <SavedElementLibraryPreview
+                      element={item.component.element}
+                      asset={item.component.asset}
+                      name={item.component.name}
+                    />
+                  </div>
+                  <div className="mt-2 min-w-0">
+                    <div className="truncate text-[10px] font-semibold text-[#0f172a]" dir="auto">
+                      {item.entry.arabicWord}
+                    </div>
+                    <div className="mt-0.5 flex min-w-0 items-center gap-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                      <span className="truncate">{item.sourceLabel}</span>
+                      <span className="text-slate-300">/</span>
+                      <span className="truncate normal-case tracking-normal text-[#4f46e5]">
+                        {item.entry.englishMeaning || item.entry.phoneticPronunciation || item.component.name}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
