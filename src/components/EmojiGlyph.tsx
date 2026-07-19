@@ -1,22 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { getEmojiById, loadEmojiAssetUrl } from '../emojiLibrary';
+import { getCachedEmojiAssetUrl, getEmojiById, loadEmojiAssetUrl } from '../emojiLibrary';
 
 export function EmojiGlyph({
   id,
   fallback = '🙂',
   className,
+  style,
 }: {
   id: string;
   fallback?: string;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const emojiEntry = getEmojiById(id);
-  const [assetUrl, setAssetUrl] = useState<string | null>(null);
+  const [assetUrl, setAssetUrl] = useState<string | null | undefined>(() => getCachedEmojiAssetUrl(id));
 
   useEffect(() => {
     let cancelled = false;
+    const cachedAssetUrl = getCachedEmojiAssetUrl(id);
 
-    setAssetUrl(null);
+    setAssetUrl(cachedAssetUrl);
 
     loadEmojiAssetUrl(id).then((nextAssetUrl) => {
       if (!cancelled) {
@@ -30,11 +33,21 @@ export function EmojiGlyph({
   }, [id]);
 
   if (emojiEntry && assetUrl) {
-    return <img src={assetUrl} alt={emojiEntry.label} className={className} draggable={false} />;
+    return <img src={assetUrl} alt={emojiEntry.label} className={className} style={style} draggable={false} />;
   }
 
   return (
-    <span className={className} aria-hidden="true">
+    <span
+      className={className}
+      style={{
+        ...style,
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        lineHeight: 1,
+      }}
+      aria-hidden="true"
+    >
       {fallback}
     </span>
   );

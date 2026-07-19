@@ -226,6 +226,13 @@ function CanvasElement({
   const textPadding = element.type === 'text' && textVariant === 'block' ? getTextPadding(element) : 0;
   const blockTextPaddingX = textPadding;
   const blockBackgroundColor = element.type === 'text' ? getTextBlockBackgroundColor(element) : 'transparent';
+  const renderedElement = {
+    ...element,
+    x: frame.x,
+    y: frame.y,
+    width: frame.width,
+    height: frame.height,
+  };
 
   const syncFrame = (nextFrame: Frame | ((current: Frame) => Frame)) => {
     const resolvedFrame = typeof nextFrame === 'function' ? nextFrame(frameRef.current) : nextFrame;
@@ -418,7 +425,7 @@ function CanvasElement({
 
         {element.type === 'image' && (
           <>
-            <ImageRenderer element={element} />
+            <ImageRenderer element={renderedElement} />
             <input 
               type="file" 
               accept="image/*,.svg" 
@@ -451,11 +458,11 @@ function CanvasElement({
         )}
 
         {element.type === 'color' && (
-          <ColorCardRenderer element={element as ColorElement} />
+          <ColorCardRenderer element={renderedElement as ColorElement} />
         )}
 
         {element.type === 'shape' && (
-          <ShapeRenderer element={element as ShapeElement} />
+          <ShapeRenderer element={renderedElement as ShapeElement} />
         )}
       </div>
     </Rnd>
@@ -560,6 +567,8 @@ function ColorCardRenderer({ element }: { element: ColorElement }) {
 
 function ShapeRenderer({ element }: { element: ShapeElement }) {
   if (element.shapeType === 'emoji') {
+    const emojiSize = Math.max(24, Math.round(Math.min(element.width, element.height) * 0.84));
+
     return (
       <div className="w-full h-full flex items-center justify-center pointer-events-none">
         <div className="h-[84%] w-[84%]">
@@ -567,6 +576,7 @@ function ShapeRenderer({ element }: { element: ShapeElement }) {
             id={element.emojiHexcode || 'grinning-face'}
             fallback={element.emojiChar || '😀'}
             className="h-full w-full object-contain drop-shadow-[0_12px_20px_rgba(15,23,42,0.14)]"
+            style={{ fontSize: `${emojiSize}px` }}
           />
         </div>
       </div>

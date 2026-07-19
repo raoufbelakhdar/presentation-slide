@@ -78,6 +78,7 @@ const openMojiBySlug = openmojiEntries.reduce((map, entry) => {
 
 const EMOJI_ASSET_LOADERS = new Map<string, () => Promise<string>>();
 const EMOJI_ASSET_URL_CACHE = new Map<string, Promise<string | null>>();
+const EMOJI_ASSET_URL_VALUE_CACHE = new Map<string, string | null>();
 
 const emojiEntries = Object.entries(fluentEmojiAssetLoaders)
   .map(([path, loadAssetUrl]) => {
@@ -139,10 +140,19 @@ export function getEmojiById(id: string) {
   return resolvedId ? EMOJI_BY_ID.get(resolvedId) || null : null;
 }
 
+export function getCachedEmojiAssetUrl(id: string) {
+  const resolvedId = resolveEmojiId(id);
+  return resolvedId ? EMOJI_ASSET_URL_VALUE_CACHE.get(resolvedId) : undefined;
+}
+
 export async function loadEmojiAssetUrl(id: string) {
   const resolvedId = resolveEmojiId(id);
   if (!resolvedId) {
     return null;
+  }
+
+  if (EMOJI_ASSET_URL_VALUE_CACHE.has(resolvedId)) {
+    return EMOJI_ASSET_URL_VALUE_CACHE.get(resolvedId) || null;
   }
 
   const existingRequest = EMOJI_ASSET_URL_CACHE.get(resolvedId);
@@ -157,7 +167,11 @@ export async function loadEmojiAssetUrl(id: string) {
 
   const assetRequest = loadAssetUrl()
     .then((assetUrl) => assetUrl || null)
-    .catch(() => null);
+    .catch(() => null)
+    .then((assetUrl) => {
+      EMOJI_ASSET_URL_VALUE_CACHE.set(resolvedId, assetUrl);
+      return assetUrl;
+    });
 
   EMOJI_ASSET_URL_CACHE.set(resolvedId, assetRequest);
   return assetRequest;
