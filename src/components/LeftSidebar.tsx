@@ -142,6 +142,7 @@ const SHARED_ASSETS_VISIBILITY_STORAGE_KEY =
   "visual-learning-shared-assets-visible";
 const COMPONENT_THUMBNAIL_BACKGROUND_CLASS =
   "bg-[linear-gradient(135deg,#0f172a_0%,#1e293b_52%,#334155_100%)]";
+const DICTIONARY_ASSIGNMENT_RESULT_LIMIT = 72;
 const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
   { value: "all", label: "All", icon: LayoutGrid },
   { value: "image", label: "Images", icon: Image },
@@ -163,12 +164,12 @@ type DictionaryAssignmentTab =
   (typeof DICTIONARY_ASSIGNMENT_TAB_OPTIONS)[number]["value"];
 type DictionaryAssignmentOption = {
   id: string;
+  sourceId: string;
   group: Exclude<DictionaryAssignmentTab, "all">;
   label: string;
   typeLabel: string;
-  component: SavedComponent;
-  previewComponent?: SavedComponent;
   searchText: string;
+  createComponent: (entry: DictionaryEntry) => SavedComponent;
 };
 
 function matchesSearchQuery(
@@ -678,6 +679,9 @@ export function LeftSidebar() {
   const deferredIconQuery = useDeferredValue(iconQuery);
   const deferredEmojiQuery = useDeferredValue(emojiQuery);
   const deferredPexelsQuery = useDeferredValue(pexelsQuery);
+  const deferredDictionaryAssignmentQuery = useDeferredValue(
+    dictionaryAssignmentQuery,
+  );
   const normalizedLibraryQuery = deferredLibraryQuery.trim().toLowerCase();
   const filteredIcons = deferredIconQuery.trim()
     ? searchLucideIcons(deferredIconQuery, 72)
@@ -1880,7 +1884,7 @@ export function LeftSidebar() {
     dictionaryAssignmentSavedComponentMap.values(),
   );
   const normalizedDictionaryAssignmentQuery =
-    dictionaryAssignmentQuery.trim().toLowerCase();
+    deferredDictionaryAssignmentQuery.trim().toLowerCase();
   const selectedElementAsset =
     selectedElement?.type === "image"
       ? projectAssetsById.get(selectedElement.assetId)
@@ -1896,188 +1900,181 @@ export function LeftSidebar() {
     dictionaryAssignmentTab === "all" || dictionaryAssignmentTab === "icons";
   const shouldShowDictionaryAssignmentEmojis =
     dictionaryAssignmentTab === "all" || dictionaryAssignmentTab === "emojis";
-  const dictionaryAssignmentIconNames = shouldShowDictionaryAssignmentIcons
+  const dictionaryAssignmentSavedComponentCandidates =
+    shouldShowDictionaryAssignmentComponents
+      ? normalizedDictionaryAssignmentQuery
+        ? dictionaryAssignmentSavedComponents
+        : dictionaryAssignmentSavedComponents.slice(
+            0,
+            DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+          )
+      : [];
+  const dictionaryAssignmentAssetCandidates = shouldShowDictionaryAssignmentAssets
     ? normalizedDictionaryAssignmentQuery
-      ? searchLucideIcons(
-          normalizedDictionaryAssignmentQuery,
-          LUCIDE_ICON_NAMES.length,
-        )
-      : dictionaryAssignmentTab === "icons"
-        ? LUCIDE_ICON_NAMES
-        : FEATURED_ICON_NAMES
+      ? availableAssets
+      : availableAssets.slice(0, DICTIONARY_ASSIGNMENT_RESULT_LIMIT)
+    : [];
+  const dictionaryAssignmentIconNames = shouldShowDictionaryAssignmentIcons
+    ? searchLucideIcons(
+        normalizedDictionaryAssignmentQuery,
+        DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+      )
     : [];
   const dictionaryAssignmentEmojiEntries = shouldShowDictionaryAssignmentEmojis
-    ? normalizedDictionaryAssignmentQuery
-      ? searchEmojis(normalizedDictionaryAssignmentQuery, EMOJI_LIBRARY.length)
-      : dictionaryAssignmentTab === "emojis"
-        ? EMOJI_LIBRARY
-        : FEATURED_EMOJI_IDS.map((id) => getEmojiById(id)).filter(
-            (entry): entry is NonNullable<ReturnType<typeof getEmojiById>> =>
-              Boolean(entry),
-          )
+    ? searchEmojis(
+        normalizedDictionaryAssignmentQuery,
+        DICTIONARY_ASSIGNMENT_RESULT_LIMIT,
+      )
     : [];
   const dictionaryAssignmentOptions: DictionaryAssignmentOption[] =
     dictionaryAssignmentEntry
       ? [
           ...(shouldShowDictionaryAssignmentPresets
-            ? presetDefinitions.map((preset) => {
-                const component = createDictionaryPresetComponent(
-                  dictionaryAssignmentEntry,
+            ? presetDefinitions.map((preset) => ({
+                id: `preset:${preset.id}`,
+                sourceId: `preset:${preset.id}`,
+                group: "presets" as const,
+                label: preset.label,
+                typeLabel: "Preset",
+                searchText: [
                   preset.id,
-                );
-                return {
-                  id: `preset:${preset.id}`,
-                  group: "presets" as const,
-                  label: preset.label,
-                  typeLabel: "Preset",
-                  component,
-                  previewComponent: customizeComponentForDictionaryEntry(
-                    component,
-                    dictionaryAssignmentEntry,
-                  ),
-                  searchText: [
-                    preset.id,
-                    preset.label,
-                    component.name,
-                    getSavedComponentSearchText(component),
-                  ]
-                    .join(" ")
-                    .toLowerCase(),
-                };
-              })
+                  preset.label,
+                  dictionaryAssignmentEntry.arabicWord,
+                  dictionaryAssignmentEntry.englishMeaning,
+                  dictionaryAssignmentEntry.phoneticPronunciation,
+                ]
+                  .join(" ")
+                  .toLowerCase(),
+                createComponent: (entry: DictionaryEntry) =>
+                  createDictionaryPresetComponent(entry, preset.id),
+              }))
             : []),
           ...(shouldShowDictionaryAssignmentComponents && selectedElement
             ? [
                 (() => {
-                  const component = createDictionaryComponentFromElement(
-                    dictionaryAssignmentEntry,
-                    `selected:${selectedElement.id}`,
-                    `${dictionaryAssignmentEntry.arabicWord} ${getSceneElementName(
-                      selectedElement,
-                    )}`,
-                    selectedElement,
-                    selectedElementAsset,
-                  );
+                  const selectedElementName = getSceneElementName(selectedElement);
 
                   return {
                     id: `selected:${selectedElement.id}`,
+                    sourceId: `selected:${selectedElement.id}`,
                     group: "components" as const,
-                    label: getSceneElementName(selectedElement),
+                    label: selectedElementName,
                     typeLabel: "Selected Component",
-                    component,
-                    previewComponent: customizeComponentForDictionaryEntry(
-                      component,
-                      dictionaryAssignmentEntry,
-                    ),
                     searchText: [
                       "selected",
-                      getSceneElementName(selectedElement),
+                      selectedElementName,
                       getSavedFavoriteTypeLabel(selectedElement),
-                      getSavedComponentSearchText(component),
+                      dictionaryAssignmentEntry.arabicWord,
+                      dictionaryAssignmentEntry.englishMeaning,
+                      dictionaryAssignmentEntry.phoneticPronunciation,
                     ]
                       .join(" ")
                       .toLowerCase(),
+                    createComponent: (entry: DictionaryEntry) =>
+                      createDictionaryComponentFromElement(
+                        entry,
+                        `selected:${selectedElement.id}`,
+                        `${entry.arabicWord} ${selectedElementName}`,
+                        selectedElement,
+                        selectedElementAsset,
+                      ),
                   };
                 })(),
               ]
             : []),
           ...(shouldShowDictionaryAssignmentComponents
-            ? dictionaryAssignmentSavedComponents.map((component) => {
-                const assignmentComponent = createDictionaryComponentFromElement(
-                  dictionaryAssignmentEntry,
-                  `saved:${component.id}`,
-                  component.name,
-                  component.element,
-                  component.asset,
-                );
-
-                return {
-                  id: `saved:${component.id}`,
-                  group: "components" as const,
-                  label: component.name,
-                  typeLabel: getSavedFavoriteTypeLabel(component.element),
-                  component: assignmentComponent,
-                  previewComponent: customizeComponentForDictionaryEntry(
-                    assignmentComponent,
-                    dictionaryAssignmentEntry,
+            ? dictionaryAssignmentSavedComponentCandidates.map((component) => ({
+                id: `saved:${component.id}`,
+                sourceId: `saved:${component.id}`,
+                group: "components" as const,
+                label: component.name,
+                typeLabel: getSavedFavoriteTypeLabel(component.element),
+                searchText: getSavedComponentSearchText(component),
+                createComponent: (entry: DictionaryEntry) =>
+                  createDictionaryComponentFromElement(
+                    entry,
+                    `saved:${component.id}`,
+                    component.name,
+                    component.element,
+                    component.asset,
                   ),
-                  searchText: getSavedComponentSearchText(component),
-                };
-              })
+              }))
             : []),
           ...(shouldShowDictionaryAssignmentAssets
-            ? availableAssets.map((asset) => {
-                const component = createDictionaryAssetComponent(
-                  dictionaryAssignmentEntry,
-                  asset,
-                );
-
-                return {
-                  id: `asset:${asset.id}`,
-                  group: "assets" as const,
-                  label: asset.name,
-                  typeLabel: getAssetKind(asset),
-                  component,
-                  searchText: [
-                    asset.id,
-                    asset.name,
-                    getAssetKind(asset),
-                    getSavedComponentSearchText(component),
-                  ]
-                    .join(" ")
-                    .toLowerCase(),
-                };
-              })
+            ? dictionaryAssignmentAssetCandidates.map((asset) => ({
+                id: `asset:${asset.id}`,
+                sourceId: `asset:${asset.id}`,
+                group: "assets" as const,
+                label: asset.name,
+                typeLabel: getAssetKind(asset),
+                searchText: [
+                  asset.id,
+                  asset.name,
+                  getAssetKind(asset),
+                  dictionaryAssignmentEntry.arabicWord,
+                  dictionaryAssignmentEntry.englishMeaning,
+                  dictionaryAssignmentEntry.phoneticPronunciation,
+                ]
+                  .join(" ")
+                  .toLowerCase(),
+                createComponent: (entry: DictionaryEntry) =>
+                  createDictionaryAssetComponent(entry, asset),
+              }))
             : []),
           ...dictionaryAssignmentIconNames.map((iconName) => {
-            const component = createDictionaryIconComponent(
-              dictionaryAssignmentEntry,
-              iconName,
-            );
-
             return {
               id: `icon:${iconName}`,
+              sourceId: `icon:${iconName}`,
               group: "icons" as const,
               label: formatIconName(iconName),
               typeLabel: "Icon",
-              component,
               searchText: [
                 iconName,
                 formatIconName(iconName),
-                getSavedComponentSearchText(component),
+                dictionaryAssignmentEntry.arabicWord,
+                dictionaryAssignmentEntry.englishMeaning,
+                dictionaryAssignmentEntry.phoneticPronunciation,
               ]
                 .join(" ")
                 .toLowerCase(),
+              createComponent: (entry: DictionaryEntry) =>
+                createDictionaryIconComponent(entry, iconName),
             };
           }),
           ...dictionaryAssignmentEmojiEntries.map((emojiEntry) => {
-            const component = createDictionaryEmojiComponent(
-              dictionaryAssignmentEntry,
-              emojiEntry,
-            );
-
             return {
               id: `emoji:${emojiEntry.id}`,
+              sourceId: `emoji:${emojiEntry.id}`,
               group: "emojis" as const,
               label: getEmojiLabel(emojiEntry),
               typeLabel: "Emoji",
-              component,
               searchText: [
                 emojiEntry.id,
                 emojiEntry.label,
                 emojiEntry.emoji,
                 emojiEntry.searchText,
-                getSavedComponentSearchText(component),
+                dictionaryAssignmentEntry.arabicWord,
+                dictionaryAssignmentEntry.englishMeaning,
+                dictionaryAssignmentEntry.phoneticPronunciation,
               ]
                 .join(" ")
                 .toLowerCase(),
+              createComponent: (entry: DictionaryEntry) =>
+                createDictionaryEmojiComponent(entry, emojiEntry),
             };
           }),
         ]
       : [];
-  const filteredDictionaryAssignmentOptions = dictionaryAssignmentOptions.filter(
+  const searchedDictionaryAssignmentOptions = dictionaryAssignmentOptions.filter(
     (option) =>
       matchesSearchQuery(normalizedDictionaryAssignmentQuery, option.searchText),
+  );
+  const filteredDictionaryAssignmentOptions =
+    searchedDictionaryAssignmentOptions.slice(0, DICTIONARY_ASSIGNMENT_RESULT_LIMIT);
+  const hiddenDictionaryAssignmentResultCount = Math.max(
+    0,
+    searchedDictionaryAssignmentOptions.length -
+      filteredDictionaryAssignmentOptions.length,
   );
   const dictionaryAssignmentCounts = new Map<DictionaryAssignmentTab, number>([
     [
@@ -2106,29 +2103,47 @@ export function LeftSidebar() {
       return null;
     }
 
-    const previewComponent = option.previewComponent || option.component;
+    const GroupIcon =
+      option.group === "presets"
+        ? Layers
+        : option.group === "components"
+          ? Shapes
+          : option.group === "assets"
+            ? Image
+            : option.group === "icons"
+              ? Lightbulb
+              : Smile;
     const isAssigned = dictionaryAssignmentEntry.components.some(
-      (entryComponent) => entryComponent.id === option.component.id,
+      (entryComponent) =>
+        entryComponent.id ===
+        getDictionaryAssignmentId(dictionaryAssignmentEntry, option.sourceId),
     );
 
     return (
       <button
         key={option.id}
         type="button"
-        onClick={() =>
-          assignDictionaryComponent(dictionaryAssignmentEntry, option.component)
-        }
+        onClick={() => {
+          assignDictionaryComponent(
+            dictionaryAssignmentEntry,
+            option.createComponent(dictionaryAssignmentEntry),
+          );
+        }}
         title={`Assign ${option.label}`}
-        className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
+        className="flex min-h-16 items-center gap-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3 text-left transition-colors hover:border-[#4f46e5] hover:bg-white"
       >
-        <SavedElementFavoritePreview favorite={previewComponent} />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[10px] font-semibold text-[#0f172a]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[#4f46e5]">
+          <GroupIcon className="h-4 w-4" />
+        </div>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-xs font-semibold text-[#0f172a]">
               {option.label}
             </div>
-            <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
-              {option.typeLabel}
+            <div className="mt-1 flex min-w-0 items-center gap-2 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <span className="truncate">{option.typeLabel}</span>
+              <span className="text-slate-300">/</span>
+              <span className="truncate">{option.group}</span>
             </div>
           </div>
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500">
@@ -2819,7 +2834,7 @@ export function LeftSidebar() {
                 Assignable Library
               </div>
               <div className="rounded-full bg-[#eef2ff] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
-                {filteredDictionaryAssignmentOptions.length}
+                {searchedDictionaryAssignmentOptions.length}
               </div>
             </div>
 
@@ -2828,11 +2843,19 @@ export function LeftSidebar() {
                 No assignable items match that search
               </div>
             ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {filteredDictionaryAssignmentOptions.map(
-                  renderDictionaryAssignmentOption,
+              <>
+                <div className="grid gap-2">
+                  {filteredDictionaryAssignmentOptions.map(
+                    renderDictionaryAssignmentOption,
+                  )}
+                </div>
+                {hiddenDictionaryAssignmentResultCount > 0 && (
+                  <div className="mt-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    Showing first {DICTIONARY_ASSIGNMENT_RESULT_LIMIT} of{" "}
+                    {searchedDictionaryAssignmentOptions.length}
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </div>
