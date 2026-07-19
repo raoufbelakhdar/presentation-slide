@@ -6,6 +6,7 @@ import {
   DEFAULT_SEQUENCE_ANIMATION_TYPE,
   DEFAULT_SEQUENCE_DELAY,
   DEFAULT_SEQUENCE_DURATION,
+  DictionaryEntry,
   ElementKeyframe,
   FavoriteComponent,
   Project,
@@ -16,6 +17,7 @@ import {
 } from './types';
 import { loadPersistedLibrary, PersistedLibraryRecord, savePersistedLibrary } from './persistence';
 import { getAssetKind, getDefaultImageFrameStyle } from './assetUtils';
+import { normalizeDictionaryEntries, normalizeDictionaryEntry } from './dictionary';
 import { buildSceneTemplate, generateId, getSceneSequenceCount, mergeAssetLibraries } from './utils';
 
 const PROJECT_LIBRARY_KEY = 'visual-learning-projects';
@@ -30,6 +32,7 @@ interface AppState {
   sharedAssets: Asset[];
   sharedSavedComponents: SavedComponent[];
   favoriteComponents: FavoriteComponent[];
+  dictionaryEntries: DictionaryEntry[];
   templates: SceneTemplate[];
   project: Project;
   activeProjectId: string | null;
@@ -70,6 +73,10 @@ type Action =
   | { type: 'ADD_TEMPLATE'; payload: SceneTemplate }
   | { type: 'TOGGLE_FAVORITE_COMPONENT'; payload: FavoriteComponent }
   | { type: 'UPSERT_FAVORITE_COMPONENT'; payload: FavoriteComponent }
+  | { type: 'UPSERT_DICTIONARY_ENTRIES'; payload: DictionaryEntry[] }
+  | { type: 'DELETE_DICTIONARY_ENTRY'; payload: string }
+  | { type: 'ADD_DICTIONARY_COMPONENT'; payload: { entryId: string; component: SavedComponent } }
+  | { type: 'DELETE_DICTIONARY_COMPONENT'; payload: { entryId: string; componentId: string } }
   | { type: 'SELECT_ELEMENT'; payload: string | null }
   | { type: 'SELECT_ELEMENTS'; payload: string[] }
   | { type: 'TOGGLE_ELEMENT_SELECTION'; payload: string }
@@ -119,6 +126,10 @@ const TRACKED_ACTIONS = new Set<Action['type']>([
   'ADD_TEMPLATE',
   'DELETE_TEMPLATE',
   'UPDATE_TEMPLATE',
+  'UPSERT_DICTIONARY_ENTRIES',
+  'DELETE_DICTIONARY_ENTRY',
+  'ADD_DICTIONARY_COMPONENT',
+  'DELETE_DICTIONARY_COMPONENT',
   'ADD_ELEMENT',
   'UPDATE_ELEMENT',
   'REPLACE_ELEMENT',
@@ -550,6 +561,54 @@ function upsertTemplate(templates: SceneTemplate[], template: SceneTemplate): Sc
   return nextTemplates;
 }
 
+function getDictionaryEntryKey(entry: Pick<DictionaryEntry, 'id' | 'arabicWord'>) {
+  return entry.id || entry.arabicWord.trim().toLowerCase();
+}
+
+function mergeDictionaryComponents(
+  currentComponents: SavedComponent[],
+  incomingComponents: SavedComponent[],
+) {
+  const componentsById = new Map<string, SavedComponent>();
+
+  for (const component of currentComponents) {
+    componentsById.set(component.id, component);
+  }
+
+  for (const component of incomingComponents) {
+    componentsById.set(component.id, component);
+  }
+
+  return Array.from(componentsById.values());
+}
+
+function upsertDictionaryEntries(
+  dictionaryEntries: DictionaryEntry[],
+  entriesToUpsert: DictionaryEntry[],
+) {
+  const entriesByKey = new Map<string, DictionaryEntry>();
+
+  for (const entry of dictionaryEntries) {
+    entriesByKey.set(getDictionaryEntryKey(entry), entry);
+  }
+
+  for (const entry of entriesToUpsert) {
+    const key = getDictionaryEntryKey(entry);
+    const existingEntry = entriesByKey.get(key);
+    entriesByKey.set(key, {
+      ...existingEntry,
+      ...entry,
+      components: mergeDictionaryComponents(
+        existingEntry?.components || [],
+        entry.components,
+      ),
+      updatedAt: getTimestamp(),
+    });
+  }
+
+  return Array.from(entriesByKey.values());
+}
+
 function applyProjectUpdate(state: AppState, project: Project, overrides: Partial<AppState> = {}): AppState {
   const savedProject = stampProject(project);
   const activeProjectId = overrides.activeProjectId ?? state.activeProjectId ?? savedProject.id;
@@ -710,6 +769,7 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
   );
   const sharedSavedComponents = normalizeSavedComponents(payload?.sharedSavedComponents);
   const favoriteComponents = normalizeFavoriteComponents(payload?.favorites);
+  const dictionaryEntries = normalizeDictionaryEntries(payload?.dictionaryEntries);
 
   let templates: SceneTemplate[] = [];
   if (Array.isArray(payload?.templates)) {
@@ -735,6 +795,7 @@ function buildHydratedState(baseState: AppState, payload: PersistedLibraryRecord
     sharedAssets,
     sharedSavedComponents,
     favoriteComponents,
+    dictionaryEntries,
     templates,
     project: activeProject || baseState.project,
     activeProjectId,
@@ -769,6 +830,7 @@ function loadLegacyLibraryFromLocalStorage(): PersistedLibraryRecord | null {
     sharedAssets: [],
     sharedSavedComponents: [],
     favorites: normalizeFavoriteComponents(storedFavorites),
+    dictionaryEntries: [],
     templates,
   };
 }
@@ -786,6 +848,7 @@ const initialState: AppState = {
   sharedAssets: [],
   sharedSavedComponents: [],
   favoriteComponents: [],
+  dictionaryEntries: [],
   templates: [],
   project: createEmptyProject(),
   activeProjectId: null,
@@ -1091,6 +1154,54 @@ function appReducer(state: AppState, action: Action): AppState {
         favoriteComponents: nextFavorites,
       };
     }
+    case 'UPSERT_DICTIONARY_ENTRIES':
+      return {
+        ...state,
+        dictionaryEntries: upsertDictionaryEntries(
+          state.dictionaryEntries,
+          normalizeDictionaryEntries(action.payload),
+        ),
+      };
+    case 'DELETE_DICTIONARY_ENTRY':
+      return {
+        ...state,
+        dictionaryEntries: state.dictionaryEntries.filter(
+          (entry) => entry.id !== action.payload,
+        ),
+      };
+    case 'ADD_DICTIONARY_COMPONENT':
+      return {
+        ...state,
+        dictionaryEntries: state.dictionaryEntries.map((entry) => {
+          if (entry.id !== action.payload.entryId) {
+            return entry;
+          }
+
+          const normalizedEntry = normalizeDictionaryEntry({
+            ...entry,
+            components: mergeDictionaryComponents(entry.components, [
+              action.payload.component,
+            ]),
+          });
+
+          return normalizedEntry || entry;
+        }),
+      };
+    case 'DELETE_DICTIONARY_COMPONENT':
+      return {
+        ...state,
+        dictionaryEntries: state.dictionaryEntries.map((entry) =>
+          entry.id === action.payload.entryId
+            ? {
+                ...entry,
+                components: entry.components.filter(
+                  (component) => component.id !== action.payload.componentId,
+                ),
+                updatedAt: getTimestamp(),
+              }
+            : entry,
+        ),
+      };
     case 'DELETE_TEMPLATE':
       return {
         ...state,
@@ -1514,6 +1625,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       sharedAssets: present.sharedAssets,
       sharedSavedComponents: present.sharedSavedComponents,
       favorites: present.favoriteComponents,
+      dictionaryEntries: present.dictionaryEntries,
       templates: present.templates,
     }).catch((error) => {
       console.error('Failed to persist local project library', error);
@@ -1521,6 +1633,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [
     present.activeProjectId,
     present.favoriteComponents,
+    present.dictionaryEntries,
     present.isHydrated,
     present.projects,
     present.sharedAssets,

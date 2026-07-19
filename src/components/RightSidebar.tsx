@@ -1,6 +1,6 @@
 import React, { useDeferredValue, useEffect, useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
+import { BookOpen, BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
 import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
@@ -569,7 +569,7 @@ function LayersPanel({
 
 export function RightSidebar() {
   const { state, dispatch } = useAppContext();
-  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds, sharedSavedComponents } = state;
+  const { project, activeSceneIndex, favoriteComponents, selectedElementId, selectedElementIds, sharedSavedComponents, dictionaryEntries } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
   const projectAssetsById = new Map<string, Asset>(availableAssets.map((asset) => [asset.id, asset]));
@@ -580,6 +580,9 @@ export function RightSidebar() {
     !selectedElement && selectedSequenceStep !== null ? 'layers' : 'properties',
   );
   const [libraryQuery, setLibraryQuery] = useState('');
+  const [selectedDictionaryEntryId, setSelectedDictionaryEntryId] = useState(
+    dictionaryEntries[0]?.id || '',
+  );
   const isMultiSelecting = selectedElementIds.length > 1;
   const deferredLibraryQuery = useDeferredValue(libraryQuery);
   const normalizedLibraryQuery = deferredLibraryQuery.trim().toLowerCase();
@@ -597,6 +600,17 @@ export function RightSidebar() {
 
     setActiveTab('properties');
   }, [selectedElementId, selectedSequenceStep]);
+
+  useEffect(() => {
+    if (dictionaryEntries.length === 0) {
+      setSelectedDictionaryEntryId('');
+      return;
+    }
+
+    if (!dictionaryEntries.some((entry) => entry.id === selectedDictionaryEntryId)) {
+      setSelectedDictionaryEntryId(dictionaryEntries[0].id);
+    }
+  }, [dictionaryEntries, selectedDictionaryEntryId]);
 
   const handleSelectElement = (event: React.MouseEvent<HTMLButtonElement>, elementId: string) => {
     if (event.ctrlKey || event.metaKey || event.shiftKey) {
@@ -952,6 +966,17 @@ export function RightSidebar() {
           : undefined,
     };
   };
+  const selectedDictionaryEntry = dictionaryEntries.find(
+    (entry) => entry.id === selectedDictionaryEntryId,
+  );
+  const buildSelectedDictionaryComponent = (): SavedComponent => {
+    const savedComponent = buildSelectedSavedComponent();
+
+    return {
+      ...savedComponent,
+      id: `dict:${selectedDictionaryEntryId}:${selectedElement.id}:${generateId()}`,
+    };
+  };
   const saveSelectedElementToFavorites = () => {
     const favorite = buildSelectedSavedComponent();
 
@@ -969,6 +994,19 @@ export function RightSidebar() {
     }
 
     dispatch({ type: 'UPSERT_SHARED_SAVED_COMPONENT', payload: favorite });
+  };
+  const assignSelectedElementToDictionary = () => {
+    if (!selectedDictionaryEntry) {
+      return;
+    }
+
+    dispatch({
+      type: 'ADD_DICTIONARY_COMPONENT',
+      payload: {
+        entryId: selectedDictionaryEntry.id,
+        component: buildSelectedDictionaryComponent(),
+      },
+    });
   };
   const toggleSavedComponentFavorite = (favorite: SavedComponent) => {
     dispatch({ type: 'TOGGLE_FAVORITE_COMPONENT', payload: favorite });
@@ -1198,9 +1236,57 @@ export function RightSidebar() {
     </div>
   );
 
+  const dictionaryAssignmentSection = (
+    <div className="rounded-md border border-[#e2e8f0] bg-white p-2.5">
+      <div className="mb-2 flex items-center gap-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-[#e2e8f0] bg-[#f8fafc] text-slate-500">
+          <BookOpen className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+            Dictionary
+          </div>
+          <div className="truncate text-[11px] font-semibold text-[#0f172a]">
+            {selectedDictionaryEntry?.arabicWord || 'No words'}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex gap-2">
+        <select
+          value={selectedDictionaryEntryId}
+          onChange={(event) => setSelectedDictionaryEntryId(event.target.value)}
+          disabled={dictionaryEntries.length === 0}
+          className="min-w-0 flex-1 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-2 py-2 text-[11px] font-semibold text-[#0f172a] outline-none focus:border-[#4f46e5] disabled:cursor-not-allowed disabled:text-slate-300"
+        >
+          {dictionaryEntries.length === 0 ? (
+            <option value="">Import words first</option>
+          ) : (
+            dictionaryEntries.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.arabicWord}
+                {entry.phonetic ? ` - ${entry.phonetic}` : ''}
+              </option>
+            ))
+          )}
+        </select>
+        <button
+          type="button"
+          onClick={assignSelectedElementToDictionary}
+          disabled={!selectedDictionaryEntry}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#dbe4f0] bg-[#f8fafc] text-slate-600 transition-colors hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-[#dbe4f0]"
+          title="Assign selected component to dictionary word"
+        >
+          <Save className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+
   const propertySections = (
     <>
       {saveShareSection}
+      {dictionaryAssignmentSection}
       {positionSection}
       {revealTimingSection}
 

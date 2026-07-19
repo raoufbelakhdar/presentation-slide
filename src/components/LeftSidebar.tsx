@@ -21,9 +21,11 @@ import {
   Shapes,
   TextCursorInput,
   WifiOff,
+  BookOpen,
 } from "lucide-react";
 import {
   Asset,
+  DictionaryEntry,
   FavoriteComponent,
   FavoritePresetId,
   SceneElement,
@@ -47,6 +49,7 @@ import {
   mergeAssetLibraries,
   splitTextContent,
 } from "../utils";
+import { getDictionarySearchText, parseDictionaryJson } from "../dictionary";
 import {
   DEFAULT_ICON_COLOR,
   FEATURED_ICON_NAMES,
@@ -528,6 +531,7 @@ export function LeftSidebar() {
     sharedAssets,
     sharedSavedComponents,
     favoriteComponents,
+    dictionaryEntries,
     templates,
     selectedSequenceStep,
   } = state;
@@ -549,7 +553,7 @@ export function LeftSidebar() {
     "library",
   );
   const [componentTab, setComponentTab] = useState<
-    "favorites" | "presets" | "icons" | "emojis" | "assets"
+    "favorites" | "presets" | "icons" | "emojis" | "assets" | "dictionary"
   >("favorites");
   const [templateTab, setTemplateTab] = useState<"scene" | "branch">("branch");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
@@ -557,6 +561,8 @@ export function LeftSidebar() {
   );
   const [editingTemplateName, setEditingTemplateName] = useState("");
   const [libraryQuery, setLibraryQuery] = useState("");
+  const [dictionaryJson, setDictionaryJson] = useState("");
+  const [dictionaryImportError, setDictionaryImportError] = useState("");
   const [iconQuery, setIconQuery] = useState("");
   const [emojiQuery, setEmojiQuery] = useState("");
   const [assetLibraryTab, setAssetLibraryTab] = useState<"local" | "pexels">(
@@ -1083,6 +1089,9 @@ export function LeftSidebar() {
   const filteredPresetDefinitions = presetDefinitions.filter((preset) =>
     matchesSearchQuery(normalizedLibraryQuery, preset.label, preset.id),
   );
+  const filteredDictionaryEntries = dictionaryEntries.filter((entry) =>
+    matchesSearchQuery(normalizedLibraryQuery, getDictionarySearchText(entry)),
+  );
   const hasFavoriteSearchResults =
     filteredSavedComponentCount > 0 ||
     filteredFavoritePresets.length > 0 ||
@@ -1197,18 +1206,89 @@ export function LeftSidebar() {
     dispatch({ type: "USE_TEMPLATE", payload: templateId });
   };
 
+  const importDictionaryJson = (jsonValue = dictionaryJson) => {
+    try {
+      const importedEntries = parseDictionaryJson(jsonValue);
+
+      if (importedEntries.length === 0) {
+        setDictionaryImportError(
+          "No dictionary words found. Use an array or an object with a words array.",
+        );
+        return;
+      }
+
+      dispatch({
+        type: "UPSERT_DICTIONARY_ENTRIES",
+        payload: importedEntries,
+      });
+      setDictionaryJson("");
+      setDictionaryImportError("");
+      setComponentTab("dictionary");
+    } catch {
+      setDictionaryImportError("Invalid JSON. Check commas and quotes.");
+    }
+  };
+
+  const handleDictionaryFileImport = (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    void file.text().then((value) => {
+      setDictionaryJson(value);
+      importDictionaryJson(value);
+    });
+    event.target.value = "";
+  };
+
+  const deleteDictionaryEntry = (entry: DictionaryEntry) => {
+    const message = `Delete "${entry.arabicWord}" from the dictionary?`;
+    if (!confirm(message)) return;
+
+    dispatch({ type: "DELETE_DICTIONARY_ENTRY", payload: entry.id });
+  };
+
+  const deleteDictionaryComponent = (
+    entry: DictionaryEntry,
+    component: SavedComponent,
+  ) => {
+    dispatch({
+      type: "DELETE_DICTIONARY_COMPONENT",
+      payload: { entryId: entry.id, componentId: component.id },
+    });
+  };
+
+  const addDictionaryComponents = (entry: DictionaryEntry) => {
+    entry.components.forEach((component, index) =>
+      addSavedFavoriteElement(component, index, entry.components.length),
+    );
+  };
+
   const addSavedFavoriteElement = (
-    favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
+    favorite: SavedComponent,
+    placementIndex = 0,
+    placementCount = 1,
   ) => {
     const nextElement = cloneFavoriteElement(favorite.element);
     const nextWidth = Math.max(1, Math.round(nextElement.width));
     const nextHeight = Math.max(1, Math.round(nextElement.height));
+    const offsetX =
+      placementCount > 1
+        ? (placementIndex - (placementCount - 1) / 2) * Math.min(nextWidth + 28, 260)
+        : 0;
+    const offsetY =
+      placementCount > 1
+        ? (placementIndex % 2) * Math.min(nextHeight * 0.2, 48)
+        : 0;
     const nextX = Math.min(
-      Math.max(Math.round((1920 - nextWidth) / 2), 0),
+      Math.max(Math.round((1920 - nextWidth) / 2 + offsetX), 0),
       Math.max(0, 1920 - nextWidth),
     );
     const nextY = Math.min(
-      Math.max(Math.round((1080 - nextHeight) / 2), 0),
+      Math.max(Math.round((1080 - nextHeight) / 2 + offsetY), 0),
       Math.max(0, 1080 - nextHeight),
     );
 
@@ -1348,6 +1428,117 @@ export function LeftSidebar() {
       </div>
     );
   };
+
+  const renderDictionaryCard = (entry: DictionaryEntry) => (
+    <div
+      key={entry.id}
+      className="rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => {
+            if (entry.components.length > 0) {
+              addDictionaryComponents(entry);
+            }
+          }}
+          className="min-w-0 flex-1 text-left"
+          title={
+            entry.components.length > 0
+              ? `Add ${entry.components.length} mapped component${entry.components.length === 1 ? "" : "s"}`
+              : entry.arabicWord
+          }
+        >
+          <div
+            className="truncate text-lg font-bold leading-tight text-[#0f172a]"
+            dir="auto"
+          >
+            {entry.arabicWord}
+          </div>
+          <div className="mt-1 truncate text-[11px] font-semibold text-[#4f46e5]">
+            {entry.phonetic || "No phonetic"}
+          </div>
+          <div className="mt-0.5 truncate text-[10px] font-medium text-slate-500">
+            {entry.pronunciation || "No pronunciation"}
+          </div>
+        </button>
+
+        <div className="flex shrink-0 items-center gap-1">
+          {entry.components.length > 0 && (
+            <button
+              type="button"
+              onClick={() => addDictionaryComponents(entry)}
+              className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[#4f46e5] transition-colors hover:border-[#4f46e5] hover:bg-indigo-50"
+              title="Add all mapped components"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => deleteDictionaryEntry(entry)}
+            className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-400 transition-colors hover:border-rose-300 hover:bg-rose-50 hover:text-rose-500"
+            title="Delete dictionary word"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 flex items-center justify-between gap-2 border-t border-[#e2e8f0] pt-3">
+        <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+          Components
+        </div>
+        <div className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-slate-500">
+          {entry.components.length}
+        </div>
+      </div>
+
+      {entry.components.length === 0 ? (
+        <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] bg-white px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+          No mapped components
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {entry.components.map((component, index) => (
+            <div key={component.id} className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  addSavedFavoriteElement(
+                    component,
+                    index,
+                    entry.components.length,
+                  )
+                }
+                title={component.name}
+                className="flex w-full flex-col rounded-sm border border-[#e2e8f0] bg-white p-2 text-left transition-colors hover:border-[#4f46e5]"
+              >
+                <SavedElementFavoritePreview favorite={component} />
+                <div className="mt-2 truncate text-[10px] font-semibold text-[#0f172a]">
+                  {component.name}
+                </div>
+                <div className="mt-0.5 truncate text-[9px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {getSavedFavoriteTypeLabel(component.element)}
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  deleteDictionaryComponent(entry, component);
+                }}
+                className="absolute right-1.5 top-1.5 z-10 rounded-full border border-white/70 bg-white/90 p-1 text-slate-400 shadow-sm transition-colors hover:text-rose-500"
+                title="Remove from word"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   const renderTemplateCard = (template: (typeof templates)[number]) => (
     <div
@@ -1501,7 +1692,7 @@ export function LeftSidebar() {
         {activeTab === "library" ? (
           <div className="p-4 space-y-6">
             <div>
-              <div className="mb-4 grid grid-cols-5 gap-2 rounded-sm bg-[#f8fafc] p-1">
+              <div className="mb-4 grid grid-cols-6 gap-2 rounded-sm bg-[#f8fafc] p-1">
                 <button
                   type="button"
                   onClick={() => setComponentTab("favorites")}
@@ -1562,10 +1753,23 @@ export function LeftSidebar() {
                 >
                   <Smile className="h-4 w-4" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setComponentTab("dictionary")}
+                  className={`rounded-sm p-2 flex items-center justify-center text-[10px] font-bold uppercase tracking-[0.18em] transition-colors ${
+                    componentTab === "dictionary"
+                      ? "bg-white text-[#1e293b] shadow-sm"
+                      : "text-slate-400 hover:text-slate-600"
+                  }`}
+                  title="Dictionary"
+                >
+                  <BookOpen className="h-4 w-4" />
+                </button>
               </div>
 
               {(componentTab === "favorites" ||
                 componentTab === "presets" ||
+                componentTab === "dictionary" ||
                 (componentTab === "assets" && assetLibraryTab === "local")) && (
                 <label className="mb-4 flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 focus-within:border-[#4f46e5]">
                   <Search className="h-3.5 w-3.5 text-slate-400" />
@@ -1578,7 +1782,9 @@ export function LeftSidebar() {
                         ? "Search your library..."
                         : componentTab === "presets"
                           ? "Search presets..."
-                          : "Search assets..."
+                          : componentTab === "dictionary"
+                            ? "Search dictionary..."
+                            : "Search assets..."
                     }
                     className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
                   />
@@ -1992,6 +2198,73 @@ export function LeftSidebar() {
                     ) : (
                       <div className="mt-3 rounded-sm border border-dashed border-[#dbe4f0] px-3 py-5 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                         Shared assets are hidden. Favorite components stay visible.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : componentTab === "dictionary" ? (
+                <div className="space-y-5">
+                  <div className="space-y-3 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        JSON Import
+                      </div>
+                      <label className="flex h-8 w-8 cursor-pointer items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-500 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]">
+                        <Upload className="h-4 w-4" />
+                        <input
+                          type="file"
+                          accept="application/json,.json"
+                          className="hidden"
+                          onChange={handleDictionaryFileImport}
+                        />
+                      </label>
+                    </div>
+                    <textarea
+                      value={dictionaryJson}
+                      onChange={(event) => {
+                        setDictionaryJson(event.target.value);
+                        setDictionaryImportError("");
+                      }}
+                      placeholder='[{"Arabic Word":"...","Phonetic":"...","Pronunciation":"..."}]'
+                      className="min-h-[96px] w-full resize-none rounded-sm border border-[#e2e8f0] bg-white p-2 font-mono text-[11px] leading-relaxed text-[#0f172a] outline-none focus:border-[#4f46e5]"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => importDictionaryJson()}
+                      disabled={!dictionaryJson.trim()}
+                      className="flex w-full items-center justify-center gap-2 rounded-sm border border-[#dbe4f0] bg-white py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:border-[#dbe4f0]"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      Import Words
+                    </button>
+                    {dictionaryImportError && (
+                      <div className="rounded-sm border border-rose-100 bg-rose-50 px-3 py-2 text-[10px] font-semibold text-rose-600">
+                        {dictionaryImportError}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                        Dictionary Words
+                      </div>
+                      <div className="rounded-full bg-[#eef2ff] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-[#4f46e5]">
+                        {filteredDictionaryEntries.length}
+                      </div>
+                    </div>
+
+                    {dictionaryEntries.length === 0 ? (
+                      <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        No dictionary words yet
+                      </div>
+                    ) : filteredDictionaryEntries.length === 0 ? (
+                      <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-6 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        No dictionary words match that search
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredDictionaryEntries.map(renderDictionaryCard)}
                       </div>
                     )}
                   </div>

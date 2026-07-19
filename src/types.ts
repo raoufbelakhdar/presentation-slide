@@ -113,6 +113,16 @@ export type FavoriteComponent =
 
 export type SavedComponent = Extract<FavoriteComponent, { type: 'saved-element' }>;
 
+export interface DictionaryEntry {
+  id: string;
+  arabicWord: string;
+  phonetic: string;
+  pronunciation: string;
+  components: SavedComponent[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface SceneTemplate {
   id: string;
   name: string;
