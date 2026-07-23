@@ -74,6 +74,7 @@ import {
   searchEmojis,
 } from "../emojiLibrary";
 import { EmojiGlyph } from "./EmojiGlyph";
+import { ScriptPanel } from "./ScriptPanel";
 import {
   convertRemoteImageToDataUrl,
   getPexelsAssetUrl,
@@ -658,7 +659,7 @@ export function LeftSidebar() {
   const branchTemplates = templates.filter(
     (template) => template.kind === "branch",
   );
-  const [activeTab, setActiveTab] = useState<"library" | "templates">(
+  const [activeTab, setActiveTab] = useState<"library" | "script" | "templates">(
     "library",
   );
   const [componentTab, setComponentTab] = useState<
@@ -3021,6 +3022,12 @@ export function LeftSidebar() {
           Components
         </button>
         <button
+          className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${activeTab === "script" ? "text-[#1e293b] border-[#4f46e5] bg-white" : "text-slate-400 border-transparent hover:bg-slate-50"}`}
+          onClick={() => setActiveTab("script")}
+        >
+          Script
+        </button>
+        <button
           className={`flex-1 py-2 text-[11px] font-bold border-b-2 transition-colors ${activeTab === "templates" ? "text-[#1e293b] border-[#4f46e5] bg-white" : "text-slate-400 border-transparent hover:bg-slate-50"}`}
           onClick={() => setActiveTab("templates")}
         >
@@ -3029,7 +3036,9 @@ export function LeftSidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {activeTab === "library" ? (
+        {activeTab === "script" ? (
+          <ScriptPanel />
+        ) : activeTab === "library" ? (
           <div className="p-4 space-y-6">
             <div>
               <div className="mb-4 grid grid-cols-6 gap-2 rounded-sm bg-[#f8fafc] p-1">

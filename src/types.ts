@@ -124,6 +124,31 @@ export interface DictionaryEntry {
   updatedAt?: string;
 }
 
+export type ScriptLayout = 'horizontal' | 'vertical' | 'grid';
+
+export type ScriptWordAssociation =
+  | { kind: 'ignored' }
+  | { kind: 'text'; variant: 'free' | 'block' }
+  | { kind: 'icon'; iconName: string }
+  | { kind: 'asset'; assetId: string }
+  | { kind: 'component'; component: SavedComponent };
+
+export interface ScriptWord {
+  id: string;
+  text: string;
+  association?: ScriptWordAssociation;
+}
+
+export interface ScriptDefinition {
+  id: string;
+  name: string;
+  text: string;
+  words: ScriptWord[];
+  layout: ScriptLayout;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SceneTemplate {
   id: string;
   name: string;
