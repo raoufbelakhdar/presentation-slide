@@ -123,6 +123,23 @@ const SAVED_COMPONENT_TYPE_FILTER_OPTIONS = [
 type SavedComponentTypeFilter =
   (typeof SAVED_COMPONENT_TYPE_FILTER_OPTIONS)[number]["value"];
 
+type ImportedWordRow = {
+  id: string;
+  title: string;
+  subtitle: string;
+};
+
+const WORD_IMPORT_SAMPLE_JSON = `[
+  {
+    "title": "Bonjour",
+    "subtitle": "Hello"
+  },
+  {
+    "title": "Merci",
+    "subtitle": "Thank you"
+  }
+]`;
+
 function matchesSearchQuery(
   query: string,
   ...values: Array<string | null | undefined>
@@ -130,6 +147,122 @@ function matchesSearchQuery(
   if (!query) return true;
 
   return values.some((value) => value?.toLowerCase().includes(query));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function getStringField(
+  record: Record<string, unknown>,
+  keys: string[],
+): string {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return "";
+}
+
+function getWordImportItems(data: unknown): unknown[] {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  if (!isRecord(data)) {
+    return [];
+  }
+
+  const candidateKeys = ["words", "items", "entries", "data"];
+  for (const key of candidateKeys) {
+    const value = data[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+
+  const objectRows = Object.entries(data).flatMap(([title, subtitle]) =>
+    typeof subtitle === "string" ? [{ title, subtitle }] : [],
+  );
+  if (objectRows.length > 0) {
+    return objectRows;
+  }
+
+  return [];
+}
+
+function hashImportedWord(value: string) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return hash.toString(36);
+}
+
+function slugImportedWord(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 32) || "word"
+  );
+}
+
+function parseImportedWords(data: unknown): ImportedWordRow[] {
+  const rows = getWordImportItems(data)
+    .map((item) => {
+      if (typeof item === "string") {
+        return {
+          title: item.trim(),
+          subtitle: "",
+        };
+      }
+
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const title = getStringField(item, ["title", "word", "term", "name"]);
+      const subtitle = getStringField(item, [
+        "subtitle",
+        "translation",
+        "meaning",
+        "description",
+        "definition",
+      ]);
+
+      if (!title) {
+        return null;
+      }
+
+      return { title, subtitle };
+    })
+    .filter((row): row is Pick<ImportedWordRow, "title" | "subtitle"> =>
+      Boolean(row),
+    );
+
+  const seenIds = new Set<string>();
+
+  return rows
+    .map((row) => {
+      const source = `${row.title}\n${row.subtitle}`;
+      const id = `word-${slugImportedWord(row.title)}-${hashImportedWord(source)}`;
+      return { ...row, id };
+    })
+    .filter((row) => {
+      if (seenIds.has(row.id)) {
+        return false;
+      }
+
+      seenIds.add(row.id);
+      return true;
+    });
 }
 
 function cloneFavoriteElement(element: SceneElement): SceneElement {
@@ -593,6 +726,13 @@ export function LeftSidebar() {
   });
   const [savedComponentTypeFilter, setSavedComponentTypeFilter] =
     useState<SavedComponentTypeFilter>("all");
+  const [isWordImportModalOpen, setIsWordImportModalOpen] = useState(false);
+  const [importedWordRows, setImportedWordRows] = useState<ImportedWordRow[]>(
+    [],
+  );
+  const [wordImportFileName, setWordImportFileName] = useState("");
+  const [wordImportError, setWordImportError] = useState("");
+  const [wordImportNotice, setWordImportNotice] = useState("");
   const defaultRevealStep = selectedSequenceStep ?? 1;
   const deferredLibraryQuery = useDeferredValue(libraryQuery);
   const deferredIconQuery = useDeferredValue(iconQuery);
@@ -750,6 +890,101 @@ export function LeftSidebar() {
       color: "#ffffff",
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
+  };
+
+  const buildImportedWordComponent = (row: ImportedWordRow): SavedComponent => {
+    const text = [row.title, row.subtitle].filter(Boolean).join("\n");
+
+    return {
+      type: "saved-element",
+      id: row.id,
+      name: row.title,
+      element: {
+        id: `${row.id}-element`,
+        type: "text",
+        variant: "block",
+        text,
+        x: 100,
+        y: 100,
+        width: 400,
+        height: 120,
+        revealStep: 1,
+        fontSize: 40,
+        subtitleFontSize: 20,
+        padding: 20,
+        fontWeight: "bold",
+        color: "#ffffff",
+      },
+    };
+  };
+
+  const saveImportedWordRows = (
+    rows: ImportedWordRow[],
+    destination: "saved" | "shared" | "both",
+  ) => {
+    rows.forEach((row) => {
+      const component = buildImportedWordComponent(row);
+
+      if (destination === "saved" || destination === "both") {
+        dispatch({ type: "UPSERT_FAVORITE_COMPONENT", payload: component });
+      }
+
+      if (destination === "shared" || destination === "both") {
+        dispatch({ type: "UPSERT_SHARED_SAVED_COMPONENT", payload: component });
+      }
+    });
+
+    const destinationLabel =
+      destination === "both"
+        ? "saved and shared"
+        : destination === "shared"
+          ? "shared"
+          : "saved";
+    setWordImportNotice(`${rows.length} word ${rows.length === 1 ? "was" : "were"} ${destinationLabel}.`);
+    setComponentTab("favorites");
+    setSavedComponentTypeFilter("text-block");
+  };
+
+  const handleWordImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.currentTarget.value = "";
+
+    if (!file) {
+      return;
+    }
+
+    setWordImportFileName(file.name);
+    setWordImportError("");
+    setWordImportNotice("");
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result || "null")) as unknown;
+        const rows = parseImportedWords(parsed);
+
+        if (rows.length === 0) {
+          setImportedWordRows([]);
+          setWordImportError(
+            "No valid words found. Use an array of objects with title and subtitle fields.",
+          );
+          return;
+        }
+
+        setImportedWordRows(rows);
+        setWordImportNotice(
+          `${rows.length} word ${rows.length === 1 ? "is" : "are"} ready to save or share.`,
+        );
+      } catch {
+        setImportedWordRows([]);
+        setWordImportError("That file is not valid JSON.");
+      }
+    };
+    reader.onerror = () => {
+      setImportedWordRows([]);
+      setWordImportError("The selected file could not be read.");
+    };
+    reader.readAsText(file);
   };
 
   const addFreeTextElement = () => {
@@ -1480,7 +1715,222 @@ export function LeftSidebar() {
     </div>
   );
 
+  const renderWordImportModal = () => {
+    const hasImportedRows = importedWordRows.length > 0;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
+        <div className="flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-md bg-white shadow-2xl">
+          <div className="flex items-center justify-between gap-4 border-b border-[#e2e8f0] px-5 py-4">
+            <div className="min-w-0">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
+                Text Block Import
+              </div>
+              <h2 className="mt-1 truncate text-lg font-bold text-[#0f172a]">
+                Import Words
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsWordImportModalOpen(false)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-sm border border-[#e2e8f0] bg-[#f8fafc] text-slate-500 transition-colors hover:border-rose-200 hover:bg-rose-50 hover:text-rose-500"
+              title="Close"
+              aria-label="Close import modal"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,280px),minmax(0,1fr)] overflow-hidden max-md:grid-cols-1">
+            <div className="space-y-4 overflow-y-auto border-r border-[#e2e8f0] bg-[#f8fafc] p-5 max-md:border-r-0 max-md:border-b">
+              <div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  JSON Format
+                </div>
+                <pre className="max-h-52 overflow-auto rounded-sm border border-[#e2e8f0] bg-white p-3 text-[11px] leading-relaxed text-slate-600">
+                  {WORD_IMPORT_SAMPLE_JSON}
+                </pre>
+              </div>
+
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-sm border border-dashed border-[#cbd5e1] bg-white px-4 py-6 text-center transition-colors hover:border-[#4f46e5] hover:bg-[#eef2ff]">
+                <Upload className="mb-2 h-5 w-5 text-[#4f46e5]" />
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-700">
+                  Choose JSON
+                </span>
+                <span className="mt-1 max-w-44 text-[10px] font-semibold leading-snug text-slate-400">
+                  Arrays or a root words array are supported.
+                </span>
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={handleWordImportFile}
+                />
+              </label>
+
+              {wordImportFileName && (
+                <div className="truncate rounded-sm border border-[#e2e8f0] bg-white px-3 py-2 text-[11px] font-semibold text-slate-600">
+                  {wordImportFileName}
+                </div>
+              )}
+
+              {wordImportError && (
+                <div className="rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-[11px] font-semibold leading-snug text-rose-600">
+                  {wordImportError}
+                </div>
+              )}
+
+              {wordImportNotice && !wordImportError && (
+                <div className="rounded-sm border border-emerald-200 bg-emerald-50 px-3 py-2 text-[11px] font-semibold leading-snug text-emerald-700">
+                  {wordImportNotice}
+                </div>
+              )}
+            </div>
+
+            <div className="flex min-h-0 flex-col">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#e2e8f0] px-5 py-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {importedWordRows.length} Imported
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => saveImportedWordRows(importedWordRows, "saved")}
+                    disabled={!hasImportedRows}
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[#dbe4f0] bg-[#f8fafc] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Save all as components"
+                  >
+                    <Save className="h-3.5 w-3.5" />
+                    Save All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveImportedWordRows(importedWordRows, "shared")}
+                    disabled={!hasImportedRows}
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[#dbe4f0] bg-[#f8fafc] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:bg-white hover:text-[#4f46e5] disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Share all components"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    Share All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => saveImportedWordRows(importedWordRows, "both")}
+                    disabled={!hasImportedRows}
+                    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm bg-[#4f46e5] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50"
+                    title="Save and share all components"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                    Save + Share
+                  </button>
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto p-5">
+                {hasImportedRows ? (
+                  <table className="w-full min-w-[560px] border-collapse text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-[#e2e8f0] text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                        <th className="w-10 px-2 py-2">#</th>
+                        <th className="px-2 py-2">Title</th>
+                        <th className="px-2 py-2">Subtitle</th>
+                        <th className="w-24 px-2 py-2">Status</th>
+                        <th className="w-40 px-2 py-2 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importedWordRows.map((row, index) => {
+                        const isSaved = isFavorite(buildImportedWordComponent(row));
+                        const isShared = sharedSavedComponentIds.has(row.id);
+
+                        return (
+                          <tr
+                            key={row.id}
+                            className="border-b border-[#f1f5f9] align-top last:border-b-0"
+                          >
+                            <td className="px-2 py-3 text-[11px] font-bold text-slate-400">
+                              {index + 1}
+                            </td>
+                            <td className="max-w-48 px-2 py-3 font-semibold text-[#0f172a]">
+                              <div className="break-words">{row.title}</div>
+                            </td>
+                            <td className="max-w-64 px-2 py-3 text-slate-600">
+                              <div className="break-words">
+                                {row.subtitle || (
+                                  <span className="text-slate-300">No subtitle</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2 py-3">
+                              <div className="flex flex-col gap-1">
+                                {isSaved && (
+                                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-emerald-700">
+                                    Saved
+                                  </span>
+                                )}
+                                {isShared && (
+                                  <span className="rounded-full bg-[#eef2ff] px-2 py-1 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-[#4f46e5]">
+                                    Shared
+                                  </span>
+                                )}
+                                {!isSaved && !isShared && (
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-center text-[9px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                                    Ready
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-2 py-3">
+                              <div className="flex justify-end gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => saveImportedWordRows([row], "saved")}
+                                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-[#f8fafc] text-slate-500 transition-colors hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+                                  title="Save component"
+                                  aria-label={`Save ${row.title}`}
+                                >
+                                  <Save className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => saveImportedWordRows([row], "shared")}
+                                  className="flex h-8 w-8 items-center justify-center rounded-sm border border-[#dbe4f0] bg-[#f8fafc] text-slate-500 transition-colors hover:border-[#c7d2fe] hover:bg-[#eef2ff] hover:text-[#4f46e5]"
+                                  title="Share component"
+                                  aria-label={`Share ${row.title}`}
+                                >
+                                  <Layers className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => saveImportedWordRows([row], "both")}
+                                  className="flex h-8 w-8 items-center justify-center rounded-sm bg-[#4f46e5] text-white transition-colors hover:bg-[#4338ca]"
+                                  title="Save and share component"
+                                  aria-label={`Save and share ${row.title}`}
+                                >
+                                  <Check className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="flex min-h-72 items-center justify-center rounded-sm border border-dashed border-[#dbe4f0] px-6 py-10 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    Import a JSON word list to preview text blocks here
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
+    <>
     <div className="w-72 bg-white border-r border-[#e2e8f0] flex flex-col h-full shrink-0">
       <div className="flex border-b border-[#f1f5f9]">
         <button
@@ -1999,9 +2449,23 @@ export function LeftSidebar() {
               ) : componentTab === "presets" ? (
                 <div>
                   <div>
-                    <h3 className="mb-4 text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">
-                      Component Presets
-                    </h3>
+                    <div className="mb-4 flex items-center justify-between gap-2">
+                      <h3 className="text-[10px] font-bold text-[#64748b] uppercase tracking-[0.2em]">
+                        Component Presets
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsWordImportModalOpen(true);
+                          setWordImportError("");
+                        }}
+                        className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[#dbe4f0] bg-white px-2.5 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+                        title="Import text-block words from JSON"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        Import
+                      </button>
+                    </div>
                     <div className="grid grid-cols-2 gap-2">
                       {filteredPresetDefinitions.map((preset) => (
                         <div key={preset.id} className="relative">
@@ -2604,5 +3068,7 @@ export function LeftSidebar() {
         )}
       </div>
     </div>
+    {isWordImportModalOpen && renderWordImportModal()}
+    </>
   );
 }
