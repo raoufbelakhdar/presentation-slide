@@ -992,10 +992,23 @@ export function RightSidebar() {
 
     dispatch({ type: 'DELETE_SAVED_COMPONENT', payload: favorite.id });
   };
+  const applySavedTextBlockDefaults = (element: SceneElement): SceneElement => {
+    if (element.type !== 'text' || getTextVariant(element) !== 'block') {
+      return element;
+    }
+
+    return {
+      ...element,
+      fontSize: 35,
+      subtitleFontSize: 30,
+    };
+  };
   const replaceSelectedElementWithFavorite = (
     favorite: SavedComponent,
   ) => {
-    const nextElement = cloneFavoriteElement(favorite.element);
+    const nextElement = applySavedTextBlockDefaults(
+      cloneFavoriteElement(favorite.element),
+    );
 
     if (nextElement.type === 'image') {
       let assetId = nextElement.assetId;

@@ -883,8 +883,8 @@ export function LeftSidebar() {
       width: 400,
       height: 120,
       revealStep: defaultRevealStep,
-      fontSize: 40,
-      subtitleFontSize: 20,
+      fontSize: 35,
+      subtitleFontSize: 30,
       padding: 20,
       fontWeight: "bold",
       color: "#ffffff",
@@ -909,8 +909,8 @@ export function LeftSidebar() {
         width: 400,
         height: 120,
         revealStep: 1,
-        fontSize: 40,
-        subtitleFontSize: 20,
+        fontSize: 35,
+        subtitleFontSize: 30,
         padding: 20,
         fontWeight: "bold",
         color: "#ffffff",
@@ -1432,10 +1432,24 @@ export function LeftSidebar() {
     dispatch({ type: "USE_TEMPLATE", payload: templateId });
   };
 
+  const applySavedTextBlockDefaults = (element: SceneElement): SceneElement => {
+    if (element.type !== "text" || getTextVariant(element) !== "block") {
+      return element;
+    }
+
+    return {
+      ...element,
+      fontSize: 35,
+      subtitleFontSize: 30,
+    };
+  };
+
   const addSavedFavoriteElement = (
     favorite: Extract<FavoriteComponent, { type: "saved-element" }>,
   ) => {
-    const nextElement = cloneFavoriteElement(favorite.element);
+    const nextElement = applySavedTextBlockDefaults(
+      cloneFavoriteElement(favorite.element),
+    );
     const nextWidth = Math.max(1, Math.round(nextElement.width));
     const nextHeight = Math.max(1, Math.round(nextElement.height));
     const nextX = Math.min(
