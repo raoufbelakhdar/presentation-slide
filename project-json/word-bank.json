@@ -1,0 +1,754 @@
+[
+  {
+    "title": "shahr-un",
+    "subtitle": "a month"
+  },
+  {
+    "title": "sanat-un",
+    "subtitle": "a year"
+  },
+  {
+    "title": "as-sanat-u",
+    "subtitle": "the year"
+  },
+  {
+    "title": "shahr-an",
+    "subtitle": "a month"
+  },
+  {
+    "title": "ash-shahr-u",
+    "subtitle": "the month"
+  },
+  {
+    "title": "raqm",
+    "subtitle": "number"
+  },
+  {
+    "title": "yanāyir",
+    "subtitle": "January"
+  },
+  {
+    "title": "ash-shahr-u",
+    "subtitle": "the month"
+  },
+  {
+    "title": "fibrāyir",
+    "subtitle": "February"
+  },
+  {
+    "title": "māris",
+    "subtitle": "March"
+  },
+  {
+    "title": "abrīl",
+    "subtitle": "April"
+  },
+  {
+    "title": "māyū",
+    "subtitle": "May"
+  },
+  {
+    "title": "yūnyū",
+    "subtitle": "June"
+  },
+  {
+    "title": "yūlyū",
+    "subtitle": "July"
+  },
+  {
+    "title": "aghusṭus",
+    "subtitle": "August"
+  },
+  {
+    "title": "sibtambir",
+    "subtitle": "September"
+  },
+  {
+    "title": "uktūbir",
+    "subtitle": "October"
+  },
+  {
+    "title": "nūfambir",
+    "subtitle": "November"
+  },
+  {
+    "title": "dīsambir",
+    "subtitle": "December"
+  },
+  {
+    "title": "al-awwal-u",
+    "subtitle": "the first"
+  },
+  {
+    "title": "ath-thānī",
+    "subtitle": "the second"
+  },
+  {
+    "title": "ath-thālith-u",
+    "subtitle": "the third"
+  },
+  {
+    "title": "ar-rābi‘-u",
+    "subtitle": "the fourth"
+  },
+  {
+    "title": "al-khāmis-u",
+    "subtitle": "the fifth"
+  },
+  {
+    "title": "as-sādis-u",
+    "subtitle": "the sixth"
+  },
+  {
+    "title": "as-sābi‘-u",
+    "subtitle": "the seventh"
+  },
+  {
+    "title": "ath-thāmin-u",
+    "subtitle": "the eighth"
+  },
+  {
+    "title": "at-tāsi‘-u",
+    "subtitle": "the ninth"
+  },
+  {
+    "title": "al-‘āshir-u",
+    "subtitle": "the tenth"
+  },
+  {
+    "title": "al-ḥādī ‘ashar",
+    "subtitle": "the eleventh"
+  },
+  {
+    "title": "ath-thānī ‘ashar",
+    "subtitle": "the twelfth"
+  },
+  {
+    "title": "al-akhīr-u",
+    "subtitle": "the last"
+  },
+  {
+    "title": "asābī‘a",
+    "subtitle": "weeks"
+  },
+  {
+    "title": "al-usbū‘-u",
+    "subtitle": "the week"
+  },
+  {
+    "title": "ayyām-in",
+    "subtitle": "days"
+  },
+  {
+    "title": "as-sabt-u",
+    "subtitle": "Saturday"
+  },
+  {
+    "title": "yawm-un",
+    "subtitle": "a day"
+  },
+  {
+    "title": "al-aḥad-u",
+    "subtitle": "Sunday"
+  },
+  {
+    "title": "al-ithnayn-i",
+    "subtitle": "Monday"
+  },
+  {
+    "title": "ath-thulāthā’-u",
+    "subtitle": "Tuesday"
+  },
+  {
+    "title": "al-arbi‘ā’-u",
+    "subtitle": "Wednesday"
+  },
+  {
+    "title": "al-khamīs-u",
+    "subtitle": "Thursday"
+  },
+  {
+    "title": "al-jumu‘at-u",
+    "subtitle": "Friday"
+  },
+  {
+    "title": "al-yawm-u",
+    "subtitle": "the day / today"
+  },
+  {
+    "title": "al-usbū‘-i",
+    "subtitle": "the week"
+  },
+  {
+    "title": "ism-u",
+    "subtitle": "name"
+  },
+  {
+    "title": "ar-rajul-i",
+    "subtitle": "the man"
+  },
+  {
+    "title": "al-mar’at-i",
+    "subtitle": "the woman"
+  },
+  {
+    "title": "al-walad-i",
+    "subtitle": "the boy / child"
+  },
+  {
+    "title": "al-fatāt-i",
+    "subtitle": "the girl"
+  },
+  {
+    "title": "al-ab-i",
+    "subtitle": "the father"
+  },
+  {
+    "title": "al-umm-i",
+    "subtitle": "the mother"
+  },
+  {
+    "title": "al-ibn-i",
+    "subtitle": "the son"
+  },
+  {
+    "title": "al-bint-i",
+    "subtitle": "the daughter / girl"
+  },
+  {
+    "title": "az-zawj-i",
+    "subtitle": "the husband"
+  },
+  {
+    "title": "az-zawjat-i",
+    "subtitle": "the wife"
+  },
+  {
+    "title": "al-akh-i",
+    "subtitle": "the brother"
+  },
+  {
+    "title": "al-ukht-i",
+    "subtitle": "the sister"
+  },
+  {
+    "title": "ladayhi",
+    "subtitle": "he has"
+  },
+  {
+    "title": "zawja",
+    "subtitle": "wife"
+  },
+  {
+    "title": "zawj",
+    "subtitle": "husband"
+  },
+  {
+    "title": "zawjat-u",
+    "subtitle": "wife of"
+  },
+  {
+    "title": "ism-u-hā",
+    "subtitle": "her name"
+  },
+  {
+    "title": "zawj-u",
+    "subtitle": "husband of"
+  },
+  {
+    "title": "ism-u-hu",
+    "subtitle": "his name"
+  },
+  {
+    "title": "ibn-un",
+    "subtitle": "a son"
+  },
+  {
+    "title": "ibn-u",
+    "subtitle": "son of"
+  },
+  {
+    "title": "bint-un",
+    "subtitle": "a daughter / girl"
+  },
+  {
+    "title": "bint-u",
+    "subtitle": "daughter of"
+  },
+  {
+    "title": "ladayhā",
+    "subtitle": "she has"
+  },
+  {
+    "title": "ladayhimā",
+    "subtitle": "they have"
+  },
+  {
+    "title": "ab-un",
+    "subtitle": "a father"
+  },
+  {
+    "title": "umm-un",
+    "subtitle": "a mother"
+  },
+  {
+    "title": "ukht-un",
+    "subtitle": "a sister"
+  },
+  {
+    "title": "akh-un",
+    "subtitle": "a brother"
+  },
+  {
+    "title": "abū",
+    "subtitle": "father of"
+  },
+  {
+    "title": "umm-u",
+    "subtitle": "mother of"
+  },
+  {
+    "title": "ism-u-hā",
+    "subtitle": "her name"
+  },
+  {
+    "title": "akhū",
+    "subtitle": "brother of"
+  },
+  {
+    "title": "ukht-u",
+    "subtitle": "sister of"
+  },
+  {
+    "title": "ibn-unā",
+    "subtitle": "our son"
+  },
+  {
+    "title": "usrat-un",
+    "subtitle": "a family"
+  },
+  {
+    "title": "walad-un",
+    "subtitle": "a boy / child"
+  },
+  {
+    "title": "‘umr-u-hu",
+    "subtitle": "his age"
+  },
+  {
+    "title": "sanat-an",
+    "subtitle": "a year"
+  },
+  {
+    "title": "bint-un",
+    "subtitle": "a girl / daughter"
+  },
+  {
+    "title": "‘umr-u-hā",
+    "subtitle": "her age"
+  },
+  {
+    "title": "‘umr-u",
+    "subtitle": "age of"
+  },
+  {
+    "title": "akbar-u",
+    "subtitle": "older / bigger"
+  },
+  {
+    "title": "aṣghar-u",
+    "subtitle": "younger / smaller"
+  },
+  {
+    "title": "kabīr-āni",
+    "subtitle": "two older / big"
+  },
+  {
+    "title": "ṣaghīr-āni",
+    "subtitle": "two younger / small"
+  },
+  {
+    "title": "al-wālid-āni",
+    "subtitle": "the parents"
+  },
+  {
+    "title": "al-walad-āni",
+    "subtitle": "the two boys / children"
+  },
+  {
+    "title": "sanat-in",
+    "subtitle": "a year"
+  },
+  {
+    "title": "bayna",
+    "subtitle": "between"
+  },
+  {
+    "title": "sanawāt-in",
+    "subtitle": "years"
+  },
+  {
+    "title": "al-akbar-u",
+    "subtitle": "the older"
+  },
+  {
+    "title": "al-aṣghar-u",
+    "subtitle": "the younger"
+  },
+  {
+    "title": "al-usrat-u",
+    "subtitle": "the family"
+  },
+  {
+    "title": "ta‘īsh-u",
+    "subtitle": "lives"
+  },
+  {
+    "title": "manzil-in",
+    "subtitle": "a house / home"
+  },
+  {
+    "title": "al-manzil-u",
+    "subtitle": "the house / home"
+  },
+  {
+    "title": "kabīr-un",
+    "subtitle": "big / large"
+  },
+  {
+    "title": "ṣaghīr-un",
+    "subtitle": "small"
+  },
+  {
+    "title": "ashkhāṣ-in",
+    "subtitle": "people / persons"
+  },
+  {
+    "title": "ghuraf-in",
+    "subtitle": "rooms"
+  },
+  {
+    "title": "ghurfat-un",
+    "subtitle": "a room"
+  },
+  {
+    "title": "ṣaghīrat-un",
+    "subtitle": "small"
+  },
+  {
+    "title": "ghurfat-u",
+    "subtitle": "room of"
+  },
+  {
+    "title": "ghurfat-i",
+    "subtitle": "room of"
+  },
+  {
+    "title": "al-wālidayn-i",
+    "subtitle": "the parents"
+  },
+  {
+    "title": "kabīrat-un",
+    "subtitle": "big / large"
+  },
+  {
+    "title": "bāb-un",
+    "subtitle": "a door"
+  },
+  {
+    "title": "nāfidhat-un",
+    "subtitle": "a window"
+  },
+  {
+    "title": "nawāfidh-u",
+    "subtitle": "windows"
+  },
+  {
+    "title": "kathīrat-un",
+    "subtitle": "many / a lot of"
+  },
+  {
+    "title": "al-manzil-i",
+    "subtitle": "the house / home"
+  },
+  {
+    "title": "bāb-u",
+    "subtitle": "door of"
+  },
+  {
+    "title": "al-amāmiyy-u",
+    "subtitle": "the front"
+  },
+  {
+    "title": "al-khalfiyy-u",
+    "subtitle": "the back / rear"
+  },
+  {
+    "title": "bāb-āni",
+    "subtitle": "two doors"
+  },
+  {
+    "title": "abwāb-in",
+    "subtitle": "doors"
+  },
+  {
+    "title": "saqf-u",
+    "subtitle": "roof / ceiling of"
+  },
+  {
+    "title": "as-saqf-u",
+    "subtitle": "the roof / ceiling"
+  },
+  {
+    "title": "fawqa",
+    "subtitle": "above / on top of"
+  },
+  {
+    "title": "taḥta",
+    "subtitle": "under / below"
+  },
+  {
+    "title": "ladā",
+    "subtitle": "with / at"
+  },
+  {
+    "title": "sayyārat-un",
+    "subtitle": "a car"
+  },
+  {
+    "title": "sayyārat-āni",
+    "subtitle": "two cars"
+  },
+  {
+    "title": "as-sayyārat-u",
+    "subtitle": "the car"
+  },
+  {
+    "title": "amāma",
+    "subtitle": "in front of"
+  },
+  {
+    "title": "khalf-a",
+    "subtitle": "behind"
+  },
+  {
+    "title": "al-ḥadīqat-u",
+    "subtitle": "the garden"
+  },
+  {
+    "title": "manzil-in",
+    "subtitle": "a house / home"
+  },
+  {
+    "title": "miṣr-a",
+    "subtitle": "Egypt"
+  },
+  {
+    "title": "miṣr-u",
+    "subtitle": "Egypt"
+  },
+  {
+    "title": "balad-un",
+    "subtitle": "a country"
+  },
+  {
+    "title": "manzil-un",
+    "subtitle": "a house / home"
+  },
+  {
+    "title": "‘arabiyy-un",
+    "subtitle": "Arab"
+  },
+  {
+    "title": "al-jazā’ir-u",
+    "subtitle": "Algeria"
+  },
+  {
+    "title": "gharbiyy-un",
+    "subtitle": "Western"
+  },
+  {
+    "title": "faransā",
+    "subtitle": "France"
+  },
+  {
+    "title": "balad-āni",
+    "subtitle": "two countries"
+  },
+  {
+    "title": "‘arabiyy-āni",
+    "subtitle": "two Arab"
+  },
+  {
+    "title": "gharbiyy-āni",
+    "subtitle": "two Western"
+  },
+  {
+    "title": "usrat-u-hu",
+    "subtitle": "his family"
+  },
+  {
+    "title": "miṣriyyūn-a",
+    "subtitle": "Egyptians"
+  },
+  {
+    "title": "al-qāhirat-u",
+    "subtitle": "Cairo"
+  },
+  {
+    "title": "madīnat-un",
+    "subtitle": "a city"
+  },
+  {
+    "title": "miṣriyyat-un",
+    "subtitle": "Egyptian"
+  },
+  {
+    "title": "landan-u",
+    "subtitle": "London"
+  },
+  {
+    "title": "injiltirā",
+    "subtitle": "England"
+  },
+  {
+    "title": "injilīziyyat-un",
+    "subtitle": "English"
+  },
+  {
+    "title": "bārīs-u",
+    "subtitle": "Paris"
+  },
+  {
+    "title": "faransā",
+    "subtitle": "France"
+  },
+  {
+    "title": "faransiyyat-un",
+    "subtitle": "French"
+  },
+  {
+    "title": "mudun-un",
+    "subtitle": "cities"
+  },
+  {
+    "title": "buldān-un",
+    "subtitle": "countries"
+  },
+  {
+    "title": "‘āṣimat-u",
+    "subtitle": "capital of"
+  },
+  {
+    "title": "dākhila",
+    "subtitle": "inside"
+  },
+  {
+    "title": "khārija",
+    "subtitle": "outside"
+  },
+  {
+    "title": "yaskun-u",
+    "subtitle": "he lives"
+  },
+  {
+    "title": "al-miṣriyyūn-a",
+    "subtitle": "the Egyptians"
+  },
+  {
+    "title": "yatakallamūn-a",
+    "subtitle": "they speak"
+  },
+  {
+    "title": "al-‘arabiyyat-a",
+    "subtitle": "Arabic"
+  },
+  {
+    "title": "lughat-u",
+    "subtitle": "language of"
+  },
+  {
+    "title": "miṣr-a",
+    "subtitle": "Egypt"
+  },
+  {
+    "title": "al-‘arabiyyat-u",
+    "subtitle": "Arabic"
+  },
+  {
+    "title": "al-jazā’iriyyūn-a",
+    "subtitle": "the Algerians"
+  },
+  {
+    "title": "al-injilīziyyūn-a",
+    "subtitle": "the English"
+  },
+  {
+    "title": "al-injilīziyyat-a",
+    "subtitle": "English"
+  },
+  {
+    "title": "al-injilīziyyat-u",
+    "subtitle": "English"
+  },
+  {
+    "title": "al-faransiyyūn-a",
+    "subtitle": "the French"
+  },
+  {
+    "title": "al-faransiyyat-a",
+    "subtitle": "French"
+  },
+  {
+    "title": "al-faransiyyat-u",
+    "subtitle": "French"
+  },
+  {
+    "title": "al-jazā’ir-u",
+    "subtitle": "Algeria"
+  },
+  {
+    "title": "al-jazā’ir-i",
+    "subtitle": "Algeria"
+  },
+  {
+    "title": "awsa‘-u",
+    "subtitle": "wider / broader"
+  },
+  {
+    "title": "malāyīn-u",
+    "subtitle": "millions"
+  },
+  {
+    "title": "shakhṣ-in",
+    "subtitle": "person"
+  },
+  {
+    "title": "milyūn-a",
+    "subtitle": "million"
+  },
+  {
+    "title": "milyūn-an",
+    "subtitle": "a million"
+  },
+  {
+    "title": "aqall-u",
+    "subtitle": "fewer / less"
+  },
+  {
+    "title": "al-miṣriyyīn-a",
+    "subtitle": "the Egyptians"
+  },
+  {
+    "title": "al-faransiyyīn-a",
+    "subtitle": "the French"
+  },
+  {
+    "title": "al-jazā’iriyyīn-a",
+    "subtitle": "the Algerians"
+  },
+  {
+    "title": "mutasāwūn-a",
+    "subtitle": "equal / are equal"
+  }
+]
