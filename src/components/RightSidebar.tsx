@@ -496,9 +496,21 @@ function LayersPanel({
 }) {
   const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
   const sequenceStep = step ?? null;
+  const [layerQuery, setLayerQuery] = useState('');
+  const deferredLayerQuery = useDeferredValue(layerQuery);
+  const normalizedLayerQuery = deferredLayerQuery.trim().toLowerCase();
   const managedElements = elements
     .filter((element) => (sequenceStep === null ? true : element.revealStep <= sequenceStep))
     .sort((a, b) => (b.zIndex ?? 0) - (a.zIndex ?? 0));
+  const filteredManagedElements = managedElements.filter((element) =>
+    matchesSearchQuery(
+      normalizedLayerQuery,
+      getElementName(element, assetsById),
+      getElementTypeLabel(element),
+      `layer ${(element.zIndex ?? 0).toString().padStart(2, '0')}`,
+      element.id,
+    ),
+  );
 
   const renderElementRow = (element: SceneElement) => {
     const hidden = sequenceStep === null
@@ -567,7 +579,7 @@ function LayersPanel({
         </div>
         {sequenceStep === null ? (
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
-            {managedElements.length}
+            {filteredManagedElements.length}/{managedElements.length}
           </div>
         ) : (
           <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#4f46e5]">
@@ -576,10 +588,23 @@ function LayersPanel({
         )}
       </div>
 
+      <label className="mb-3 flex items-center gap-2 rounded-sm border border-[#e2e8f0] bg-white px-3 py-2 focus-within:border-[#4f46e5]">
+        <Search className="h-3.5 w-3.5 text-slate-400" />
+        <input
+          type="text"
+          value={layerQuery}
+          onChange={(event) => setLayerQuery(event.target.value)}
+          placeholder="Search layers..."
+          className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+        />
+      </label>
+
       <div className="space-y-2">
-        {managedElements.length > 0 ? managedElements.map((element) => renderElementRow(element)) : (
+        {filteredManagedElements.length > 0 ? filteredManagedElements.map((element) => renderElementRow(element)) : (
           <div className="rounded-sm border border-dashed border-[#e2e8f0] px-2 py-2 text-[10px] text-slate-400">
-            No components available in this sequence
+            {managedElements.length > 0
+              ? 'No layers match that search'
+              : 'No components available in this sequence'}
           </div>
         )}
       </div>
