@@ -967,6 +967,9 @@ export function RightSidebar() {
     selectedSequenceStep !== null &&
     selectedElement.revealStep <= selectedSequenceStep &&
     Boolean(getEffectiveElementState(selectedElement, selectedSequenceStep).hidden);
+  const canToggleSelectedElementVisibility =
+    selectedSequenceStep !== null &&
+    selectedElement.revealStep <= selectedSequenceStep;
   const selectedEmoji = shapeElement?.shapeType === 'emoji'
     ? getEmojiById(shapeElement.emojiHexcode || '')
     : null;
@@ -1175,7 +1178,7 @@ export function RightSidebar() {
   );
 
   const revealTimingSection = (
-    <div className="flex gap-4">
+    <div className="flex items-end gap-3">
       <div className="flex-1">
         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Reveal On</label>
         <input
@@ -1199,6 +1202,40 @@ export function RightSidebar() {
           }}
           className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-bold focus:outline-none focus:border-[#4f46e5]"
         />
+      </div>
+      <div className="w-24">
+        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-2">Layer</label>
+        <button
+          type="button"
+          onClick={() => {
+            if (!canToggleSelectedElementVisibility || selectedSequenceStep === null) {
+              return;
+            }
+
+            handleSequenceVisibilityToggle(
+              selectedElement,
+              !selectedElementHiddenInSequence,
+            );
+          }}
+          disabled={!canToggleSelectedElementVisibility}
+          className={`flex h-[34px] w-full items-center justify-center gap-1.5 rounded-sm border px-2 text-[10px] font-bold uppercase tracking-[0.14em] transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+            selectedElementHiddenInSequence
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+              : 'border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100'
+          }`}
+          title={
+            selectedElementHiddenInSequence
+              ? 'Reveal in this sequence'
+              : 'Hide in this sequence'
+          }
+        >
+          {selectedElementHiddenInSequence ? (
+            <Eye className="h-3.5 w-3.5" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5" />
+          )}
+          {selectedElementHiddenInSequence ? 'Reveal' : 'Hide'}
+        </button>
       </div>
     </div>
   );
