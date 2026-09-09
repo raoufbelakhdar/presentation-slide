@@ -146,7 +146,27 @@ function matchesSearchQuery(
 ) {
   if (!query) return true;
 
-  return values.some((value) => value?.toLowerCase().includes(query));
+  const normalizedQuery = query.toLowerCase();
+  const compactQuery = normalizeSearchText(query);
+
+  return values.some((value) => {
+    if (!value) return false;
+
+    const normalizedValue = value.toLowerCase();
+    if (normalizedValue.includes(normalizedQuery)) {
+      return true;
+    }
+
+    return Boolean(compactQuery) && normalizeSearchText(value).includes(compactQuery);
+  });
+}
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
