@@ -224,16 +224,53 @@ function getElementPlacementSide(element: SceneElement): PlacementSide {
   return centerX < CANVAS_WIDTH / 2 ? 'left' : 'right';
 }
 
+function getSameSideElements(elements: SceneElement[], side: PlacementSide) {
+  return elements.filter((element) => getElementPlacementSide(element) === side);
+}
+
 function getPlacementOffset(
   elements: SceneElement[],
   side: PlacementSide,
   flow: PlacementFlow,
   gap: number,
 ) {
-  return elements.filter((element) => getElementPlacementSide(element) === side).reduce((offset, element) => {
+  return getSameSideElements(elements, side).reduce((offset, element) => {
     const size = flow === 'vertical' ? element.height : element.width;
     return offset + Math.max(1, Math.round(size)) + gap;
   }, 0);
+}
+
+function getVerticalAxisX(
+  sameSideElements: SceneElement[],
+  elementWidth: number,
+  side: PlacementSide,
+  sideMargin: number,
+  axisWidth = elementWidth,
+) {
+  const columnWidth = Math.max(
+    axisWidth,
+    elementWidth,
+    ...sameSideElements.map((sameSideElement) => Math.max(1, Math.round(sameSideElement.width))),
+  );
+
+  return side === 'left'
+    ? sideMargin + columnWidth / 2
+    : CANVAS_WIDTH - sideMargin - columnWidth / 2;
+}
+
+function getHorizontalAxisY(
+  sameSideElements: SceneElement[],
+  elementHeight: number,
+  topMargin: number,
+  axisHeight = elementHeight,
+) {
+  const rowHeight = Math.max(
+    axisHeight,
+    elementHeight,
+    ...sameSideElements.map((sameSideElement) => Math.max(1, Math.round(sameSideElement.height))),
+  );
+
+  return topMargin + rowHeight / 2;
 }
 
 function getPlacementPosition(
@@ -244,14 +281,19 @@ function getPlacementPosition(
   sideMargin: number,
   topMargin: number,
   gap: number,
+  axisSize?: number,
 ) {
   const width = Math.max(1, Math.round(element.width));
+  const height = Math.max(1, Math.round(element.height));
+  const sameSideElements = getSameSideElements(precedingElements, side);
   const offset = getPlacementOffset(precedingElements, side, flow, gap);
   const maxX = Math.max(sideMargin, CANVAS_WIDTH - width - sideMargin);
 
   if (flow === 'vertical') {
+    const axisX = getVerticalAxisX(sameSideElements, width, side, sideMargin, axisSize);
+
     return {
-      x: side === 'left' ? sideMargin : maxX,
+      x: clamp(Math.round(axisX - width / 2), sideMargin, maxX),
       y: topMargin + offset,
     };
   }
@@ -259,11 +301,18 @@ function getPlacementPosition(
   const x = side === 'left'
     ? sideMargin + offset
     : CANVAS_WIDTH - width - sideMargin - offset;
+  const axisY = getHorizontalAxisY(sameSideElements, height, topMargin, axisSize);
 
   return {
     x: clamp(x, sideMargin, maxX),
-    y: topMargin,
+    y: Math.max(0, Math.round(axisY - height / 2)),
   };
+}
+
+function getMatchLayoutAxisSize(match: MatchedComponent, flow: PlacementFlow) {
+  const element = applySavedTextBlockDefaults(cloneFavoriteElement(match.component.element));
+  const size = flow === 'vertical' ? element.width : element.height;
+  return Math.max(1, Math.round(size));
 }
 
 function getComponentDedupeKey(component: SavedComponent) {
@@ -404,6 +453,7 @@ export function ScriptComponentMatcher({
     match: MatchedComponent,
     revealStep: number,
     precedingElements: SceneElement[],
+    axisSize?: number,
   ): SceneElement | null => {
     const nextElement = applySavedTextBlockDefaults(
       cloneFavoriteElement(match.component.element),
@@ -416,6 +466,7 @@ export function ScriptComponentMatcher({
       placementSideMargin,
       placementTopMargin,
       placementGap,
+      axisSize,
     );
     if (nextElement.type === 'image') {
       let assetId = nextElement.assetId;
@@ -498,12 +549,17 @@ export function ScriptComponentMatcher({
     const firstRevealStep = getSceneSequenceCount(activeScene) + 1;
     const stagedElements = [...activeScene.elements];
     const elements: SceneElement[] = [];
+    const axisSize = Math.max(
+      1,
+      ...filteredComponents.map((match) => getMatchLayoutAxisSize(match, placementFlow)),
+    );
 
     filteredComponents.forEach((match) => {
       const element = createSceneElementFromMatch(
         match,
         firstRevealStep + elements.length,
         stagedElements,
+        axisSize,
       );
 
       if (element) {
