@@ -1,5 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { Check, Image as ImageIcon, Layers, Plus, Search, Target, Type, X } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowRight,
+  Check,
+  Image as ImageIcon,
+  Layers,
+  PanelLeft,
+  PanelRight,
+  Plus,
+  Search,
+  Target,
+  Type,
+  X,
+} from 'lucide-react';
 import { useAppContext } from '../AppContext';
 import { Asset, FavoriteComponent, SavedComponent, SceneElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
@@ -20,6 +33,16 @@ type DedupeElement = Omit<
   SceneElement,
   'assetId' | 'hideStep' | 'id' | 'keyframes' | 'revealStep' | 'x' | 'y' | 'zIndex'
 >;
+
+type PlacementSide = 'left' | 'right';
+type PlacementFlow = 'vertical' | 'horizontal';
+
+const CANVAS_WIDTH = 1920;
+const PLACEMENT_MARGIN = 20;
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(Math.max(value, min), max);
+}
 
 function normalizeSearchText(value: string) {
   return value
@@ -190,6 +213,40 @@ function getPreviewIcon(component: SavedComponent) {
   return Target;
 }
 
+function getPlacementOffset(elements: SceneElement[], flow: PlacementFlow) {
+  return elements.reduce((offset, element) => {
+    const size = flow === 'vertical' ? element.height : element.width;
+    return offset + Math.max(1, Math.round(size)) + PLACEMENT_MARGIN;
+  }, 0);
+}
+
+function getPlacementPosition(
+  element: SceneElement,
+  precedingElements: SceneElement[],
+  side: PlacementSide,
+  flow: PlacementFlow,
+) {
+  const width = Math.max(1, Math.round(element.width));
+  const offset = getPlacementOffset(precedingElements, flow);
+  const maxX = Math.max(PLACEMENT_MARGIN, CANVAS_WIDTH - width - PLACEMENT_MARGIN);
+
+  if (flow === 'vertical') {
+    return {
+      x: side === 'left' ? PLACEMENT_MARGIN : maxX,
+      y: PLACEMENT_MARGIN + offset,
+    };
+  }
+
+  const x = side === 'left'
+    ? PLACEMENT_MARGIN + offset
+    : CANVAS_WIDTH - width - PLACEMENT_MARGIN - offset;
+
+  return {
+    x: clamp(x, PLACEMENT_MARGIN, maxX),
+    y: PLACEMENT_MARGIN,
+  };
+}
+
 function getComponentDedupeKey(component: SavedComponent) {
   const {
     id: _id,
@@ -278,6 +335,8 @@ export function ScriptComponentMatcher({
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [componentQuery, setComponentQuery] = useState('');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [placementSide, setPlacementSide] = useState<PlacementSide>('left');
+  const [placementFlow, setPlacementFlow] = useState<PlacementFlow>('vertical');
   const [notice, setNotice] = useState('');
 
   const tokens = useMemo(() => tokenizeScriptLine(scriptLine), [scriptLine]);
@@ -322,19 +381,16 @@ export function ScriptComponentMatcher({
   const createSceneElementFromMatch = (
     match: MatchedComponent,
     revealStep: number,
+    precedingElements: SceneElement[],
   ): SceneElement | null => {
     const nextElement = applySavedTextBlockDefaults(
       cloneFavoriteElement(match.component.element),
     );
-    const nextWidth = Math.max(1, Math.round(nextElement.width));
-    const nextHeight = Math.max(1, Math.round(nextElement.height));
-    const nextX = Math.min(
-      Math.max(Math.round((1920 - nextWidth) / 2), 0),
-      Math.max(0, 1920 - nextWidth),
-    );
-    const nextY = Math.min(
-      Math.max(Math.round((1080 - nextHeight) / 2), 0),
-      Math.max(0, 1080 - nextHeight),
+    const nextPosition = getPlacementPosition(
+      nextElement,
+      precedingElements,
+      placementSide,
+      placementFlow,
     );
     if (nextElement.type === 'image') {
       let assetId = nextElement.assetId;
@@ -362,8 +418,8 @@ export function ScriptComponentMatcher({
         ...nextElement,
         id: generateId(),
         assetId,
-        x: nextX,
-        y: nextY,
+        x: nextPosition.x,
+        y: nextPosition.y,
         revealStep,
         hideStep: null,
         keyframes: undefined,
@@ -374,8 +430,8 @@ export function ScriptComponentMatcher({
     return {
       ...nextElement,
       id: generateId(),
-      x: nextX,
-      y: nextY,
+      x: nextPosition.x,
+      y: nextPosition.y,
       revealStep,
       hideStep: null,
       keyframes: undefined,
@@ -391,7 +447,7 @@ export function ScriptComponentMatcher({
     }
 
     const revealStep = getSceneSequenceCount(activeScene) + 1;
-    const element = createSceneElementFromMatch(match, revealStep);
+    const element = createSceneElementFromMatch(match, revealStep, activeScene.elements);
     if (!element) {
       return;
     }
@@ -415,9 +471,21 @@ export function ScriptComponentMatcher({
     }
 
     const firstRevealStep = getSceneSequenceCount(activeScene) + 1;
-    const elements = filteredComponents
-      .map((match, index) => createSceneElementFromMatch(match, firstRevealStep + index))
-      .filter((element): element is SceneElement => Boolean(element));
+    const stagedElements = [...activeScene.elements];
+    const elements: SceneElement[] = [];
+
+    filteredComponents.forEach((match) => {
+      const element = createSceneElementFromMatch(
+        match,
+        firstRevealStep + elements.length,
+        stagedElements,
+      );
+
+      if (element) {
+        elements.push(element);
+        stagedElements.push(element);
+      }
+    });
 
     if (elements.length === 0) {
       return;
@@ -608,6 +676,74 @@ export function ScriptComponentMatcher({
                 >
                   Create New Scene
                 </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-2">
+              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                Layout
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
+                  <button
+                    type="button"
+                    aria-label="Place components from the left"
+                    aria-pressed={placementSide === 'left'}
+                    title="Place from left"
+                    onClick={() => setPlacementSide('left')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                      placementSide === 'left'
+                        ? 'bg-[#eef2ff] text-[#4f46e5]'
+                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                    }`}
+                  >
+                    <PanelLeft className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Place components from the right"
+                    aria-pressed={placementSide === 'right'}
+                    title="Place from right"
+                    onClick={() => setPlacementSide('right')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                      placementSide === 'right'
+                        ? 'bg-[#eef2ff] text-[#4f46e5]'
+                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                    }`}
+                  >
+                    <PanelRight className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
+                  <button
+                    type="button"
+                    aria-label="Stack components vertically"
+                    aria-pressed={placementFlow === 'vertical'}
+                    title="Vertical layout"
+                    onClick={() => setPlacementFlow('vertical')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                      placementFlow === 'vertical'
+                        ? 'bg-[#eef2ff] text-[#4f46e5]'
+                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                    }`}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="Place components horizontally"
+                    aria-pressed={placementFlow === 'horizontal'}
+                    title="Horizontal layout"
+                    onClick={() => setPlacementFlow('horizontal')}
+                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                      placementFlow === 'horizontal'
+                        ? 'bg-[#eef2ff] text-[#4f46e5]'
+                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                    }`}
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             </div>
 
