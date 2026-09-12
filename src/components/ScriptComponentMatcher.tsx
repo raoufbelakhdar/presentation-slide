@@ -54,6 +54,8 @@ const CANVAS_WIDTH = 1920;
 const DEFAULT_SIDE_MARGIN = 150;
 const DEFAULT_TOP_MARGIN = 150;
 const DEFAULT_PLACEMENT_GAP = 50;
+const ICON_RESULT_PAGE_SIZE = 18;
+const PEXELS_RESULT_PAGE_SIZE = 6;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -437,9 +439,9 @@ function buildMissingFreeTextComponent(term: string): SavedComponent {
       width: 420,
       height: 80,
       revealStep: 1,
-      fontSize: 44,
+      fontSize: 100,
       fontWeight: 'bold',
-      color: '#0f172a',
+      color: '#ffffff',
     },
   };
 }
@@ -521,8 +523,11 @@ export function ScriptComponentMatcher({
   const [selectedMissingTerm, setSelectedMissingTerm] = useState<string | null>(null);
   const [missingCreationMode, setMissingCreationMode] = useState<MissingCreationMode>(null);
   const [missingIconQuery, setMissingIconQuery] = useState('');
+  const [missingIconLimit, setMissingIconLimit] = useState(ICON_RESULT_PAGE_SIZE);
   const [pexelsQuery, setPexelsQuery] = useState('');
+  const [pexelsPage, setPexelsPage] = useState(1);
   const [pexelsPhotos, setPexelsPhotos] = useState<PexelsPhoto[]>([]);
+  const [pexelsHasNextPage, setPexelsHasNextPage] = useState(false);
   const [pexelsStatus, setPexelsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [pexelsError, setPexelsError] = useState('');
   const [isImportingPexelsId, setIsImportingPexelsId] = useState<number | null>(null);
@@ -546,6 +551,19 @@ export function ScriptComponentMatcher({
       matchesAnySearchTerm(activeSearchTerms, getComponentSearchText(component)),
     )
     .slice(0, 40);
+  const orderedFilteredComponents = filteredComponents
+    .map((match, index) => {
+      const searchText = getComponentSearchText(match.component);
+      const termIndex = targetTerms.findIndex((term) => matchesSearchQuery(term, searchText));
+
+      return {
+        match,
+        index,
+        termIndex: termIndex === -1 ? Number.MAX_SAFE_INTEGER : termIndex,
+      };
+    })
+    .sort((first, second) => first.termIndex - second.termIndex || first.index - second.index)
+    .map(({ match }) => match);
   const missingTerms = targetTerms.filter(
     (term) =>
       !allComponents.some(({ component }) =>
@@ -557,13 +575,16 @@ export function ScriptComponentMatcher({
       ? selectedMissingTerm
       : missingTerms[0] || '';
   const deferredPexelsQuery = useDeferredValue(pexelsQuery);
-  const iconResults = useMemo(
-    () => searchLucideIcons(missingIconQuery || activeMissingTerm, 18),
-    [activeMissingTerm, missingIconQuery],
+  const iconSearchQuery = missingIconQuery || activeMissingTerm;
+  const iconSearchResults = useMemo(
+    () => searchLucideIcons(iconSearchQuery, missingIconLimit + 1),
+    [iconSearchQuery, missingIconLimit],
   );
+  const iconResults = iconSearchResults.slice(0, missingIconLimit);
+  const hasMoreIconResults = iconSearchResults.length > missingIconLimit;
   const selectedMatchedComponent =
     allComponents.find(({ component }) => component.id === selectedComponentId) ||
-    filteredComponents[0] ||
+    orderedFilteredComponents[0] ||
     null;
 
   useEffect(() => {
@@ -575,6 +596,7 @@ export function ScriptComponentMatcher({
       setPexelsStatus('error');
       setPexelsError('Add VITE_PEXELS_API_KEY to enable Pexels search.');
       setPexelsPhotos([]);
+      setPexelsHasNextPage(false);
       return;
     }
 
@@ -582,6 +604,7 @@ export function ScriptComponentMatcher({
       setPexelsStatus('error');
       setPexelsError('Pexels search is unavailable while offline.');
       setPexelsPhotos([]);
+      setPexelsHasNextPage(false);
       return;
     }
 
@@ -590,6 +613,7 @@ export function ScriptComponentMatcher({
       setPexelsStatus('idle');
       setPexelsPhotos([]);
       setPexelsError('');
+      setPexelsHasNextPage(false);
       return;
     }
 
@@ -599,25 +623,35 @@ export function ScriptComponentMatcher({
 
     searchPexelsPhotos({
       query,
-      perPage: 6,
-      page: 1,
+      perPage: PEXELS_RESULT_PAGE_SIZE,
+      page: pexelsPage,
       signal: controller.signal,
     })
       .then((result) => {
         setPexelsStatus('success');
-        setPexelsPhotos(result.photos);
+        setPexelsHasNextPage(result.hasNextPage);
+        setPexelsPhotos((currentPhotos) => {
+          if (pexelsPage === 1) return result.photos;
+
+          const existingIds = new Set(currentPhotos.map((photo) => photo.id));
+          return [
+            ...currentPhotos,
+            ...result.photos.filter((photo) => !existingIds.has(photo.id)),
+          ];
+        });
       })
       .catch((error) => {
         if (controller.signal.aborted) return;
         setPexelsStatus('error');
         setPexelsPhotos([]);
+        setPexelsHasNextPage(false);
         setPexelsError(
           error instanceof Error ? error.message : 'Pexels search is unavailable right now.',
         );
       });
 
     return () => controller.abort();
-  }, [activeMissingTerm, deferredPexelsQuery, missingCreationMode, open]);
+  }, [activeMissingTerm, deferredPexelsQuery, missingCreationMode, open, pexelsPage]);
 
   if (!open) {
     return null;
@@ -664,7 +698,11 @@ export function ScriptComponentMatcher({
     setSelectedMissingTerm(term);
     setMissingCreationMode(mode);
     setMissingIconQuery(term);
+    setMissingIconLimit(ICON_RESULT_PAGE_SIZE);
     setPexelsQuery(term);
+    setPexelsPage(1);
+    setPexelsPhotos([]);
+    setPexelsHasNextPage(false);
     setPexelsError('');
   };
 
@@ -793,7 +831,7 @@ export function ScriptComponentMatcher({
   };
 
   const addAllMatchedComponentsToCurrentScene = () => {
-    if (!activeScene || filteredComponents.length === 0) {
+    if (!activeScene || orderedFilteredComponents.length === 0) {
       return;
     }
 
@@ -802,10 +840,10 @@ export function ScriptComponentMatcher({
     const elements: SceneElement[] = [];
     const axisSize = Math.max(
       1,
-      ...filteredComponents.map((match) => getMatchLayoutAxisSize(match, placementFlow)),
+      ...orderedFilteredComponents.map((match) => getMatchLayoutAxisSize(match, placementFlow)),
     );
 
-    filteredComponents.forEach((match) => {
+    orderedFilteredComponents.forEach((match) => {
       const element = createSceneElementFromMatch(
         match,
         firstRevealStep + elements.length,
@@ -998,7 +1036,7 @@ export function ScriptComponentMatcher({
                 <button
                   type="button"
                   onClick={addAllMatchedComponentsToCurrentScene}
-                  disabled={filteredComponents.length === 0}
+	                  disabled={orderedFilteredComponents.length === 0}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-slate-900 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                   title="Add all matched components to the current scene as new sequences"
                 >
@@ -1206,46 +1244,65 @@ export function ScriptComponentMatcher({
                       <div className="space-y-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2">
                         <label className="flex items-center gap-2 rounded-sm border border-[#dbe4f0] bg-white px-2 py-1.5 focus-within:border-[#4f46e5]">
                           <Search className="h-3.5 w-3.5 text-slate-400" />
-                          <input
-                            type="text"
-                            value={missingIconQuery}
-                            onChange={(event) => setMissingIconQuery(event.target.value)}
-                            placeholder="Search icons..."
-                            className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+	                          <input
+	                            type="text"
+	                            value={missingIconQuery}
+	                            onChange={(event) => {
+	                              setMissingIconQuery(event.target.value);
+	                              setMissingIconLimit(ICON_RESULT_PAGE_SIZE);
+	                            }}
+	                            placeholder="Search icons..."
+	                            className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
                           />
                         </label>
                         {iconResults.length > 0 ? (
-                          <div className="grid grid-cols-6 gap-1.5">
-                            {iconResults.map((iconName) => (
-                              <button
-                                key={iconName}
-                                type="button"
-                                onClick={() => createMissingIconComponent(activeMissingTerm, iconName)}
-                                className="flex h-9 items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
-                                title={formatIconName(iconName)}
-                              >
-                                <LucideIconGlyph name={iconName} className="h-4 w-4" />
-                              </button>
-                            ))}
+                          <div className="max-h-40 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-6 gap-1.5">
+                              {iconResults.map((iconName) => (
+                                <button
+                                  key={iconName}
+                                  type="button"
+                                  onClick={() => createMissingIconComponent(activeMissingTerm, iconName)}
+                                  className="flex h-9 items-center justify-center rounded-sm border border-slate-700 bg-slate-900 text-white transition-colors hover:border-[#818cf8] hover:bg-slate-800 hover:text-[#c7d2fe]"
+                                  title={formatIconName(iconName)}
+                                >
+                                  <LucideIconGlyph name={iconName} className="h-4 w-4" />
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         ) : (
-                          <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                            No icons match
-                          </div>
-                        )}
-                      </div>
-                    )}
+	                          <div className="rounded-sm border border-dashed border-[#dbe4f0] px-3 py-4 text-center text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+	                            No icons match
+	                          </div>
+	                        )}
+	                        {hasMoreIconResults && (
+	                          <button
+	                            type="button"
+	                            onClick={() => setMissingIconLimit((limit) => limit + ICON_RESULT_PAGE_SIZE)}
+	                            className="flex h-8 w-full items-center justify-center rounded-sm border border-[#dbe4f0] bg-white text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5]"
+	                          >
+	                            More
+	                          </button>
+	                        )}
+	                      </div>
+	                    )}
 
                     {missingCreationMode === 'image' && (
                       <div className="space-y-2 rounded-sm border border-[#e2e8f0] bg-[#f8fafc] p-2">
                         <label className="flex items-center gap-2 rounded-sm border border-[#dbe4f0] bg-white px-2 py-1.5 focus-within:border-[#4f46e5]">
                           <Search className="h-3.5 w-3.5 text-slate-400" />
-                          <input
-                            type="text"
-                            value={pexelsQuery}
-                            onChange={(event) => setPexelsQuery(event.target.value)}
-                            placeholder="Search Pexels photos..."
-                            className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
+	                          <input
+	                            type="text"
+	                            value={pexelsQuery}
+	                            onChange={(event) => {
+	                              setPexelsQuery(event.target.value);
+	                              setPexelsPage(1);
+	                              setPexelsPhotos([]);
+	                              setPexelsHasNextPage(false);
+	                            }}
+	                            placeholder="Search Pexels photos..."
+	                            className="w-full bg-transparent text-xs text-[#0f172a] outline-none placeholder:text-slate-400"
                           />
                           {pexelsStatus === 'loading' && (
                             <Loader2 className="h-3.5 w-3.5 animate-spin text-[#4f46e5]" />
@@ -1261,40 +1318,55 @@ export function ScriptComponentMatcher({
                             No Pexels images match
                           </div>
                         ) : (
-                          <div className="grid grid-cols-3 gap-2">
-                            {pexelsPhotos.map((photo) => (
-                              <button
-                                key={photo.id}
-                                type="button"
-                                onClick={() => void createMissingImageComponent(activeMissingTerm, photo)}
-                                disabled={isImportingPexelsId === photo.id}
-                                className="group relative aspect-square overflow-hidden rounded-sm border border-[#dbe4f0] bg-slate-100 disabled:cursor-wait disabled:opacity-70"
-                                title={photo.alt || 'Pexels photo'}
-                              >
-                                <img
-                                  src={getPexelsThumbnailUrl(photo)}
-                                  alt={photo.alt || 'Pexels photo'}
-                                  loading="lazy"
-                                  className="h-full w-full object-cover"
-                                />
-                                <span className="absolute inset-x-1 bottom-1 flex items-center justify-center rounded-sm bg-white/95 px-1 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
-                                  {isImportingPexelsId === photo.id ? 'Saving' : 'Use'}
-                                </span>
-                              </button>
-                            ))}
+                          <div className="max-h-52 overflow-y-auto pr-1">
+                            <div className="grid grid-cols-3 gap-2">
+                              {pexelsPhotos.map((photo) => (
+                                <button
+                                  key={photo.id}
+                                  type="button"
+                                  onClick={() => void createMissingImageComponent(activeMissingTerm, photo)}
+                                  disabled={isImportingPexelsId === photo.id}
+                                  className="group relative aspect-square overflow-hidden rounded-sm border border-[#dbe4f0] bg-slate-100 disabled:cursor-wait disabled:opacity-70"
+                                  title={photo.alt || 'Pexels photo'}
+                                >
+                                  <img
+                                    src={getPexelsThumbnailUrl(photo)}
+                                    alt={photo.alt || 'Pexels photo'}
+                                    loading="lazy"
+                                    className="h-full w-full object-cover"
+                                  />
+                                  <span className="absolute inset-x-1 bottom-1 flex items-center justify-center rounded-sm bg-white/95 px-1 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-700 opacity-0 shadow-sm transition-opacity group-hover:opacity-100">
+                                    {isImportingPexelsId === photo.id ? 'Saving' : 'Use'}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    )}
+	                        )}
+	                        {pexelsHasNextPage && pexelsPhotos.length > 0 && (
+	                          <button
+	                            type="button"
+	                            onClick={() => setPexelsPage((page) => page + 1)}
+	                            disabled={pexelsStatus === 'loading'}
+	                            className="flex h-8 w-full items-center justify-center gap-1.5 rounded-sm border border-[#dbe4f0] bg-white text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600 transition-colors hover:border-[#4f46e5] hover:text-[#4f46e5] disabled:cursor-wait disabled:opacity-70"
+	                          >
+	                            {pexelsStatus === 'loading' ? (
+	                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+	                            ) : null}
+	                            More
+	                          </button>
+	                        )}
+	                      </div>
+	                    )}
                   </div>
                 )}
               </div>
             )}
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {filteredComponents.length > 0 ? (
+              {orderedFilteredComponents.length > 0 ? (
                 <div className="space-y-2">
-                  {filteredComponents.map((match) => {
+                  {orderedFilteredComponents.map((match) => {
                     const { component, source } = match;
                     const isSelected = selectedMatchedComponent?.component.id === component.id;
                     const Icon = getPreviewIcon(component);

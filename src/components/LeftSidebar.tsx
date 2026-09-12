@@ -1019,9 +1019,9 @@ export function LeftSidebar() {
       width: 520,
       height: 140,
       revealStep: defaultRevealStep,
-      fontSize: 64,
+      fontSize: 100,
       fontWeight: "bold",
-      color: "#0f172a",
+      color: "#ffffff",
     };
     dispatch({ type: "ADD_ELEMENT", payload: newElement });
   };
