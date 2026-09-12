@@ -3,7 +3,7 @@ import { useAppContext } from '../AppContext';
 import { BringToFront, Check, Copy, Eye, EyeOff, Image as ImageIcon, Layers, Move, RotateCcw, Save, Search, SendToBack, Star, Trash2, Type, Upload, X } from 'lucide-react';
 import { Asset, ColorElement, DEFAULT_SEQUENCE_ANIMATION_TYPE, DEFAULT_SEQUENCE_DELAY, DEFAULT_SEQUENCE_DURATION, FavoriteComponent, SavedComponent, SceneElement, ShapeElement, TextElement } from '../types';
 import { createAssetFromFile, getAssetKind, getDefaultImageFrameStyle } from '../assetUtils';
-import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { combineTextContent, generateId, getEffectiveElementState, getTextAlign, getTextPadding, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 import { DEFAULT_ICON_COLOR, formatIconName } from '../iconLibrary';
 import { getEmojiById, getEmojiLabel } from '../emojiLibrary';
 import { LucideIconGlyph } from './LucideIconGlyph';
@@ -1049,6 +1049,7 @@ export function RightSidebar() {
       ...element,
       fontSize: 35,
       subtitleFontSize: 30,
+      padding: getTextPadding(element),
     };
   };
   const replaceSelectedElementWithFavorite = (
@@ -1474,8 +1475,9 @@ export function RightSidebar() {
                 <input 
                   type="number" 
                   min={8}
-                  value={textElement.padding || 20}
-                  onChange={(e) => handleUpdate({ padding: Math.max(6, parseInt(e.target.value) || 20) })}
+                  max={20}
+                  value={getTextPadding(textElement)}
+                  onChange={(e) => handleUpdate({ padding: getTextPadding({ padding: parseInt(e.target.value) || 20 }) })}
                   className="w-full bg-[#f8fafc] border border-[#e2e8f0] rounded-sm text-xs p-2 font-mono focus:outline-none focus:border-[#4f46e5]"
                 />
               </div>

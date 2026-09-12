@@ -16,7 +16,7 @@ import {
 import { useAppContext } from '../AppContext';
 import { Asset, FavoriteComponent, SavedComponent, SceneElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
-import { generateId, getSceneSequenceCount, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { generateId, getSceneSequenceCount, getTextPadding, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 
 type ScriptToken = {
   id: string;
@@ -133,6 +133,7 @@ function applySavedTextBlockDefaults(element: SceneElement): SceneElement {
     ...element,
     fontSize: 35,
     subtitleFontSize: 30,
+    padding: getTextPadding(element),
   };
 }
 

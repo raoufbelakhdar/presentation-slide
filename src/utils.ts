@@ -39,7 +39,7 @@ export function getTextAlign(element: Pick<TextElement, 'align' | 'variant'>) {
 }
 
 export function getTextPadding(element: Pick<TextElement, 'padding'>) {
-  return Math.max(6, Math.round(element.padding || 20));
+  return Math.min(20, Math.max(6, Math.round(element.padding || 20)));
 }
 
 export function getTextSubtitleFontSize(element: Pick<TextElement, 'fontSize' | 'subtitleFontSize'>) {

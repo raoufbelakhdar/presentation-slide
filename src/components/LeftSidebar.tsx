@@ -42,6 +42,7 @@ import {
   buildSceneTemplate,
   generateId,
   getTextAlign,
+  getTextPadding,
   getTextSubtitleFontSize,
   getTextVariant,
   mergeAssetLibraries,
@@ -1461,6 +1462,7 @@ export function LeftSidebar() {
       ...element,
       fontSize: 35,
       subtitleFontSize: 30,
+      padding: getTextPadding(element),
     };
   };
 
