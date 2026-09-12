@@ -219,8 +219,18 @@ function getPreviewIcon(component: SavedComponent) {
   return Target;
 }
 
-function getPlacementOffset(elements: SceneElement[], flow: PlacementFlow, gap: number) {
-  return elements.reduce((offset, element) => {
+function getElementPlacementSide(element: SceneElement): PlacementSide {
+  const centerX = element.x + Math.max(1, Math.round(element.width)) / 2;
+  return centerX < CANVAS_WIDTH / 2 ? 'left' : 'right';
+}
+
+function getPlacementOffset(
+  elements: SceneElement[],
+  side: PlacementSide,
+  flow: PlacementFlow,
+  gap: number,
+) {
+  return elements.filter((element) => getElementPlacementSide(element) === side).reduce((offset, element) => {
     const size = flow === 'vertical' ? element.height : element.width;
     return offset + Math.max(1, Math.round(size)) + gap;
   }, 0);
@@ -236,7 +246,7 @@ function getPlacementPosition(
   gap: number,
 ) {
   const width = Math.max(1, Math.round(element.width));
-  const offset = getPlacementOffset(precedingElements, flow, gap);
+  const offset = getPlacementOffset(precedingElements, side, flow, gap);
   const maxX = Math.max(sideMargin, CANVAS_WIDTH - width - sideMargin);
 
   if (flow === 'vertical') {
