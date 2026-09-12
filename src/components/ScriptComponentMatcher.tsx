@@ -3,7 +3,7 @@ import { Check, Image as ImageIcon, Layers, Plus, Search, Target, Type, X } from
 import { useAppContext } from '../AppContext';
 import { Asset, FavoriteComponent, SavedComponent, SceneElement } from '../types';
 import { getDefaultImageFrameStyle } from '../assetUtils';
-import { generateId, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
+import { generateId, getSceneSequenceCount, getTextVariant, mergeAssetLibraries, splitTextContent } from '../utils';
 
 type ScriptToken = {
   id: string;
@@ -15,6 +15,11 @@ type MatchedComponent = {
   component: SavedComponent;
   source: 'saved' | 'shared';
 };
+
+type DedupeElement = Omit<
+  SceneElement,
+  'assetId' | 'hideStep' | 'id' | 'keyframes' | 'revealStep' | 'x' | 'y' | 'zIndex'
+>;
 
 function normalizeSearchText(value: string) {
   return value
@@ -185,25 +190,66 @@ function getPreviewIcon(component: SavedComponent) {
   return Target;
 }
 
+function getComponentDedupeKey(component: SavedComponent) {
+  const {
+    id: _id,
+    x: _x,
+    y: _y,
+    zIndex: _zIndex,
+    revealStep: _revealStep,
+    hideStep: _hideStep,
+    keyframes: _keyframes,
+    ...element
+  } = component.element;
+
+  if (component.element.type === 'image') {
+    const { assetId: _assetId, ...imageElement } = element as DedupeElement & { assetId?: string };
+    return JSON.stringify({
+      name: normalizeSearchText(component.name),
+      element: imageElement,
+      asset: component.asset
+        ? {
+            name: normalizeSearchText(component.asset.name),
+            dataUrl: component.asset.dataUrl,
+          }
+        : null,
+    });
+  }
+
+  return JSON.stringify({
+    name: normalizeSearchText(component.name),
+    element,
+  });
+}
+
 function dedupeMatchedComponents(
   favorites: FavoriteComponent[],
   sharedSavedComponents: SavedComponent[],
 ): MatchedComponent[] {
   const componentMap = new Map<string, MatchedComponent>();
+  const contentKeys = new Set<string>();
 
   favorites.forEach((favorite) => {
     if (favorite.type !== 'saved-element') return;
+    const contentKey = getComponentDedupeKey(favorite);
     componentMap.set(favorite.id, {
       component: favorite,
       source: 'saved',
     });
+    contentKeys.add(contentKey);
   });
 
   sharedSavedComponents.forEach((component) => {
+    const contentKey = getComponentDedupeKey(component);
+    if (componentMap.has(component.id) || contentKeys.has(contentKey)) {
+      return;
+    }
+
     componentMap.set(component.id, {
       component,
-      source: componentMap.has(component.id) ? 'saved' : 'shared',
+      source: 'shared',
     });
+    contentKeys.add(contentKey);
   });
 
   return Array.from(componentMap.values());
@@ -222,7 +268,6 @@ export function ScriptComponentMatcher({
     sharedSavedComponents,
     project,
     activeSceneIndex,
-    selectedSequenceStep,
   } = state;
   const activeScene = project.scenes[activeSceneIndex];
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
@@ -274,11 +319,10 @@ export function ScriptComponentMatcher({
     setNotice('');
   };
 
-  const addMatchedComponentToScene = (match: MatchedComponent | null) => {
-    if (!match || !activeScene) {
-      return;
-    }
-
+  const createSceneElementFromMatch = (
+    match: MatchedComponent,
+    revealStep: number,
+  ): SceneElement | null => {
     const nextElement = applySavedTextBlockDefaults(
       cloneFavoriteElement(match.component.element),
     );
@@ -292,8 +336,6 @@ export function ScriptComponentMatcher({
       Math.max(Math.round((1080 - nextHeight) / 2), 0),
       Math.max(0, 1080 - nextHeight),
     );
-    const revealStep = selectedSequenceStep ?? 1;
-
     if (nextElement.type === 'image') {
       let assetId = nextElement.assetId;
       const existingAsset = assetsById.get(assetId);
@@ -316,41 +358,101 @@ export function ScriptComponentMatcher({
         });
       }
 
-      dispatch({
-        type: 'ADD_ELEMENT',
-        payload: {
-          ...nextElement,
-          id: generateId(),
-          assetId,
-          x: nextX,
-          y: nextY,
-          revealStep,
-          hideStep: null,
-          keyframes: undefined,
-          frameStyle: getDefaultImageFrameStyle(assetsById.get(assetId) || match.component.asset),
-        },
-      });
-    } else {
-      dispatch({
-        type: 'ADD_ELEMENT',
-        payload: {
-          ...nextElement,
-          id: generateId(),
-          x: nextX,
-          y: nextY,
-          revealStep,
-          hideStep: null,
-          keyframes: undefined,
-        },
-      });
+      return {
+        ...nextElement,
+        id: generateId(),
+        assetId,
+        x: nextX,
+        y: nextY,
+        revealStep,
+        hideStep: null,
+        keyframes: undefined,
+        frameStyle: getDefaultImageFrameStyle(assetsById.get(assetId) || match.component.asset),
+      };
     }
 
-    const targetLabel = selectedWords.length > 0 ? selectedWords.join(' ') : componentQuery;
+    return {
+      ...nextElement,
+      id: generateId(),
+      x: nextX,
+      y: nextY,
+      revealStep,
+      hideStep: null,
+      keyframes: undefined,
+    };
+  };
+
+  const getTargetLabel = () =>
+    selectedWords.length > 0 ? selectedWords.join(' ') : componentQuery;
+
+  const addMatchedComponentToCurrentScene = (match: MatchedComponent | null) => {
+    if (!match || !activeScene) {
+      return;
+    }
+
+    const revealStep = getSceneSequenceCount(activeScene) + 1;
+    const element = createSceneElementFromMatch(match, revealStep);
+    if (!element) {
+      return;
+    }
+
+    dispatch({
+      type: 'ADD_ELEMENT',
+      payload: element,
+    });
+
+    const targetLabel = getTargetLabel();
     setNotice(
       targetLabel
-        ? `Added "${match.component.name}" for "${targetLabel}".`
-        : `Added "${match.component.name}".`,
+        ? `Added "${match.component.name}" for "${targetLabel}" to sequence ${revealStep}.`
+        : `Added "${match.component.name}" to sequence ${revealStep}.`,
     );
+  };
+
+  const addAllMatchedComponentsToCurrentScene = () => {
+    if (!activeScene || filteredComponents.length === 0) {
+      return;
+    }
+
+    const firstRevealStep = getSceneSequenceCount(activeScene) + 1;
+    const elements = filteredComponents
+      .map((match, index) => createSceneElementFromMatch(match, firstRevealStep + index))
+      .filter((element): element is SceneElement => Boolean(element));
+
+    if (elements.length === 0) {
+      return;
+    }
+
+    elements.forEach((element) => {
+      dispatch({
+        type: 'ADD_ELEMENT',
+        payload: element,
+      });
+    });
+
+    const lastRevealStep = firstRevealStep + elements.length - 1;
+    setNotice(
+      `Added ${elements.length} component${elements.length === 1 ? '' : 's'} to sequences ${firstRevealStep}-${lastRevealStep}.`,
+    );
+  };
+
+  const createNewScene = () => {
+    const targetLabel = getTargetLabel();
+    const sceneName = targetLabel
+      ? `Script: ${targetLabel.slice(0, 36)}`
+      : `Script Matches ${project.scenes.length + 1}`;
+
+    dispatch({
+      type: 'ADD_SCENE',
+      payload: {
+        id: generateId(),
+        name: sceneName,
+        elements: [],
+        sequenceCount: 1,
+      },
+    });
+
+    setNotice(`Created "${sceneName}". Use Add or Add All to place components.`);
   };
 
   return (
@@ -478,16 +580,35 @@ export function ScriptComponentMatcher({
                   {filteredComponents.length}/{allComponents.length} available
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => addMatchedComponentToScene(selectedMatchedComponent)}
-                disabled={!selectedMatchedComponent}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-[#4f46e5] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50"
-                title="Add selected component to scene"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add
-              </button>
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => addMatchedComponentToCurrentScene(selectedMatchedComponent)}
+                  disabled={!selectedMatchedComponent}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-[#4f46e5] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#4338ca] disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Add selected component to the current scene after the last sequence"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </button>
+                <button
+                  type="button"
+                  onClick={addAllMatchedComponentsToCurrentScene}
+                  disabled={filteredComponents.length === 0}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-slate-900 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Add all matched components to the current scene as new sequences"
+                >
+                  Add All
+                </button>
+                <button
+                  type="button"
+                  onClick={createNewScene}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm border border-[#c7d2fe] bg-[#eef2ff] px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-[#4338ca] transition-colors hover:bg-[#e0e7ff] disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Create an empty scene for these script matches"
+                >
+                  Create New Scene
+                </button>
+              </div>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
@@ -503,7 +624,7 @@ export function ScriptComponentMatcher({
                         key={component.id}
                         type="button"
                         onClick={() => setSelectedComponentId(component.id)}
-                        onDoubleClick={() => addMatchedComponentToScene(match)}
+                        onDoubleClick={() => addMatchedComponentToCurrentScene(match)}
                         className={`w-full rounded-sm border p-3 text-left transition-colors ${
                           isSelected
                             ? 'border-[#4f46e5] bg-[#eef2ff]'
