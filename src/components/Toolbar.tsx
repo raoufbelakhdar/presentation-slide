@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../AppContext';
-import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2, Home } from 'lucide-react';
+import { Play, Save, FolderOpen, Plus, Copy, Trash2, Download, Undo2, Redo2, Home, Target } from 'lucide-react';
 import { buildExportableProject, exportProject, generateId, mergeAssetLibraries, readTextFile } from '../utils';
+import { ScriptComponentMatcher } from './ScriptComponentMatcher';
 
 export function Toolbar() {
   const { state, dispatch, canUndo, canRedo } = useAppContext();
   const { project, activeSceneIndex, mode } = state;
   const availableAssets = mergeAssetLibraries(project.assets, state.sharedAssets);
+  const [isScriptMatcherOpen, setIsScriptMatcherOpen] = useState(false);
 
   const handleNewScene = () => {
     dispatch({
@@ -40,6 +42,7 @@ export function Toolbar() {
   }
 
   return (
+    <>
     <div className="flex items-center justify-between h-14 bg-white border-b border-[#e2e8f0] px-6 shadow-sm shrink-0 z-30">
       <div className="flex items-center gap-2">
         <button onClick={() => dispatch({ type: 'SET_SCREEN', payload: 'projects' })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Project Library">
@@ -75,6 +78,10 @@ export function Toolbar() {
         <button onClick={handleNewScene} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="New Scene">
           <Plus className="w-4 h-4" />
           <span className="hidden sm:inline">New Scene</span>
+        </button>
+        <button onClick={() => setIsScriptMatcherOpen(true)} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Match script words to saved components">
+          <Target className="w-4 h-4" />
+          <span className="hidden sm:inline">Script Match</span>
         </button>
         <button onClick={() => dispatch({ type: 'DUPLICATE_SCENE', payload: activeSceneIndex })} className="px-3 py-1.5 text-xs font-semibold hover:bg-slate-50 transition-colors border border-transparent hover:border-[#cbd5e1] rounded-sm flex items-center gap-1.5" title="Duplicate Scene">
           <Copy className="w-4 h-4" />
@@ -131,5 +138,10 @@ export function Toolbar() {
         </button>
       </div>
     </div>
+    <ScriptComponentMatcher
+      open={isScriptMatcherOpen}
+      onClose={() => setIsScriptMatcherOpen(false)}
+    />
+    </>
   );
 }
