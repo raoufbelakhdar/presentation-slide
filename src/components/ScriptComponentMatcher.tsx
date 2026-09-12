@@ -38,10 +38,16 @@ type PlacementSide = 'left' | 'right';
 type PlacementFlow = 'vertical' | 'horizontal';
 
 const CANVAS_WIDTH = 1920;
-const PLACEMENT_MARGIN = 20;
+const DEFAULT_SIDE_MARGIN = 150;
+const DEFAULT_TOP_MARGIN = 150;
+const DEFAULT_PLACEMENT_GAP = 50;
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
+}
+
+function toLayoutNumber(value: string) {
+  return Math.max(0, Math.round(Number(value) || 0));
 }
 
 function normalizeSearchText(value: string) {
@@ -213,10 +219,10 @@ function getPreviewIcon(component: SavedComponent) {
   return Target;
 }
 
-function getPlacementOffset(elements: SceneElement[], flow: PlacementFlow) {
+function getPlacementOffset(elements: SceneElement[], flow: PlacementFlow, gap: number) {
   return elements.reduce((offset, element) => {
     const size = flow === 'vertical' ? element.height : element.width;
-    return offset + Math.max(1, Math.round(size)) + PLACEMENT_MARGIN;
+    return offset + Math.max(1, Math.round(size)) + gap;
   }, 0);
 }
 
@@ -225,25 +231,28 @@ function getPlacementPosition(
   precedingElements: SceneElement[],
   side: PlacementSide,
   flow: PlacementFlow,
+  sideMargin: number,
+  topMargin: number,
+  gap: number,
 ) {
   const width = Math.max(1, Math.round(element.width));
-  const offset = getPlacementOffset(precedingElements, flow);
-  const maxX = Math.max(PLACEMENT_MARGIN, CANVAS_WIDTH - width - PLACEMENT_MARGIN);
+  const offset = getPlacementOffset(precedingElements, flow, gap);
+  const maxX = Math.max(sideMargin, CANVAS_WIDTH - width - sideMargin);
 
   if (flow === 'vertical') {
     return {
-      x: side === 'left' ? PLACEMENT_MARGIN : maxX,
-      y: PLACEMENT_MARGIN + offset,
+      x: side === 'left' ? sideMargin : maxX,
+      y: topMargin + offset,
     };
   }
 
   const x = side === 'left'
-    ? PLACEMENT_MARGIN + offset
-    : CANVAS_WIDTH - width - PLACEMENT_MARGIN - offset;
+    ? sideMargin + offset
+    : CANVAS_WIDTH - width - sideMargin - offset;
 
   return {
-    x: clamp(x, PLACEMENT_MARGIN, maxX),
-    y: PLACEMENT_MARGIN,
+    x: clamp(x, sideMargin, maxX),
+    y: topMargin,
   };
 }
 
@@ -337,6 +346,9 @@ export function ScriptComponentMatcher({
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [placementSide, setPlacementSide] = useState<PlacementSide>('left');
   const [placementFlow, setPlacementFlow] = useState<PlacementFlow>('vertical');
+  const [placementSideMargin, setPlacementSideMargin] = useState(DEFAULT_SIDE_MARGIN);
+  const [placementTopMargin, setPlacementTopMargin] = useState(DEFAULT_TOP_MARGIN);
+  const [placementGap, setPlacementGap] = useState(DEFAULT_PLACEMENT_GAP);
   const [notice, setNotice] = useState('');
 
   const tokens = useMemo(() => tokenizeScriptLine(scriptLine), [scriptLine]);
@@ -391,6 +403,9 @@ export function ScriptComponentMatcher({
       precedingElements,
       placementSide,
       placementFlow,
+      placementSideMargin,
+      placementTopMargin,
+      placementGap,
     );
     if (nextElement.type === 'image') {
       let assetId = nextElement.assetId;
@@ -679,71 +694,114 @@ export function ScriptComponentMatcher({
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-2">
-              <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                Layout
+            <div className="border-b border-[#e2e8f0] bg-[#f8fafc] px-5 py-2">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                  Layout
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
+                    <button
+                      type="button"
+                      aria-label="Place components from the left"
+                      aria-pressed={placementSide === 'left'}
+                      title="Place from left"
+                      onClick={() => setPlacementSide('left')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                        placementSide === 'left'
+                          ? 'bg-[#eef2ff] text-[#4f46e5]'
+                          : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                      }`}
+                    >
+                      <PanelLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Place components from the right"
+                      aria-pressed={placementSide === 'right'}
+                      title="Place from right"
+                      onClick={() => setPlacementSide('right')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                        placementSide === 'right'
+                          ? 'bg-[#eef2ff] text-[#4f46e5]'
+                          : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                      }`}
+                    >
+                      <PanelRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
+                    <button
+                      type="button"
+                      aria-label="Stack components vertically"
+                      aria-pressed={placementFlow === 'vertical'}
+                      title="Vertical layout"
+                      onClick={() => setPlacementFlow('vertical')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                        placementFlow === 'vertical'
+                          ? 'bg-[#eef2ff] text-[#4f46e5]'
+                          : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                      }`}
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Place components horizontally"
+                      aria-pressed={placementFlow === 'horizontal'}
+                      title="Horizontal layout"
+                      onClick={() => setPlacementFlow('horizontal')}
+                      className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
+                        placementFlow === 'horizontal'
+                          ? 'bg-[#eef2ff] text-[#4f46e5]'
+                          : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
+                      }`}
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
-                  <button
-                    type="button"
-                    aria-label="Place components from the left"
-                    aria-pressed={placementSide === 'left'}
-                    title="Place from left"
-                    onClick={() => setPlacementSide('left')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
-                      placementSide === 'left'
-                        ? 'bg-[#eef2ff] text-[#4f46e5]'
-                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
-                    }`}
-                  >
-                    <PanelLeft className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Place components from the right"
-                    aria-pressed={placementSide === 'right'}
-                    title="Place from right"
-                    onClick={() => setPlacementSide('right')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
-                      placementSide === 'right'
-                        ? 'bg-[#eef2ff] text-[#4f46e5]'
-                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
-                    }`}
-                  >
-                    <PanelRight className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="flex rounded-sm border border-[#dbe4f0] bg-white p-0.5">
-                  <button
-                    type="button"
-                    aria-label="Stack components vertically"
-                    aria-pressed={placementFlow === 'vertical'}
-                    title="Vertical layout"
-                    onClick={() => setPlacementFlow('vertical')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
-                      placementFlow === 'vertical'
-                        ? 'bg-[#eef2ff] text-[#4f46e5]'
-                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
-                    }`}
-                  >
-                    <ArrowDown className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Place components horizontally"
-                    aria-pressed={placementFlow === 'horizontal'}
-                    title="Horizontal layout"
-                    onClick={() => setPlacementFlow('horizontal')}
-                    className={`flex h-8 w-8 items-center justify-center rounded-[2px] transition-colors ${
-                      placementFlow === 'horizontal'
-                        ? 'bg-[#eef2ff] text-[#4f46e5]'
-                        : 'text-slate-500 hover:bg-[#f1f5f9] hover:text-[#4f46e5]'
-                    }`}
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
-                </div>
+              <div className="grid grid-cols-3 gap-2">
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Side
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={placementSideMargin}
+                    onChange={(event) => setPlacementSideMargin(toLayoutNumber(event.target.value))}
+                    className="h-8 w-full rounded-sm border border-[#dbe4f0] bg-white px-2 text-xs font-semibold text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Top
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={placementTopMargin}
+                    onChange={(event) => setPlacementTopMargin(toLayoutNumber(event.target.value))}
+                    className="h-8 w-full rounded-sm border border-[#dbe4f0] bg-white px-2 text-xs font-semibold text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                  />
+                </label>
+                <label className="min-w-0">
+                  <span className="mb-1 block text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Gap
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={placementGap}
+                    onChange={(event) => setPlacementGap(toLayoutNumber(event.target.value))}
+                    className="h-8 w-full rounded-sm border border-[#dbe4f0] bg-white px-2 text-xs font-semibold text-[#0f172a] outline-none transition-colors focus:border-[#4f46e5]"
+                  />
+                </label>
               </div>
             </div>
 
