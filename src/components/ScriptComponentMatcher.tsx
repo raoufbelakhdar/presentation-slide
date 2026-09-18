@@ -515,6 +515,7 @@ export function ScriptComponentMatcher({
   const [selectedTokenIds, setSelectedTokenIds] = useState<string[]>([]);
   const [componentQuery, setComponentQuery] = useState('');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [selectedComponentIdsByTerm, setSelectedComponentIdsByTerm] = useState<Record<string, string>>({});
   const [placementSide, setPlacementSide] = useState<PlacementSide>('left');
   const [placementFlow, setPlacementFlow] = useState<PlacementFlow>('vertical');
   const [placementSideMargin, setPlacementSideMargin] = useState(DEFAULT_SIDE_MARGIN);
@@ -551,7 +552,7 @@ export function ScriptComponentMatcher({
       matchesAnySearchTerm(activeSearchTerms, getComponentSearchText(component)),
     )
     .slice(0, 40);
-  const orderedFilteredComponents = filteredComponents
+  const orderedMatchedOptions = filteredComponents
     .map((match, index) => {
       const searchText = getComponentSearchText(match.component);
       const termIndex = targetTerms.findIndex((term) => matchesSearchQuery(term, searchText));
@@ -559,11 +560,17 @@ export function ScriptComponentMatcher({
       return {
         match,
         index,
+        term: termIndex === -1 ? '' : targetTerms[termIndex],
         termIndex: termIndex === -1 ? Number.MAX_SAFE_INTEGER : termIndex,
       };
     })
-    .sort((first, second) => first.termIndex - second.termIndex || first.index - second.index)
-    .map(({ match }) => match);
+    .sort((first, second) => first.termIndex - second.termIndex || first.index - second.index);
+  const orderedFilteredComponents = orderedMatchedOptions.map(({ match }) => match);
+  const selectedFinalMatches = targetTerms.length > 0
+    ? orderedMatchedOptions
+        .filter(({ match, term }) => term && selectedComponentIdsByTerm[term] === match.component.id)
+        .map(({ match }) => match)
+    : orderedFilteredComponents;
   const missingTerms = targetTerms.filter(
     (term) =>
       !allComponents.some(({ component }) =>
@@ -586,6 +593,43 @@ export function ScriptComponentMatcher({
     allComponents.find(({ component }) => component.id === selectedComponentId) ||
     orderedFilteredComponents[0] ||
     null;
+  const targetTermsKey = targetTerms.join('\u0001');
+  const matchedOptionsKey = orderedMatchedOptions
+    .map(({ match, term }) => `${term}\u0001${match.component.id}`)
+    .join('\u0002');
+
+  useEffect(() => {
+    if (targetTerms.length === 0) {
+      setSelectedComponentIdsByTerm((current) =>
+        Object.keys(current).length === 0 ? current : {},
+      );
+      return;
+    }
+
+    setSelectedComponentIdsByTerm((current) => {
+      const next: Record<string, string> = {};
+
+      targetTerms.forEach((term) => {
+        const options = orderedMatchedOptions.filter((option) => option.term === term);
+        if (options.length === 0) return;
+
+        const currentId = current[term];
+        const currentStillAvailable = options.some(
+          ({ match }) => match.component.id === currentId,
+        );
+
+        next[term] = currentStillAvailable ? currentId : options[0].match.component.id;
+      });
+
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(next);
+      const changed =
+        currentKeys.length !== nextKeys.length ||
+        nextKeys.some((term) => current[term] !== next[term]);
+
+      return changed ? next : current;
+    });
+  }, [matchedOptionsKey, targetTermsKey]);
 
   useEffect(() => {
     if (!open || missingCreationMode !== 'image') {
@@ -669,6 +713,7 @@ export function ScriptComponentMatcher({
     setSelectedTokenIds(nextSelectedTokenIds);
     setComponentQuery(nextQuery);
     setSelectedComponentId(null);
+    setSelectedComponentIdsByTerm({});
     setMissingCreationMode(null);
     setNotice('');
   };
@@ -679,6 +724,14 @@ export function ScriptComponentMatcher({
       payload: component,
     });
     setSelectedComponentId(component.id);
+    setSelectedComponentIdsByTerm((current) =>
+      selectedMissingTerm
+        ? {
+            ...current,
+            [selectedMissingTerm]: component.id,
+          }
+        : current,
+    );
     setSelectedMissingTerm(null);
     setMissingCreationMode(null);
     setNotice(message);
@@ -831,7 +884,7 @@ export function ScriptComponentMatcher({
   };
 
   const addAllMatchedComponentsToCurrentScene = () => {
-    if (!activeScene || orderedFilteredComponents.length === 0) {
+    if (!activeScene || selectedFinalMatches.length === 0) {
       return;
     }
 
@@ -840,10 +893,10 @@ export function ScriptComponentMatcher({
     const elements: SceneElement[] = [];
     const axisSize = Math.max(
       1,
-      ...orderedFilteredComponents.map((match) => getMatchLayoutAxisSize(match, placementFlow)),
+      ...selectedFinalMatches.map((match) => getMatchLayoutAxisSize(match, placementFlow)),
     );
 
-    orderedFilteredComponents.forEach((match) => {
+    selectedFinalMatches.forEach((match) => {
       const element = createSceneElementFromMatch(
         match,
         firstRevealStep + elements.length,
@@ -943,6 +996,7 @@ export function ScriptComponentMatcher({
 	                  setSelectedTokenIds([]);
 	                  setComponentQuery('');
 	                  setSelectedComponentId(null);
+	                  setSelectedComponentIdsByTerm({});
 	                  setSelectedMissingTerm(null);
 	                  setMissingCreationMode(null);
 	                  setNotice('');
@@ -995,9 +1049,10 @@ export function ScriptComponentMatcher({
                 type="text"
                 value={componentQuery}
 	                onChange={(event) => {
-	                  setComponentQuery(event.target.value);
-	                  setSelectedComponentId(null);
-	                  setSelectedMissingTerm(null);
+		                  setComponentQuery(event.target.value);
+		                  setSelectedComponentId(null);
+		                  setSelectedComponentIdsByTerm({});
+		                  setSelectedMissingTerm(null);
 	                  setMissingCreationMode(null);
 	                }}
                 placeholder="Search saved/shared components..."
@@ -1018,9 +1073,9 @@ export function ScriptComponentMatcher({
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">
                   Component Matches
                 </div>
-                <div className="mt-1 text-[11px] font-semibold text-slate-500">
-                  {filteredComponents.length}/{allComponents.length} available
-                </div>
+	                <div className="mt-1 text-[11px] font-semibold text-slate-500">
+	                  {selectedFinalMatches.length}/{orderedFilteredComponents.length} selected
+	                </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <button
@@ -1036,7 +1091,7 @@ export function ScriptComponentMatcher({
                 <button
                   type="button"
                   onClick={addAllMatchedComponentsToCurrentScene}
-	                  disabled={orderedFilteredComponents.length === 0}
+	                  disabled={selectedFinalMatches.length === 0}
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-slate-900 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                   title="Add all matched components to the current scene as new sequences"
                 >
@@ -1364,29 +1419,63 @@ export function ScriptComponentMatcher({
             )}
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {orderedFilteredComponents.length > 0 ? (
+              {orderedMatchedOptions.length > 0 ? (
                 <div className="space-y-2">
-                  {orderedFilteredComponents.map((match) => {
+                  {orderedMatchedOptions.map(({ match, term }) => {
                     const { component, source } = match;
                     const isSelected = selectedMatchedComponent?.component.id === component.id;
+                    const isFinalSelected = Boolean(term) && selectedComponentIdsByTerm[term] === component.id;
                     const Icon = getPreviewIcon(component);
 
                     return (
-                      <button
-                        key={component.id}
-                        type="button"
+                      <div
+                        key={`${term || 'match'}-${component.id}`}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => setSelectedComponentId(component.id)}
                         onDoubleClick={() => addMatchedComponentToCurrentScene(match)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            setSelectedComponentId(component.id);
+                          }
+                        }}
                         className={`w-full rounded-sm border p-3 text-left transition-colors ${
-                          isSelected
+                          isFinalSelected
+                            ? 'border-emerald-300 bg-emerald-50'
+                            : isSelected
                             ? 'border-[#4f46e5] bg-[#eef2ff]'
                             : 'border-[#e2e8f0] bg-[#f8fafc] hover:border-[#a5b4fc] hover:bg-white'
                         }`}
                       >
                         <div className="flex items-start gap-3">
+                          {term && (
+                            <input
+                              type="checkbox"
+                              checked={isFinalSelected}
+                              onChange={() => {
+                                setSelectedComponentIdsByTerm((current) => {
+                                  if (current[term] === component.id) {
+                                    const { [term]: _removed, ...rest } = current;
+                                    return rest;
+                                  }
+
+                                  return {
+                                    ...current,
+                                    [term]: component.id,
+                                  };
+                                });
+                                setSelectedComponentId(component.id);
+                              }}
+                              onClick={(event) => event.stopPropagation()}
+                              className="mt-3 h-4 w-4 rounded border-[#cbd5e1] text-[#4f46e5] focus:ring-[#4f46e5]"
+                              aria-label={`Use ${component.name} for ${term}`}
+                            />
+                          )}
                           <div
                             className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-sm border ${
-                              isSelected
+                              isFinalSelected
+                                ? 'border-emerald-200 bg-white text-emerald-600'
+                                : isSelected
                                 ? 'border-[#c7d2fe] bg-white text-[#4f46e5]'
                                 : 'border-[#dbe4f0] bg-white text-slate-500'
                             }`}
@@ -1395,21 +1484,26 @@ export function ScriptComponentMatcher({
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="truncate text-xs font-bold text-[#0f172a]">
-                                {component.name}
-                              </div>
-                              {isSelected && (
-                                <Check className="h-3.5 w-3.5 shrink-0 text-[#4f46e5]" />
-                              )}
-                            </div>
+	                              <div className="truncate text-xs font-bold text-[#0f172a]">
+	                                {component.name}
+	                              </div>
+	                              {isFinalSelected && (
+	                                <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+	                              )}
+	                            </div>
                             <div className="mt-1 line-clamp-2 text-[11px] leading-snug text-slate-500">
                               {getComponentSummary(component)}
                             </div>
                             <div className="mt-2 flex items-center gap-2">
-                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                                {getComponentTypeLabel(component)}
-                              </span>
-                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
+	                              <span className="rounded-full bg-slate-100 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+	                                {getComponentTypeLabel(component)}
+	                              </span>
+                                {term && (
+                                  <span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                                    {term}
+                                  </span>
+                                )}
+	                              <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-bold uppercase tracking-[0.14em] ${
                                 source === 'shared'
                                   ? 'bg-[#eef2ff] text-[#4f46e5]'
                                   : 'bg-emerald-50 text-emerald-700'
@@ -1417,10 +1511,10 @@ export function ScriptComponentMatcher({
                                 {source === 'shared' && <Layers className="h-3 w-3" />}
                                 {source}
                               </span>
-                            </div>
-                          </div>
-                        </div>
-                      </button>
+	                            </div>
+	                          </div>
+	                        </div>
+	                      </div>
                     );
                   })}
                 </div>
